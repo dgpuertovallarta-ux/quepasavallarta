@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Variables de entorno reales que hay que configurar en el panel de Netlify
+# (Site settings → Environment variables) — nunca en este archivo ni en el
+# repositorio. Ver /docs/ARCHITECTURE.md §8 para el detalle de cada una:
+#   DATABASE_URL       — Postgres (Supabase/Neon), para persistir la ingesta
+#   ANTHROPIC_API_KEY  — activa la redacción con IA (editorialPrompt.ts)
