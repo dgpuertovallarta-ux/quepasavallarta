@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { NEWS, EXPLICA, EVENTS, BUSINESSES } from "@/lib/data";
-import { getPublishedArticles } from "@/lib/db/articles";
+import { getPublishedArticles, getPublishedExplainers } from "@/lib/db/articles";
 import { EventCard, NewsCard, SectionHead, DemoTag } from "@/components/cards";
 import HeroCarousel from "@/components/HeroCarousel";
 import EditorialLead from "@/components/EditorialLead";
@@ -44,7 +44,8 @@ export default async function HomePage() {
   // Empieza después de lo ya mostrado en "Lo más importante" (lead + secondary,
   // índices 0-5) para no repetir la misma noticia dos veces seguidas en la portada.
   const moreNews = sorted.slice(6, 30);
-  const explica = EXPLICA;
+  const realExplica = await getPublishedExplainers(10);
+  const explica = realExplica.length > 0 ? realExplica : EXPLICA.map((e) => ({ ...e, isDemo: true }));
   const events = EVENTS;
   const featuredBiz = BUSINESSES.filter((b) => b.featured).length;
 
@@ -129,7 +130,7 @@ export default async function HomePage() {
           <SectionHead
             title={
               <>
-                Explica — entendemos lo que importa <DemoTag />
+                Explica — entendemos lo que importa {realExplica.length === 0 && <DemoTag />}
               </>
             }
             linkHref="/explica"
@@ -146,7 +147,7 @@ export default async function HomePage() {
                 style={{ textDecoration: "none", color: "inherit", width: 340 }}
               >
                 <div className="card-media">
-                  <Image src={PHOTOS[e.image]} alt={e.title} fill sizes="340px" />
+                  <Image src={e.imageUrl || PHOTOS[e.image]} alt={e.title} fill sizes="340px" unoptimized={!!e.imageUrl} />
                   <span className="chip" style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}>Explica</span>
                 </div>
                 <div className="card-body">

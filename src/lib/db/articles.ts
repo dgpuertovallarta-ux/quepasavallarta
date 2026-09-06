@@ -1,5 +1,5 @@
 import { getPool, isDatabaseConfigured } from "./client";
-import type { NewsItem, Media } from "../data";
+import type { NewsItem, Media, ExplicaItem } from "../data";
 import type { PhotoKey } from "../photos";
 
 /**
@@ -124,7 +124,7 @@ const SELECT_BASE = `
   left join authors au on au.id = a.author_id
   left join story_sources ss on ss.story_id = a.story_id
   left join sources s on s.id = ss.source_id
-  where a.status = 'published'
+  where a.status = 'published' and a.is_explainer = false
 `;
 
 export async function getPublishedArticles(limit = 30): Promise<NewsItem[]> {
@@ -170,6 +170,91 @@ export async function getPublishedArticleBySlug(slug: string): Promise<NewsItem 
   return mapRowToNewsItem(res.rows[0]);
 }
 
+// ---------------------------------------------------------------------
+// VALLARTA EXPLICA — mismo pipeline y tabla, marcados is_explainer=true,
+// con una estructura más profunda (ver editorialPrompt.ts EXPLICA_SYSTEM_PROMPT).
+// ---------------------------------------------------------------------
+
+const EXPLICA_SELECT_BASE = SELECT_BASE.replace("a.is_explainer = false", "a.is_explainer = true");
+
+function sectionFrom(bodyParagraphs: string[], headerMatch: RegExp): string {
+  const idx = bodyParagraphs.findIndex((p) => p.startsWith("## ") && headerMatch.test(p.slice(3)));
+  if (idx === -1) return "";
+  const out: string[] = [];
+  for (let i = idx + 1; i < bodyParagraphs.length && !bodyParagraphs[i].startsWith("## "); i++) {
+    out.push(bodyParagraphs[i]);
+  }
+  return out.join(" ");
+}
+
+function mapRowToExplicaItem(row: ArticleRow): ExplicaItem {
+  const category = row.category_slug || "comunidad";
+  const paragraphs = (row.body || "").split("\n\n").filter(Boolean);
+  return {
+    slug: row.slug,
+    title: row.title,
+    dek: row.excerpt || "",
+    image: imageForCategory(category),
+    imageUrl: row.image_url || undefined,
+    imageCredit: row.image_credit || undefined,
+    publishedAt: row.published_at,
+    quePaso: sectionFrom(paragraphs, /QU[EÉ] PAS[OÓ]/i),
+    porQueImporta: sectionFrom(paragraphs, /POR QU[EÉ] IMPORTA/i),
+    queSabemos: sectionFrom(paragraphs, /^LO QUE SABEMOS$/i),
+    queNoSabemos: sectionFrom(paragraphs, /LO QUE NO SABEMOS/i),
+    contexto: sectionFrom(paragraphs, /^CONTEXTO$/i),
+    queSigue: sectionFrom(paragraphs, /QU[EÉ] SIGUE/i),
+    fuentes: row.source_url ? [{ label: row.source_name || "Fuente original", url: row.source_url }] : [],
+  };
+}
+
+export async function getPublishedExplainers(limit = 20): Promise<ExplicaItem[]> {
+  if (!isDatabaseConfigured()) return [];
+  const pool = getPool();
+  const res = await pool.query<ArticleRow>(
+    `${EXPLICA_SELECT_BASE} order by a.published_at desc nulls last limit $1`,
+    [limit]
+  );
+  const seen = new Set<string>();
+  const items: ExplicaItem[] = [];
+  for (const row of res.rows) {
+    if (seen.has(row.slug)) continue;
+    seen.add(row.slug);
+    items.push(mapRowToExplicaItem(row));
+  }
+  return items;
+}
+
+export async function getPublishedExplainerBySlug(slug: string): Promise<ExplicaItem | null> {
+  if (!isDatabaseConfigured()) return null;
+  const pool = getPool();
+  const res = await pool.query<ArticleRow>(`${EXPLICA_SELECT_BASE} and a.slug = $1 limit 1`, [slug]);
+  if (res.rows.length === 0) return null;
+  return mapRowToExplicaItem(res.rows[0]);
+}
+
+/** Evita generar un explicador para una Story que ya tiene uno. */
+export async function hasExplainerForStory(storyExternalKey: string): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  const pool = getPool();
+  const res = await pool.query(
+    `select 1 from articles a join stories s on s.id = a.story_id where s.external_key = $1 and a.is_explainer = true limit 1`,
+    [storyExternalKey]
+  );
+  return res.rows.length > 0;
+}
+
+/** Controla la cadencia (~4 al día) de "Vallarta Explica" — ver explicaPublish.ts. */
+export async function getLastExplainerPublishedAt(): Promise<Date | null> {
+  if (!isDatabaseConfigured()) return null;
+  const pool = getPool();
+  const res = await pool.query<{ published_at: string | null }>(
+    "select max(published_at) as published_at from articles where is_explainer = true"
+  );
+  const value = res.rows[0]?.published_at;
+  return value ? new Date(value) : null;
+}
+
 /** Para el flujo manual de publicación: recupera un link+nombre de fuente de una Story ya persistida, para poder extraer su foto real. */
 export async function getPrimarySourceForStory(storyExternalKey: string): Promise<{ url: string; sourceName: string } | null> {
   if (!isDatabaseConfigured()) return null;
@@ -211,6 +296,8 @@ export type PublishArticleInput = {
   imageUrl?: string;
   imageSourceUrl?: string;
   imageCredit?: string;
+  /** true para "Vallarta Explica" (ver explicaPublish.ts) — false (default) para noticia breve. */
+  isExplainer?: boolean;
 };
 
 /**
@@ -251,13 +338,14 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
     await client.query(
       `insert into articles (
          story_id, slug, title, excerpt, body, category_id, author_id, ai_generated, ai_model, status, news_score,
-         image_url, image_source_url, image_credit, image_license_status, image_extracted_at,
+         image_url, image_source_url, image_credit, image_license_status, image_extracted_at, is_explainer,
          discovered_at, drafted_at, published_at, updated_at
        )
-       values ($1,$2,$3,$4,$5,$6,$7,true,$8,'published',$9, $10,$11,$12,$13,$14, now(), now(), now(), now())`,
+       values ($1,$2,$3,$4,$5,$6,$7,true,$8,'published',$9, $10,$11,$12,$13,$14,$15, now(), now(), now(), now())`,
       [
         storyId, slug, input.title, input.excerpt, input.body, categoryId, authorId, input.aiModel, input.newsScore,
         input.imageUrl || null, input.imageSourceUrl || null, input.imageCredit || null, imageLicenseStatus, imageExtractedAt,
+        !!input.isExplainer,
       ]
     );
 

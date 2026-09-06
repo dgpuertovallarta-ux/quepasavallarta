@@ -22,8 +22,8 @@ export default async function AhoraPage() {
       </div>
       <h1 style={{ margin: "0 0 6px" }}>🟠 Vallarta Ahora</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
-        Dashboard en tiempo real de la ciudad. Clima y calidad del aire ya son datos reales (Open-Meteo,
-        sin costo). Tránsito, playas/oleaje, aeropuerto y cruceros siguen en <DemoTag /> porque requieren
+        Dashboard en tiempo real de la ciudad. Clima, calidad del aire y oleaje ya son datos reales
+        (Open-Meteo, sin costo). Tránsito, aeropuerto y cruceros siguen en <DemoTag /> porque requieren
         una API de pago o con registro (Google Maps, AviationStack, etc.) que el propietario tendría que
         contratar — ver <code>/docs/ARCHITECTURE.md</code>.
       </p>

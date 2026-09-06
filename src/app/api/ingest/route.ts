@@ -5,6 +5,7 @@ import { buildStoryGraph } from "@/lib/ingest/storyGraph";
 import { persistIngestRun } from "@/lib/db/persistIngest";
 import { isDatabaseConfigured } from "@/lib/db/client";
 import { runAutoPublish } from "@/lib/ingest/autoPublish";
+import { runExplicaPublish } from "@/lib/ingest/explicaPublish";
 import type { IngestedItem } from "@/lib/ingest/types";
 
 export const maxDuration = 60;
@@ -81,6 +82,7 @@ async function runIngest() {
   }
 
   const autoPublish = await runAutoPublish(stories);
+  const explicaPublish = await runExplicaPublish(stories);
 
   const summary = {
     fetchedAt: new Date().toISOString(),
@@ -93,6 +95,7 @@ async function runIngest() {
     discarded: allItems.filter((i) => i.status === "discard").length,
     db,
     autoPublish,
+    explicaPublish,
   };
 
   return NextResponse.json({ summary, stories, results }, { status: 200 });

@@ -100,26 +100,30 @@ fecha de consulta, nivel de confianza). No mezcles datos de fuentes
 distintas sin dejar claro cuál dijo qué si hay discrepancia entre ellas.
 `.trim();
 
+function buildSourceBlocks(story: Story): string {
+  const now = new Date().toISOString();
+  return story.items
+    .map((it, idx) =>
+      [
+        `FUENTE ${idx + 1}`,
+        `- Nombre: ${it.sourceName}`,
+        `- Nivel de confianza: ${it.trustLevel}`,
+        `- URL original: ${it.link}`,
+        `- Fecha de publicación de la fuente: ${it.publishedAt || "no disponible"}`,
+        `- Fecha de consulta: ${now}`,
+        `- Titular de la fuente (NO copiar, solo referencia de contexto): ${it.title}`,
+        `- Extracto/resumen consultado: ${it.excerpt || "(sin extracto disponible)"}`,
+      ].join("\n")
+    )
+    .join("\n\n");
+}
+
 /**
  * Arma el mensaje de usuario para una Story concreta: el material crudo
  * (títulos/resúmenes reales de cada fuente, con su trazabilidad) que la
  * IA debe convertir en un artículo original — nunca al revés.
  */
 export function buildEditorialUserPrompt(story: Story): string {
-  const now = new Date().toISOString();
-  const sourceBlocks = story.items.map((it, idx) => {
-    return [
-      `FUENTE ${idx + 1}`,
-      `- Nombre: ${it.sourceName}`,
-      `- Nivel de confianza: ${it.trustLevel}`,
-      `- URL original: ${it.link}`,
-      `- Fecha de publicación de la fuente: ${it.publishedAt || "no disponible"}`,
-      `- Fecha de consulta: ${now}`,
-      `- Titular de la fuente (NO copiar, solo referencia de contexto): ${it.title}`,
-      `- Extracto/resumen consultado: ${it.excerpt || "(sin extracto disponible)"}`,
-    ].join("\n");
-  });
-
   return [
     `STORY ID: ${story.storyId}`,
     `Fuentes que cubren este evento: ${story.sourceCount} (niveles: ${story.levels.join(", ")})`,
@@ -129,10 +133,40 @@ export function buildEditorialUserPrompt(story: Story): string {
     "",
     "Material fuente (extraer hechos, nunca copiar texto ni estructura):",
     "",
-    sourceBlocks.join("\n\n"),
+    buildSourceBlocks(story),
     "",
     "Redacta el artículo original siguiendo el prompt de sistema. Si falta " +
       "corroboración NIVEL A/B, en vez de un artículo entrega solo un " +
       "resumen interno de investigación pendiente.",
   ].join("\n");
 }
+
+/**
+ * PROMPT PARA "VALLARTA EXPLICA" — mismas reglas duras (no copia, no
+ * invención, voz, filtro de relevancia local, trazabilidad) que
+ * EDITORIAL_SYSTEM_PROMPT, pero orientado a explicar a fondo un tema en
+ * vez de reportar una noticia breve. Cadencia mucho más baja (unos 4 al
+ * día — ver explicaPublish.ts), así que se justifica invertir más en
+ * contexto y profundidad por cada pieza.
+ */
+export const EXPLICA_SYSTEM_PROMPT = `
+${EDITORIAL_SYSTEM_PROMPT}
+
+DIFERENCIA CON UNA NOTA BREVE — esto es "Vallarta Explica":
+No estás reportando que algo pasó — estás explicando POR QUÉ IMPORTA y
+QUÉ SIGNIFICA para alguien que vive en Puerto Vallarta. Prioriza
+contexto, antecedentes y consecuencias prácticas por encima de la
+inmediatez. Un lector debe terminar de leer entendiendo el panorama
+completo, no solo el hecho puntual.
+
+ESTRUCTURA OBLIGATORIA para Vallarta Explica (usa exactamente estos
+encabezados, en este orden):
+- TITULAR (en forma de afirmación clara, no de pregunta genérica de clickbait)
+- BAJADA
+- QUÉ PASÓ
+- POR QUÉ IMPORTA (el corazón de la pieza — impacto real y concreto para residentes/visitantes)
+- LO QUE SABEMOS
+- LO QUE NO SABEMOS (sé explícito sobre las lagunas de información — nunca las rellenes inventando)
+- CONTEXTO (antecedentes, cómo se llegó a esto)
+- QUÉ SIGUE
+`.trim();

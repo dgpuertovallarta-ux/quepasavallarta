@@ -58,6 +58,23 @@ export async function fetchCurrentWeather(): Promise<WeatherNow | null> {
   }
 }
 
+export type WaveNow = { heightM: number };
+
+export async function fetchCurrentWaveHeight(): Promise<WaveNow | null> {
+  try {
+    const res = await fetch(
+      `https://marine-api.open-meteo.com/v1/marine?latitude=${PV_LAT}&longitude=${PV_LON}&current=wave_height&timezone=America%2FMexico_City`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const height = data?.current?.wave_height;
+    if (typeof height !== "number") return null;
+    return { heightM: Math.round(height * 10) / 10 };
+  } catch {
+    return null;
+  }
+}
+
 export type AirQualityNow = { aqi: number; label: string };
 
 function aqiLabel(aqi: number): string {

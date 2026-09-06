@@ -285,6 +285,8 @@ export type ExplicaItem = {
   title: string;
   dek: string;
   image: PhotoKey;
+  imageUrl?: string;
+  imageCredit?: string;
   publishedAt: string;
   quePaso: string;
   porQueImporta: string;
@@ -293,6 +295,8 @@ export type ExplicaItem = {
   contexto: string;
   queSigue: string;
   fuentes: { label: string; url: string }[];
+  /** true solo para los explicadores de ejemplo de este archivo — nunca para los reales publicados desde la base de datos. */
+  isDemo?: boolean;
 };
 
 export const EXPLICA: ExplicaItem[] = [
