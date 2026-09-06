@@ -139,8 +139,12 @@ export async function Cola() {
         bajo un solo STORY ID en vez de generar un artículo por fuente (regla &ldquo;no copiamos lo que
         otros publican, investigamos lo que está pasando&rdquo; — ver{" "}
         <code>src/lib/ingest/storyGraph.ts</code> y <code>src/lib/ingest/editorialPrompt.ts</code>). Todo
-        lo que viene de fuentes NIVEL A (medios) pasa siempre a revisión humana; nada se copia ni se
-        publica automáticamente salvo NIVEL B (oficial) con score alto.
+        Desde que se activó la auto-publicación (decisión del propietario, 2026-09), las Stories NIVEL A o
+        B corroboradas y sin contenido sensible se publican solas cada 30 min ({" "}
+        <code>netlify/functions/scheduled-ingest.ts</code> → <code>autoPublish.ts</code>) — el botón de
+        abajo solo sirve para forzar la redacción/publicación de una Story ahora mismo, en vez de esperar
+        al siguiente ciclo. Contenido sensible (seguridad, salud, política, muertes) y fuentes NIVEL C/D
+        nunca se auto-publican, sin excepción.
       </p>
       {!isAiConfigured() && (
         <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
@@ -194,7 +198,7 @@ export async function Cola() {
                   ? "Sin corroborar (solo C/D)"
                   : story.needsReview
                   ? "Revisión humana"
-                  : "Publicable"}
+                  : "Se auto-publica sola (o ya se publicó)"}
               </td>
               <td>
                 <GenerateArticleButton

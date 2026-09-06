@@ -3,19 +3,15 @@ import type { Story } from "./storyGraph";
 /**
  * PROMPT EDITORIAL — la regla fundamental de contenido operacionalizada.
  * ------------------------------------------------------------------
- * Este archivo NO llama a ninguna IA todavía (no hay ANTHROPIC_API_KEY
- * conectada). Es el artefacto listo para conectar: en cuanto exista la
- * key, un futuro `generateArticle.ts` hace algo como:
- *
- *   const article = await anthropic.messages.create({
- *     model: "claude-...",
- *     system: EDITORIAL_SYSTEM_PROMPT,
- *     messages: [{ role: "user", content: buildEditorialUserPrompt(story) }],
- *   });
- *
- * y el editor humano revisa el resultado antes de publicar (regla dura:
- * "IA redacta, humano revisa" — nunca publicación 100% automática desde
- * fuentes NIVEL A/C/D).
+ * Este es el system prompt real que usa `generateArticle.ts` al llamar a
+ * la API de Claude (con ANTHROPIC_API_KEY configurada). Dos caminos lo
+ * consumen:
+ *   1. Manual: el botón "Generar borrador (IA)" en /admin — el humano
+ *      revisa/edita antes de publicar ("IA redacta, humano revisa").
+ *   2. Automático: `autoPublish.ts`, para Stories NIVEL A/B corroboradas
+ *      y no sensibles (decisión del propietario, 2026-09) — se publica
+ *      sin que nadie lo revise antes. NIVEL C/D y contenido sensible
+ *      NUNCA pasan por este camino, en ningún caso.
  *
  * Todo el contenido de abajo viene directo de las reglas que dio el
  * propietario del sitio. No se trata como una simple guía de estilo:

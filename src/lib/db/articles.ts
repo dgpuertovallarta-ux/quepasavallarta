@@ -165,6 +165,17 @@ export async function getPublishedArticleBySlug(slug: string): Promise<NewsItem 
   return mapRowToNewsItem(res.rows[0]);
 }
 
+/** Evita republicar la misma Story en cada corrida del cron (cada 30 min). */
+export async function hasPublishedArticleForStory(storyExternalKey: string): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  const pool = getPool();
+  const res = await pool.query(
+    `select 1 from articles a join stories s on s.id = a.story_id where s.external_key = $1 limit 1`,
+    [storyExternalKey]
+  );
+  return res.rows.length > 0;
+}
+
 export type PublishArticleInput = {
   title: string;
   excerpt: string;

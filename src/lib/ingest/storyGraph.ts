@@ -82,6 +82,17 @@ function slugify(text: string): string {
 }
 
 /**
+ * Elegible para auto-publicación real (decisión explícita del propietario,
+ * 2026-09): requiere corroboración NIVEL A o B Y que ningún ítem de la
+ * story haya quedado en needs_review (eso ya descarta contenido sensible
+ * y fuentes NIVEL C/D — ver decideStatus en classify.ts). Nunca se
+ * relaja para contenido sensible ni para NIVEL C/D, pase lo que pase.
+ */
+export function isAutoPublishEligible(story: Story): boolean {
+  return story.hasCorroboration && !story.needsReview;
+}
+
+/**
  * Agrupa una lista de IngestedItem (de cualquier número de fuentes) en
  * Stories. Unión por similitud de título+resumen y cercanía temporal —
  * union-find clásico sobre pares similares.

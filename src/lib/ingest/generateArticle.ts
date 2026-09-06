@@ -61,3 +61,16 @@ export async function generateArticleDraft(story: Story): Promise<GeneratedArtic
 
   return { storyId: story.storyId, model: MODEL, draft, generatedAt: new Date().toISOString() };
 }
+
+/** Extrae el titular de un draft generado (primera línea, quita **TITULAR:** si viene marcado así). */
+export function extractTitleFromDraft(draft: string): string {
+  const firstLine = draft.split("\n").find((l) => l.trim().length > 0) || "";
+  return firstLine.replace(/\*\*/g, "").replace(/^TITULAR:?\s*/i, "").trim();
+}
+
+/** Extrae la bajada de un draft generado (línea que empieza con BAJADA, si existe). */
+export function extractExcerptFromDraft(draft: string): string {
+  const line = draft.split("\n").find((l) => /^\**BAJADA/i.test(l.trim()));
+  if (!line) return "";
+  return line.replace(/\*\*/g, "").replace(/^BAJADA:?\s*/i, "").trim();
+}

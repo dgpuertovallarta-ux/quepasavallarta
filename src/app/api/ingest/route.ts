@@ -4,22 +4,26 @@ import { fetchSource } from "@/lib/ingest/fetchSource";
 import { buildStoryGraph } from "@/lib/ingest/storyGraph";
 import { persistIngestRun } from "@/lib/db/persistIngest";
 import { isDatabaseConfigured } from "@/lib/db/client";
+import { runAutoPublish } from "@/lib/ingest/autoPublish";
 import type { IngestedItem } from "@/lib/ingest/types";
 
+export const maxDuration = 60;
+
 /**
- * Endpoint REAL de ingesta — no es un mock. Al llamarlo, descarga en
- * vivo los feeds RSS reales registrados en /src/lib/ingest/sources.ts,
- * los normaliza y calcula su News Score real.
+ * Endpoint REAL de ingesta — no es un mock. Descarga en vivo los feeds
+ * RSS reales registrados en /src/lib/ingest/sources.ts, los normaliza,
+ * agrupa en Stories (Story Graph) y calcula su News Score real. Persiste
+ * el resultado en Postgres si DATABASE_URL está configurada.
  *
- * Todavía NO escribe en una base de datos (no hay una conectada aún —
- * ver /docs/ARCHITECTURE.md). Por ahora devuelve el resultado en la
- * respuesta para poder probar el pipeline de punta a punta con datos
- * reales. En cuanto exista Postgres (Supabase/Neon), este endpoint
- * pasa a hacer INSERT en `stories`/`articles` en vez de solo responder.
+ * Además, dispara la auto-publicación real (runAutoPublish): decisión
+ * explícita del propietario (2026-09) de que las Stories NIVEL A/B con
+ * corroboración, sin contenido sensible y con score alto se publiquen
+ * solas, sin revisión humana — ver /lib/ingest/autoPublish.ts. Contenido
+ * sensible y fuentes NIVEL C/D nunca se auto-publican, sin excepción.
  *
  * Probarlo: GET /api/ingest
- * En producción, este endpoint se llama automáticamente por cron
- * (Netlify Scheduled Functions o similar) — ver /docs/N8N_AUTOMATION.md.
+ * En producción, este endpoint se llama automáticamente cada 30 min por
+ * netlify/functions/scheduled-ingest.ts — ver /docs/N8N_AUTOMATION.md.
  */
 export async function GET() {
   const results: { sourceId: string; ok: boolean; items?: IngestedItem[]; error?: string }[] = [];
@@ -60,6 +64,8 @@ export async function GET() {
     }
   }
 
+  const autoPublish = await runAutoPublish(stories);
+
   const summary = {
     fetchedAt: new Date().toISOString(),
     sourcesQueried: SOURCES.length,
@@ -70,6 +76,7 @@ export async function GET() {
     needsReview: allItems.filter((i) => i.status === "needs_review").length,
     discarded: allItems.filter((i) => i.status === "discard").length,
     db,
+    autoPublish,
   };
 
   return NextResponse.json({ summary, stories, results }, { status: 200 });

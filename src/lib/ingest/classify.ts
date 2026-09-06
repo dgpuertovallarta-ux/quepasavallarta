@@ -106,16 +106,20 @@ export function decideStatus(params: {
   const { sensitive, category } = isSensitive(`${title} ${excerpt}`);
 
   if (sensitive) {
-    return { status: "needs_review", reason: `Categoría sensible detectada (${category}) — requiere revisión humana sin importar el score.` };
+    return { status: "needs_review", reason: `Categoría sensible detectada (${category}) — requiere revisión humana sin importar el score ni el nivel de la fuente.` };
   }
-  if (source.trustLevel >= 3) {
-    return { status: "needs_review", reason: "Fuente no oficial (medio de terceros) — redacción y publicación siempre requieren revisión humana." };
+  if (source.level === "C" || source.level === "D") {
+    return { status: "needs_review", reason: "Fuente NIVEL C/D (comunicador individual o comunidad/redes) — solo detección, nunca se confirma ni se publica sin corroborar con NIVEL A o B." };
   }
   if (score < 60) {
     return { status: "discard", reason: `News Score ${score} < 60 — no se publica.` };
   }
-  if (score >= 80 && source.trustLevel === 1) {
-    return { status: "auto_publishable", reason: `News Score ${score} y fuente oficial — cumple el umbral de publicación automática.` };
+  // Decisión explícita del propietario (2026-09): además de NIVEL B (oficial),
+  // NIVEL A (medios periodísticos reales) con score alto también puede
+  // auto-publicarse — antes solo NIVEL B podía. Sigue sin aplicar a
+  // contenido sensible (regla de arriba) ni a NIVEL C/D.
+  if (score >= 80 && (source.level === "A" || source.level === "B")) {
+    return { status: "auto_publishable", reason: `News Score ${score} y fuente NIVEL ${source.level} — cumple el umbral de publicación automática.` };
   }
-  return { status: "needs_review", reason: `News Score ${score} en rango de revisión (60-79) o fuente no oficial.` };
+  return { status: "needs_review", reason: `News Score ${score} en rango de revisión (60-79).` };
 }

@@ -4,13 +4,18 @@
  * Modelo de 4 niveles de confianza (tal como lo definió el propietario):
  *
  *   NIVEL A — Medios periodísticos locales (portales de noticias reales,
- *             con RSS verificable). Señal de descubrimiento fuerte, pero
- *             NUNCA se copia su texto ni su fotografía. Siempre revisión
- *             humana antes de publicar.
+ *             con RSS verificable). Señal de descubrimiento fuerte. NUNCA
+ *             se copia su texto ni su fotografía — la redacción siempre
+ *             es propia y original (editorialPrompt.ts). Desde 2026-09,
+ *             por decisión explícita del propietario, SÍ puede
+ *             auto-publicarse (sin revisión humana previa) cuando hay
+ *             corroboración y no es contenido sensible — ver
+ *             autoPublish.ts. Antes de esa fecha requería siempre
+ *             revisión humana; ver historial de N8N_AUTOMATION.md.
  *   NIVEL B — Cuentas oficiales (ayuntamiento, protección civil, policía,
- *             gobierno del estado, dependencias). La fuente más confiable:
- *             es la única que puede llegar a auto-publicarse y a que se
- *             extraiga su fotografía oficial (con crédito).
+ *             gobierno del estado, dependencias). Además de auto-publicarse,
+ *             es la única que puede llegar a que se extraiga su
+ *             fotografía oficial (con crédito).
  *   NIVEL C — Comunicadores/reporteros individuales (periodistas con
  *             cuenta propia, sin medio detrás). Solo DETECCIÓN — nunca se
  *             confirma un hecho solo porque lo dijeron; hay que
@@ -23,12 +28,15 @@
  * (ver classify.ts): 1 = NIVEL B oficial, 3 = NIVEL A medio local,
  * 4 = NIVEL C comunicador individual, 5 = NIVEL D comunidad/redes.
  *
- * REGLA DURA: solo NIVEL B (trust_level 1) puede pasar por publicación
- * 100% automática y extracción automática de imagen. Todo lo demás
- * SIEMPRE requiere:
+ * REGLA DURA (vigente): NIVEL A y B pueden auto-publicarse cuando hay
+ * corroboración y el contenido no es sensible (ver decideStatus en
+ * classify.ts e isAutoPublishEligible en storyGraph.ts). Lo que NUNCA se
+ * relaja, para ningún nivel:
  *   - redacción propia y original (nunca copiar el texto de la fuente)
- *   - revisión humana antes de publicar
- *   - nunca usar su fotografía sin permiso explícito
+ *   - nunca usar la fotografía de un tercero sin permiso explícito
+ *   - contenido sensible (seguridad, salud, política, muertes, personas
+ *     desaparecidas) siempre requiere revisión humana, sin importar nivel o score
+ *   - NIVEL C y D nunca se auto-publican ni se tratan como hecho confirmado
  * NIVEL C y D además tienen `autoDetectOnly: true`: el pipeline los usa
  * solo para detectar que algo está pasando, nunca para redactar un hecho
  * como confirmado — ver /docs/N8N_AUTOMATION.md, sección "Regla
