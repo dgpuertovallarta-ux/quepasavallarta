@@ -110,13 +110,8 @@ export default function Header({ hasRealContent = false }: { hasRealContent?: bo
         <div className="container">
           <div className="header-main">
             <Link href="/" className="brand" style={{ textDecoration: "none" }}>
-              <span className="brand-mark">QPV</span>
-              <span>
-                <span className="brand-name" style={{ display: "block" }}>
-                  Qué Pasa <span>Vallarta</span>
-                </span>
-                <span className="brand-tag">{SITE.tagline}</span>
-              </span>
+              <img src="/brand/logo.png" alt="Qué Pasa Vallarta" className="brand-logo" />
+              <span className="brand-tag">{SITE.tagline}</span>
             </Link>
             <nav className={`main-nav${navOpen ? " open" : ""}`} aria-label="Navegación principal">
               {NAV.map((n) => (

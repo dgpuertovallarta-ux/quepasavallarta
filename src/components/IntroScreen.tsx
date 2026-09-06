@@ -36,7 +36,7 @@ export default function IntroScreen() {
     setReduced(prefersReduced);
     setVisible(true);
 
-    const t = setTimeout(finish, prefersReduced ? 900 : 4200);
+    const t = setTimeout(finish, prefersReduced ? 900 : 5000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -50,11 +50,19 @@ export default function IntroScreen() {
 
   return (
     <div id="intro-screen" className={fadeOut ? "fade-out" : ""} role="presentation">
-      <div className="intro-waves">
-        <div className="intro-wave" />
-      </div>
-      <div className="intro-mark">QPV</div>
-      <div className="intro-name">{SITE.name}</div>
+      {!reduced && (
+        <video
+          className="intro-video"
+          src="/media/intro-vallarta.mp4"
+          poster="/media/intro-poster.jpg"
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+        />
+      )}
+      <div className="intro-scrim" />
+      <img className="intro-logo" src="/brand/logo-transparent.png" alt={SITE.name} />
       <div className="intro-tag">{SITE.tagline}</div>
       <button className="intro-skip" type="button" onClick={finish}>
         Saltar →

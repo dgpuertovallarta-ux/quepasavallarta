@@ -14,9 +14,11 @@ export default function Footer({ hasRealContent = false }: { hasRealContent?: bo
       <div className="container">
         <div className="footer-grid">
           <div className="footer-col">
-            <h4 style={{ fontSize: 16, color: "var(--text)", marginBottom: 8 }}>
-              Qué Pasa <span style={{ color: "var(--accent)" }}>Vallarta</span>
-            </h4>
+            <img
+              src="/brand/logo-transparent.png"
+              alt="Qué Pasa Vallarta"
+              style={{ height: 56, width: "auto", marginBottom: 10 }}
+            />
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", maxWidth: 280, marginBottom: 14 }}>
               Información clara, útil y confiable para vivir y entender lo que pasa en Puerto Vallarta y el
               municipio.
