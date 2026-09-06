@@ -5,7 +5,7 @@ import { getPublishedArticles } from "@/lib/db/articles";
 import { EventCard, SectionHead, DemoTag } from "@/components/cards";
 import HeroCarousel from "@/components/HeroCarousel";
 import EditorialLead from "@/components/EditorialLead";
-import LatestList from "@/components/LatestList";
+import CategoryTabs from "@/components/CategoryTabs";
 import LiveFeed from "@/components/LiveFeed";
 import CarouselRow from "@/components/CarouselRow";
 import Reveal from "@/components/Reveal";
@@ -40,7 +40,7 @@ export default async function HomePage() {
   const heroItems = sorted.slice(0, 5);
   const lead = sorted[0];
   const secondary = sorted.slice(1, 4);
-  const latest = sorted.slice(0, 6);
+  const latest = sorted.slice(0, 20);
   const explica = EXPLICA;
   const events = EVENTS;
   const featuredBiz = BUSINESSES.filter((b) => b.featured).length;
@@ -84,7 +84,7 @@ export default async function HomePage() {
               <strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text-muted)" }}>
                 Lo último
               </strong>
-              <LatestList items={latest} />
+              <CategoryTabs items={latest} />
             </div>
           </Reveal>
         </div>
