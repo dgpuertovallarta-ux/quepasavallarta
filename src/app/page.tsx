@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { NEWS, EXPLICA, EVENTS, BUSINESSES } from "@/lib/data";
 import { getPublishedArticles } from "@/lib/db/articles";
-import { EventCard, SectionHead, DemoTag } from "@/components/cards";
+import { EventCard, NewsCard, SectionHead, DemoTag } from "@/components/cards";
 import HeroCarousel from "@/components/HeroCarousel";
 import EditorialLead from "@/components/EditorialLead";
 import CategoryTabs from "@/components/CategoryTabs";
@@ -41,6 +41,7 @@ export default async function HomePage() {
   const lead = sorted[0];
   const secondary = sorted.slice(1, 4);
   const latest = sorted.slice(0, 20);
+  const moreNews = sorted.slice(0, 24);
   const explica = EXPLICA;
   const events = EVENTS;
   const featuredBiz = BUSINESSES.filter((b) => b.featured).length;
@@ -87,6 +88,19 @@ export default async function HomePage() {
               <CategoryTabs items={latest} />
             </div>
           </Reveal>
+        </div>
+      </div>
+
+      <div className="container section" style={{ borderTop: "1px solid var(--border)" }}>
+        <Reveal>
+          <SectionHead title="Más noticias" sub="Todo lo que está pasando en Puerto Vallarta" linkHref="/categoria/ultima-hora" linkLabel="Ver todas →" />
+        </Reveal>
+        <div className="grid grid-4">
+          {moreNews.map((n, i) => (
+            <Reveal key={n.slug} delay={Math.min(i, 8) * 30}>
+              <NewsCard n={n} compact />
+            </Reveal>
+          ))}
         </div>
       </div>
 
