@@ -83,13 +83,19 @@ function slugify(text: string): string {
 
 /**
  * Elegible para auto-publicación real (decisión explícita del propietario,
- * 2026-09): requiere corroboración NIVEL A o B Y que ningún ítem de la
- * story haya quedado en needs_review (eso ya descarta contenido sensible
- * y fuentes NIVEL C/D — ver decideStatus en classify.ts). Nunca se
- * relaja para contenido sensible ni para NIVEL C/D, pase lo que pase.
+ * 2026-09): requiere corroboración NIVEL A o B Y que al menos un ítem haya
+ * quedado explícitamente como "auto_publishable" (score >= 80, no
+ * sensible, no NIVEL C/D — ver decideStatus en classify.ts).
+ *
+ * BUG REAL ya corregido: antes esto solo revisaba "ningún ítem en
+ * needs_review", lo cual también dejaba pasar historias en estado
+ * "discard" (score < 60) — con el tiempo, agotadas las historias con
+ * buen puntaje, el pipeline habría empezado a auto-publicar notas de
+ * bajísima calidad o sin relevancia local real. Ahora exige el estado
+ * correcto explícitamente.
  */
 export function isAutoPublishEligible(story: Story): boolean {
-  return story.hasCorroboration && !story.needsReview;
+  return story.hasCorroboration && story.items.some((it) => it.status === "auto_publishable");
 }
 
 /**

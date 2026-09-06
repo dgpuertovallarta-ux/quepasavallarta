@@ -2,7 +2,7 @@ import { BUSINESSES } from "@/lib/data";
 import { scoreClass } from "@/lib/format";
 import { SOURCES } from "@/lib/ingest/sources";
 import { fetchSource } from "@/lib/ingest/fetchSource";
-import { buildStoryGraph } from "@/lib/ingest/storyGraph";
+import { buildStoryGraph, isAutoPublishEligible } from "@/lib/ingest/storyGraph";
 import { isAiConfigured } from "@/lib/ingest/generateArticle";
 import GenerateArticleButton from "./GenerateArticleButton";
 import type { IngestedItem } from "@/lib/ingest/types";
@@ -196,9 +196,9 @@ export async function Cola() {
               <td title={story.items[0].statusReason}>
                 {!story.hasCorroboration
                   ? "Sin corroborar (solo C/D)"
-                  : story.needsReview
-                  ? "Revisión humana"
-                  : "Se auto-publica sola (o ya se publicó)"}
+                  : isAutoPublishEligible(story)
+                  ? "Se auto-publica sola (o ya se publicó)"
+                  : "Revisión humana"}
               </td>
               <td>
                 <GenerateArticleButton
