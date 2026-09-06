@@ -830,7 +830,7 @@ table.data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border);
 /* ---------- Editorial lead + secundarias ---------- */
 .lead-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 22px; align-items: stretch; }
 @media (max-width: 960px) { .lead-grid { grid-template-columns: 1fr; } }
-.lead-secondary { display: flex; flex-direction: column; gap: 16px; }
+.lead-secondary { display: flex; flex-direction: column; gap: 14px; }
 .lead-secondary-item { display: flex; gap: 12px; }
 .lead-secondary-thumb { width: 100px; height: 76px; border-radius: 10px; flex-shrink: 0; position: relative; overflow: hidden; }
 .lead-secondary-thumb img { object-fit: cover; }

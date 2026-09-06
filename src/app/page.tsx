@@ -39,7 +39,7 @@ export default async function HomePage() {
   );
   const heroItems = sorted.slice(0, 5);
   const lead = sorted[0];
-  const secondary = sorted.slice(1, 4);
+  const secondary = sorted.slice(1, 9);
   const latest = sorted.slice(0, 20);
   const moreNews = sorted.slice(0, 24);
   const explica = EXPLICA;
@@ -50,28 +50,6 @@ export default async function HomePage() {
     <>
       <div className="container section-tight">
         <HeroCarousel items={heroItems} />
-      </div>
-
-      <div className="container section-tight">
-        <Reveal>
-          <div className="quick-actions">
-            {QUICK_ACTIONS.map((a) => (
-              <Link key={a.href} href={a.href} className="quick-action">
-                <span className={`quick-action-icon icon-badge-${a.color}`}>{a.icon}</span>
-                <span>
-                  <span className="quick-action-title" style={{ display: "block" }}>{a.title}</span>
-                  <span className="quick-action-sub">{a.sub}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </Reveal>
-      </div>
-
-      <div className="container section-tight">
-        <Reveal>
-          <AhoraStrip />
-        </Reveal>
       </div>
 
       <div className="container section">
@@ -102,6 +80,28 @@ export default async function HomePage() {
             </Reveal>
           ))}
         </div>
+      </div>
+
+      <div className="container section-tight" style={{ borderTop: "1px solid var(--border)" }}>
+        <Reveal>
+          <div className="quick-actions">
+            {QUICK_ACTIONS.map((a) => (
+              <Link key={a.href} href={a.href} className="quick-action">
+                <span className={`quick-action-icon icon-badge-${a.color}`}>{a.icon}</span>
+                <span>
+                  <span className="quick-action-title" style={{ display: "block" }}>{a.title}</span>
+                  <span className="quick-action-sub">{a.sub}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+
+      <div className="container section-tight">
+        <Reveal>
+          <AhoraStrip />
+        </Reveal>
       </div>
 
       <div className="container section" style={{ borderTop: "1px solid var(--border)" }}>
