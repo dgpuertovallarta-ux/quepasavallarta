@@ -26,6 +26,22 @@ export const maxDuration = 60;
  * netlify/functions/scheduled-ingest.ts — ver /docs/N8N_AUTOMATION.md.
  */
 export async function GET() {
+  try {
+    return await runIngest();
+  } catch (err) {
+    // Red de seguridad: sin esto, cualquier error no previsto tumba toda
+    // la función serverless ("Invocation Failed" en Netlify) en vez de
+    // responder con un error legible — ya pasó una vez de forma
+    // intermitente y costó tiempo diagnosticarlo sin esta traza.
+    console.error("[api/ingest] Error no manejado:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error desconocido en /api/ingest." },
+      { status: 500 }
+    );
+  }
+}
+
+async function runIngest() {
   const results: { sourceId: string; ok: boolean; items?: IngestedItem[]; error?: string }[] = [];
 
   for (const source of SOURCES) {
