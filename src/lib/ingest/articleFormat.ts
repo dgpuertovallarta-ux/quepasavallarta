@@ -74,5 +74,6 @@ export function parseArticleDraft(draft: string): ParsedArticle {
   }
 
   if (!title) title = bodyParagraphs[0] || "Sin título";
+  title = title.replace(/^#+\s*/, "").trim(); // nunca dejar pasar un "##" crudo como título
   return { title, excerpt, bodyParagraphs };
 }
