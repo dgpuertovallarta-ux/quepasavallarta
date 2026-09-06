@@ -39,9 +39,11 @@ export default async function HomePage() {
   );
   const heroItems = sorted.slice(0, 5);
   const lead = sorted[0];
-  const secondary = sorted.slice(1, 9);
+  const secondary = sorted.slice(1, 6);
   const latest = sorted.slice(0, 20);
-  const moreNews = sorted.slice(0, 24);
+  // Empieza después de lo ya mostrado en "Lo más importante" (lead + secondary,
+  // índices 0-5) para no repetir la misma noticia dos veces seguidas en la portada.
+  const moreNews = sorted.slice(6, 30);
   const explica = EXPLICA;
   const events = EVENTS;
   const featuredBiz = BUSINESSES.filter((b) => b.featured).length;
@@ -69,18 +71,20 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <div className="container section" style={{ borderTop: "1px solid var(--border)" }}>
-        <Reveal>
-          <SectionHead title="Más noticias" sub="Todo lo que está pasando en Puerto Vallarta" linkHref="/categoria/ultima-hora" linkLabel="Ver todas →" />
-        </Reveal>
-        <div className="grid grid-4">
-          {moreNews.map((n, i) => (
-            <Reveal key={n.slug} delay={Math.min(i, 8) * 30}>
-              <NewsCard n={n} compact />
-            </Reveal>
-          ))}
+      {moreNews.length > 0 && (
+        <div className="container section" style={{ borderTop: "1px solid var(--border)" }}>
+          <Reveal>
+            <SectionHead title="Más noticias" sub="Todo lo que está pasando en Puerto Vallarta" linkHref="/categoria/ultima-hora" linkLabel="Ver todas →" />
+          </Reveal>
+          <div className="grid grid-4">
+            {moreNews.map((n, i) => (
+              <Reveal key={n.slug} delay={Math.min(i, 8) * 30}>
+                <NewsCard n={n} compact />
+              </Reveal>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="container section-tight" style={{ borderTop: "1px solid var(--border)" }}>
         <Reveal>
