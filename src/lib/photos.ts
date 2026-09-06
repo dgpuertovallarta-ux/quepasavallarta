@@ -41,3 +41,14 @@ export const PHOTOS = {
 } as const;
 
 export type PhotoKey = keyof typeof PHOTOS;
+
+/**
+ * Resuelve qué imagen mostrar para una noticia: la foto REAL extraída de
+ * la fuente si existe (`imageUrl`), o si no, la ilustrativa del banco
+ * local por categoría. Usar junto con `unoptimized` en next/image cuando
+ * venga de `imageUrl` — es un host externo arbitrario, no pasa por
+ * next.config.ts `images.remotePatterns`.
+ */
+export function newsImageSrc(n: { image: PhotoKey; imageUrl?: string }): string {
+  return n.imageUrl || PHOTOS[n.image];
+}

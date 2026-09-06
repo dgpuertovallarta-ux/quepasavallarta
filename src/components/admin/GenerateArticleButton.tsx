@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CATEGORIES } from "@/lib/data";
+import { parseArticleDraft } from "@/lib/ingest/articleFormat";
 
 /**
  * Flujo real "IA redacta, humano revisa": genera un borrador llamando a
@@ -31,11 +32,6 @@ export default function GenerateArticleButton({
   const [category, setCategory] = useState(categoryGuess);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
-  function extractTitle(draft: string): string {
-    const firstLine = draft.split("\n").find((l) => l.trim().length > 0) || "";
-    return firstLine.replace(/\*\*/g, "").replace(/^TITULAR:?\s*/i, "").trim();
-  }
-
   async function handleGenerate() {
     setState("generating");
     setMessage(null);
@@ -51,8 +47,10 @@ export default function GenerateArticleButton({
         setMessage(resBody.error || `Error ${res.status}`);
         return;
       }
-      setTitle(extractTitle(resBody.article.draft));
-      setBody(resBody.article.draft);
+      const parsed = parseArticleDraft(resBody.article.draft);
+      setTitle(parsed.title);
+      setExcerpt(parsed.excerpt);
+      setBody(parsed.bodyParagraphs.join("\n\n"));
       setAiModel(resBody.article.model);
       setState("review");
     } catch (err) {

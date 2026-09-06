@@ -9,7 +9,7 @@ export default function EditorialLead({ lead, secondary }: { lead: NewsItem; sec
   return (
     <div className="lead-grid">
       <article className="card">
-        <CardMedia media={lead.media} image={lead.image} alt={lead.title} sizes="(max-width: 960px) 100vw, 60vw" priority />
+        <CardMedia media={lead.media} image={lead.image} imageUrl={lead.imageUrl} imageCredit={lead.imageCredit} alt={lead.title} sizes="(max-width: 960px) 100vw, 60vw" priority />
         <div className="card-body" style={{ padding: 20 }}>
           {lead.breaking ? (
             <span className="chip chip-breaking">Última hora</span>

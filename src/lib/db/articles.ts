@@ -84,6 +84,8 @@ type ArticleRow = {
   author_name: string;
   source_url: string | null;
   source_name: string | null;
+  image_url: string | null;
+  image_credit: string | null;
 };
 
 function mapRowToNewsItem(row: ArticleRow): NewsItem {
@@ -102,6 +104,8 @@ function mapRowToNewsItem(row: ArticleRow): NewsItem {
     updatedAt: row.updated_at,
     media: mediaForCategory(category),
     image: imageForCategory(category),
+    imageUrl: row.image_url || undefined,
+    imageCredit: row.image_credit || undefined,
     sources: row.source_url ? [{ label: row.source_name || "Fuente original", url: row.source_url }] : [],
     body: (row.body || "").split("\n\n").filter(Boolean),
   };
@@ -110,6 +114,7 @@ function mapRowToNewsItem(row: ArticleRow): NewsItem {
 const SELECT_BASE = `
   select
     a.slug, a.title, a.excerpt, a.body, a.news_score, a.published_at, a.updated_at,
+    a.image_url, a.image_credit,
     c.slug as category_slug,
     coalesce(au.display_name, 'Redacción Qué Pasa Vallarta') as author_name,
     ss.url as source_url,
@@ -165,6 +170,24 @@ export async function getPublishedArticleBySlug(slug: string): Promise<NewsItem 
   return mapRowToNewsItem(res.rows[0]);
 }
 
+/** Para el flujo manual de publicación: recupera un link+nombre de fuente de una Story ya persistida, para poder extraer su foto real. */
+export async function getPrimarySourceForStory(storyExternalKey: string): Promise<{ url: string; sourceName: string } | null> {
+  if (!isDatabaseConfigured()) return null;
+  const pool = getPool();
+  const res = await pool.query<{ url: string; name: string }>(
+    `select ss.url, s.name
+     from story_sources ss
+     join stories st on st.id = ss.story_id
+     join sources s on s.id = ss.source_id
+     where st.external_key = $1
+     order by ss.captured_at asc
+     limit 1`,
+    [storyExternalKey]
+  );
+  if (res.rows.length === 0) return null;
+  return { url: res.rows[0].url, sourceName: res.rows[0].name };
+}
+
 /** Evita republicar la misma Story en cada corrida del cron (cada 30 min). */
 export async function hasPublishedArticleForStory(storyExternalKey: string): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
@@ -184,6 +207,10 @@ export type PublishArticleInput = {
   newsScore: number;
   aiModel: string | null;
   storyExternalKey: string | null;
+  /** Foto real extraída de la fuente (og:image) — ver extractImage.ts y la advertencia de derechos de autor en /docs/N8N_AUTOMATION.md. */
+  imageUrl?: string;
+  imageSourceUrl?: string;
+  imageCredit?: string;
 };
 
 /**
@@ -218,10 +245,20 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
       suffix++;
     }
 
+    const imageLicenseStatus = input.imageUrl ? "source_unlicensed" : "illustrative_fallback";
+    const imageExtractedAt = input.imageUrl ? new Date().toISOString() : null;
+
     await client.query(
-      `insert into articles (story_id, slug, title, excerpt, body, category_id, author_id, ai_generated, ai_model, status, news_score, discovered_at, drafted_at, published_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,true,$8,'published',$9, now(), now(), now(), now())`,
-      [storyId, slug, input.title, input.excerpt, input.body, categoryId, authorId, input.aiModel, input.newsScore]
+      `insert into articles (
+         story_id, slug, title, excerpt, body, category_id, author_id, ai_generated, ai_model, status, news_score,
+         image_url, image_source_url, image_credit, image_license_status, image_extracted_at,
+         discovered_at, drafted_at, published_at, updated_at
+       )
+       values ($1,$2,$3,$4,$5,$6,$7,true,$8,'published',$9, $10,$11,$12,$13,$14, now(), now(), now(), now())`,
+      [
+        storyId, slug, input.title, input.excerpt, input.body, categoryId, authorId, input.aiModel, input.newsScore,
+        input.imageUrl || null, input.imageSourceUrl || null, input.imageCredit || null, imageLicenseStatus, imageExtractedAt,
+      ]
     );
 
     await client.query("commit");

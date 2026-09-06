@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isDatabaseConfigured } from "@/lib/db/client";
-import { publishArticle } from "@/lib/db/articles";
+import { publishArticle, getPrimarySourceForStory } from "@/lib/db/articles";
+import { extractOgImage } from "@/lib/ingest/extractImage";
 import { CATEGORIES } from "@/lib/data";
 
 /**
@@ -43,7 +44,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await publishArticle({ title, excerpt, body, categorySlug, newsScore, aiModel, storyExternalKey });
+    // Foto real de la fuente (decisión del propietario, con el riesgo de
+    // derechos de autor ya explicado — ver extractImage.ts). Si no hay
+    // storyExternalKey, o falla la extracción, publishArticle cae de
+    // vuelta a la imagen ilustrativa por categoría.
+    const primarySource = storyExternalKey ? await getPrimarySourceForStory(storyExternalKey) : null;
+    const extractedImage = primarySource ? await extractOgImage(primarySource.url) : null;
+
+    const result = await publishArticle({
+      title,
+      excerpt,
+      body,
+      categorySlug,
+      newsScore,
+      aiModel,
+      storyExternalKey,
+      imageUrl: extractedImage?.url,
+      imageSourceUrl: extractedImage?.sourceUrl,
+      imageCredit: primarySource?.sourceName,
+    });
     return NextResponse.json({ published: true, slug: result.slug }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Error desconocido al publicar." }, { status: 500 });

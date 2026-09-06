@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { getCategoryName, type NewsItem } from "@/lib/data";
-import { PHOTOS } from "@/lib/photos";
+import { newsImageSrc } from "@/lib/photos";
 import { timeAgo } from "@/lib/format";
 
 const AUTOPLAY_MS = 6500;
@@ -53,11 +53,12 @@ export default function HeroCarousel({ items }: { items: NewsItem[] }) {
         <article key={n.slug} className={`hero-slide${i === index ? " is-active" : ""}`} aria-hidden={i !== index}>
           <div className="hero-slide-media">
             <Image
-              src={PHOTOS[n.image]}
+              src={newsImageSrc(n)}
               alt={n.title}
               fill
               sizes="(max-width: 900px) 100vw, 66vw"
               priority={i === 0}
+              unoptimized={!!n.imageUrl}
             />
           </div>
           <div className="hero-slide-body">

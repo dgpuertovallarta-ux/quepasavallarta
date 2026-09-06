@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCategoryName, AUTHORS, type NewsItem, type EventItem, type Business, type Media } from "@/lib/data";
-import { PHOTOS } from "@/lib/photos";
+import { PHOTOS, newsImageSrc } from "@/lib/photos";
 import { timeAgo, fmtDate } from "@/lib/format";
 
 function mediaClass(media: Media) {
@@ -11,12 +11,16 @@ function mediaClass(media: Media) {
 export function CardMedia({
   media,
   image,
+  imageUrl,
+  imageCredit,
   alt,
   sizes,
   priority,
 }: {
   media?: Media;
   image?: keyof typeof PHOTOS;
+  imageUrl?: string;
+  imageCredit?: string;
   alt: string;
   sizes?: string;
   priority?: boolean;
@@ -25,8 +29,15 @@ export function CardMedia({
     <div className={`card-media ${media ? mediaClass(media) : ""}`}>
       {image ? (
         <>
-          <Image src={PHOTOS[image]} alt={alt} fill sizes={sizes || "(max-width: 720px) 100vw, 33vw"} priority={priority} />
-          <span className="photo-tag">Foto ilustrativa</span>
+          <Image
+            src={imageUrl || PHOTOS[image]}
+            alt={alt}
+            fill
+            sizes={sizes || "(max-width: 720px) 100vw, 33vw"}
+            priority={priority}
+            unoptimized={!!imageUrl}
+          />
+          <span className="photo-tag">{imageUrl ? `Foto: ${imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
         </>
       ) : (
         <div className="card-media-label">
@@ -42,7 +53,7 @@ export function CardMedia({
 export function NewsCard({ n, compact }: { n: NewsItem; compact?: boolean }) {
   return (
     <article className="card">
-      <CardMedia media={n.media} image={n.image} alt={n.title} />
+      <CardMedia media={n.media} image={n.image} imageUrl={n.imageUrl} imageCredit={n.imageCredit} alt={n.title} />
       <div className="card-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
         {n.isDemo && <DemoTag />}
@@ -63,7 +74,7 @@ export function NewsListItem({ n }: { n: NewsItem }) {
   return (
     <div className="card-list-item">
       <div className="card-list-thumb" style={{ position: "relative", overflow: "hidden" }}>
-        <Image src={PHOTOS[n.image]} alt="" fill sizes="84px" style={{ objectFit: "cover" }} />
+        <Image src={newsImageSrc(n)} alt="" fill sizes="84px" style={{ objectFit: "cover" }} unoptimized={!!n.imageUrl} />
       </div>
       <div className="card-list-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
@@ -82,7 +93,7 @@ export function NewsListItem({ n }: { n: NewsItem }) {
 export function HeroCard({ n }: { n: NewsItem }) {
   return (
     <article className="hero-photo">
-      <Image src={PHOTOS[n.image]} alt={n.title} fill sizes="(max-width: 900px) 100vw, 66vw" priority />
+      <Image src={newsImageSrc(n)} alt={n.title} fill sizes="(max-width: 900px) 100vw, 66vw" priority unoptimized={!!n.imageUrl} />
       <div className="hero-photo-body">
         {n.breaking ? (
           <span className="chip chip-breaking">Última hora</span>

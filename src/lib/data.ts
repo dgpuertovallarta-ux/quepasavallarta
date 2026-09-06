@@ -83,6 +83,9 @@ export type NewsItem = {
   body: string[];
   /** true solo para los artículos de ejemplo de este archivo — nunca para artículos reales publicados desde la base de datos. */
   isDemo?: boolean;
+  /** Foto REAL extraída del artículo original de la fuente (og:image) — cuando está presente, tiene prioridad sobre `image` (el banco ilustrativo). Ver extractImage.ts para la advertencia de derechos de autor. */
+  imageUrl?: string;
+  imageCredit?: string;
 };
 
 // News Score: 90-100 urgente · 80-89 publicable · 60-79 revisión · 0-59 descartar

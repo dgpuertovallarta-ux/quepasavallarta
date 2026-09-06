@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data";
 import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
-import { PHOTOS } from "@/lib/photos";
+import { newsImageSrc } from "@/lib/photos";
 import { fmtDateTime } from "@/lib/format";
 import { getPublishedArticleBySlug, getPublishedArticlesByCategory } from "@/lib/db/articles";
 
@@ -72,14 +72,20 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       </div>
 
       <div className="card-media" style={{ maxWidth: 780, aspectRatio: "16/9", borderRadius: "var(--radius-md)", marginBottom: 22 }}>
-        <Image src={PHOTOS[n.image]} alt={n.title} fill sizes="780px" priority />
-        <span className="photo-tag">Foto ilustrativa</span>
+        <Image src={newsImageSrc(n)} alt={n.title} fill sizes="780px" priority unoptimized={!!n.imageUrl} />
+        <span className="photo-tag">{n.imageUrl ? `Foto: ${n.imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
       </div>
 
       <article className="prose">
-        {n.body.map((p, i) => (
-          <p key={i}>{p}</p>
-        ))}
+        {n.body.map((p, i) =>
+          p.startsWith("## ") ? (
+            <h3 key={i} style={{ fontSize: 16, marginTop: 22 }}>
+              {p.slice(3)}
+            </h3>
+          ) : (
+            <p key={i}>{p}</p>
+          )
+        )}
       </article>
 
       {showHechos && <Hechos n={n} />}
