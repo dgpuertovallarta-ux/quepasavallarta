@@ -14,29 +14,38 @@ import type { PhotoKey } from "../photos";
 // Imagen ilustrativa por categoría — reutiliza las fotos reales de
 // Wikimedia ya verificadas en photos.ts (decisión del propietario:
 // "seguir con ilustrativas por ahora", ver /docs/N8N_AUTOMATION.md).
-const CATEGORY_IMAGE: Record<string, PhotoKey> = {
-  "ultima-hora": "malecomAtardecer",
-  seguridad: "maleconGeneral",
-  gobierno: "maleconGeneral",
-  comunidad: "fuenteAmistad",
-  turismo: "malecomAtardecer",
-  economia: "maleconGeneral",
-  negocios: "maleconGeneral",
-  transito: "construccion",
-  playas: "playa",
-  clima: "playaAtardecer",
-  cultura: "bailarines",
-  gastronomia: "tacos",
-  eventos: "bailarines",
-  entretenimiento: "bailarines",
-  deportes: "faroMalecon",
-  "medio-ambiente": "ballena",
-  servicios: "construccion",
-  politica: "maleconGeneral",
-  jalisco: "maleconGeneral",
-  mexico: "maleconGeneral",
-  mundo: "maleconGeneral",
+// Varias opciones por categoría (no solo una) para que dos artículos
+// de la misma categoría sin foto real extraída no muestren literalmente
+// la misma imagen — se elige una de forma determinística según el slug.
+const CATEGORY_IMAGES: Record<string, PhotoKey[]> = {
+  "ultima-hora": ["malecomAtardecer", "maleconGeneral", "faroMalecon"],
+  seguridad: ["maleconGeneral", "faroMalecon"],
+  gobierno: ["maleconGeneral", "fuenteAmistad"],
+  comunidad: ["fuenteAmistad", "ninoCaballito", "maleconGeneral"],
+  turismo: ["malecomAtardecer", "playaAtardecer"],
+  economia: ["maleconGeneral", "faroMalecon"],
+  negocios: ["maleconGeneral", "faroMalecon"],
+  transito: ["construccion", "maleconGeneral"],
+  playas: ["playa", "playaAtardecer"],
+  clima: ["playaAtardecer", "playa"],
+  cultura: ["bailarines", "maleconGeneral"],
+  gastronomia: ["tacos", "ceviche"],
+  eventos: ["bailarines", "fuenteAmistad"],
+  entretenimiento: ["bailarines", "ninoCaballito"],
+  deportes: ["faroMalecon", "maleconGeneral"],
+  "medio-ambiente": ["ballena", "playa"],
+  servicios: ["construccion", "maleconGeneral"],
+  politica: ["maleconGeneral", "faroMalecon"],
+  jalisco: ["maleconGeneral", "faroMalecon"],
+  mexico: ["maleconGeneral", "faroMalecon"],
+  mundo: ["maleconGeneral", "faroMalecon"],
 };
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
 
 const CATEGORY_MEDIA: Record<string, Media> = {
   clima: "ocean",
@@ -52,8 +61,9 @@ const CATEGORY_MEDIA: Record<string, Media> = {
   politica: "sand",
 };
 
-function imageForCategory(slug: string): PhotoKey {
-  return CATEGORY_IMAGE[slug] || "maleconGeneral";
+function imageForCategory(categorySlug: string, articleSlug: string): PhotoKey {
+  const options = CATEGORY_IMAGES[categorySlug] || ["maleconGeneral"];
+  return options[hashString(articleSlug) % options.length];
 }
 
 function mediaForCategory(slug: string): Media {
@@ -103,7 +113,7 @@ function mapRowToNewsItem(row: ArticleRow): NewsItem {
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
     media: mediaForCategory(category),
-    image: imageForCategory(category),
+    image: imageForCategory(category, row.slug),
     imageUrl: row.image_url || undefined,
     imageCredit: row.image_credit || undefined,
     sources: row.source_url ? [{ label: row.source_name || "Fuente original", url: row.source_url }] : [],
@@ -194,7 +204,7 @@ function mapRowToExplicaItem(row: ArticleRow): ExplicaItem {
     slug: row.slug,
     title: row.title,
     dek: row.excerpt || "",
-    image: imageForCategory(category),
+    image: imageForCategory(category, row.slug),
     imageUrl: row.image_url || undefined,
     imageCredit: row.image_credit || undefined,
     publishedAt: row.published_at,
@@ -253,6 +263,52 @@ export async function getLastExplainerPublishedAt(): Promise<Date | null> {
   );
   const value = res.rows[0]?.published_at;
   return value ? new Date(value) : null;
+}
+
+const TITLE_STOPWORDS = new Set([
+  "de", "la", "el", "en", "y", "a", "que", "del", "los", "las", "un", "una", "con", "por", "para", "se", "su", "es", "al",
+]);
+
+function titleTokens(title: string): Set<string> {
+  const clean = title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w));
+  return new Set(clean);
+}
+
+function titleSimilarity(a: string, b: string): number {
+  const ta = titleTokens(a);
+  const tb = titleTokens(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let intersection = 0;
+  for (const w of ta) if (tb.has(w)) intersection++;
+  return intersection / Math.min(ta.size, tb.size);
+}
+
+/**
+ * Red de seguridad extra contra duplicados: la misma noticia real puede
+ * generar dos STORY ID distintos en corridas diferentes del Story Graph
+ * (si el titular de la fuente varió mínimamente entre fetches), lo cual
+ * hace que hasPublishedArticleForStory (por storyId) no detecte que ya
+ * se cubrió. Esto compara por SIMILITUD DE TÍTULO contra lo publicado en
+ * los últimos días — bug real que ya pasó una vez y publicó la misma
+ * historia dos veces con títulos ligeramente distintos.
+ */
+export async function findSimilarRecentArticle(title: string, opts: { sinceDays?: number; isExplainer?: boolean } = {}): Promise<string | null> {
+  if (!isDatabaseConfigured()) return null;
+  const { sinceDays = 3, isExplainer = false } = opts;
+  const pool = getPool();
+  const res = await pool.query<{ slug: string; title: string }>(
+    "select slug, title from articles where published_at > now() - interval '1 day' * $1 and is_explainer = $2",
+    [sinceDays, isExplainer]
+  );
+  for (const row of res.rows) {
+    if (titleSimilarity(title, row.title) >= 0.6) return row.slug;
+  }
+  return null;
 }
 
 /** Para el flujo manual de publicación: recupera un link+nombre de fuente de una Story ya persistida, para poder extraer su foto real. */

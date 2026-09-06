@@ -3,7 +3,7 @@ import { isAutoPublishEligible } from "./storyGraph";
 import { generateExplainerDraft, isAiConfigured } from "./generateArticle";
 import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
 import { extractOgImage } from "./extractImage";
-import { hasExplainerForStory, getLastExplainerPublishedAt, publishArticle } from "../db/articles";
+import { hasExplainerForStory, getLastExplainerPublishedAt, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 
 // ~4 al día: solo genera uno nuevo si pasaron al menos 5.5 horas desde el
@@ -49,6 +49,12 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
       if (looksLikeInsufficientMaterial(draft.draft)) continue;
 
       const { title, excerpt, bodyParagraphs } = parseArticleDraft(draft.draft);
+
+      const similarSlug = await findSimilarRecentArticle(title, { isExplainer: true });
+      if (similarSlug) {
+        return { ran: true, published: false, storyId: story.storyId, error: `Ya existe un explicador muy similar (${similarSlug}).` };
+      }
+
       const primarySource = story.items[0];
       const extractedImage = await extractOgImage(primarySource.link);
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { NEWS } from "@/lib/data";
-import { SectionHead, DemoTag } from "@/components/cards";
+import { SectionHead } from "@/components/cards";
 import AhoraStrip from "@/components/AhoraStrip";
 import CategoryTabs from "@/components/CategoryTabs";
 import { getPublishedArticles } from "@/lib/db/articles";
@@ -22,10 +22,10 @@ export default async function AhoraPage() {
       </div>
       <h1 style={{ margin: "0 0 6px" }}>🟠 Vallarta Ahora</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
-        Dashboard en tiempo real de la ciudad. Clima, calidad del aire y oleaje ya son datos reales
-        (Open-Meteo, sin costo). Tránsito, aeropuerto y cruceros siguen en <DemoTag /> porque requieren
-        una API de pago o con registro (Google Maps, AviationStack, etc.) que el propietario tendría que
-        contratar — ver <code>/docs/ARCHITECTURE.md</code>.
+        Dashboard en tiempo real de la ciudad. Clima, calidad del aire y oleaje son datos reales
+        (Open-Meteo, sin costo). Tránsito, aeropuerto y cruceros todavía no están conectados — requieren
+        una API de pago o con registro (Google Maps, AviationStack, etc.), así que por ahora no se
+        muestran en vez de aparecer con datos de relleno. Ver <code>/docs/ARCHITECTURE.md</code>.
       </p>
       <AhoraStrip />
 

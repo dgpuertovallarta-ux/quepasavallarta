@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isDatabaseConfigured } from "@/lib/db/client";
-import { publishArticle, getPrimarySourceForStory } from "@/lib/db/articles";
+import { publishArticle, getPrimarySourceForStory, findSimilarRecentArticle } from "@/lib/db/articles";
 import { extractOgImage } from "@/lib/ingest/extractImage";
 import { CATEGORIES } from "@/lib/data";
 
@@ -41,6 +41,14 @@ export async function POST(request: Request) {
   }
   if (!CATEGORIES.some((c) => c.slug === categorySlug)) {
     return NextResponse.json({ error: `Categoría "${categorySlug}" no reconocida.` }, { status: 400 });
+  }
+
+  const similarSlug = await findSimilarRecentArticle(title, { isExplainer: false });
+  if (similarSlug) {
+    return NextResponse.json(
+      { error: `Ya existe un artículo muy similar publicado recientemente (/noticia/${similarSlug}) — revísalo antes de publicar este, para no duplicar la misma historia.` },
+      { status: 409 }
+    );
   }
 
   try {

@@ -3,7 +3,7 @@ import { isAutoPublishEligible } from "./storyGraph";
 import { generateArticleDraft, isAiConfigured } from "./generateArticle";
 import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
 import { extractOgImage } from "./extractImage";
-import { hasPublishedArticleForStory, publishArticle } from "../db/articles";
+import { hasPublishedArticleForStory, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 
 // Límite por corrida — cada auto-publicación llama a la API de Claude
@@ -59,6 +59,15 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
       }
 
       const { title, excerpt, bodyParagraphs } = parseArticleDraft(draft.draft);
+
+      // Red de seguridad extra: la misma historia real puede generar dos
+      // STORY ID distintos entre corridas (si el titular de la fuente
+      // varió mínimamente) — ya pasó una vez y publicó la misma noticia
+      // dos veces. Se compara por similitud de título, no solo por storyId.
+      const similarSlug = await findSimilarRecentArticle(title);
+      if (similarSlug) {
+        throw new Error(`Ya existe un artículo muy similar publicado recientemente (${similarSlug}) — se omite para no duplicar.`);
+      }
 
       // Foto real de la fuente (decisión del propietario, con el riesgo de
       // derechos de autor ya explicado — ver extractImage.ts). Si falla,

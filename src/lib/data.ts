@@ -268,13 +268,15 @@ export const BREAKING = {
 // ------------------------------------------------------------------
 export type AhoraTile = { label: string; value: string; sub: string; demo: boolean; icon: string };
 
+// Solo los datos que ya son reales (Open-Meteo, sin costo). Tránsito,
+// aeropuerto y cruceros se quitaron de aquí a propósito — el propietario
+// pidió explícitamente no mostrar nada de relleno mientras no haya una
+// fuente real para esos (requieren Google Maps / AviationStack / API de
+// puerto, todas de pago o con registro — ver /docs/ARCHITECTURE.md).
 export const AHORA: Record<string, AhoraTile> = {
-  clima: { icon: "☀️", label: "Clima ahora", value: "—", sub: "Conectar API meteorológica", demo: true },
-  trafico: { icon: "🚦", label: "Tránsito", value: "Sin datos", sub: "Conectar feed vial", demo: true },
-  playas: { icon: "🏖️", label: "Oleaje / Playas", value: "—", sub: "Conectar boletín Protección Civil", demo: true },
-  aeropuerto: { icon: "✈️", label: "Aeropuerto (PVR)", value: "Sin datos", sub: "Conectar API de vuelos", demo: true },
-  cruceros: { icon: "🚢", label: "Cruceros hoy", value: "—", sub: "Conectar API de puerto/API-Marina", demo: true },
-  calidadAire: { icon: "🌬️", label: "Calidad del aire", value: "—", sub: "Conectar sensor ambiental", demo: true },
+  clima: { icon: "☀️", label: "Clima ahora", value: "Cargando…", sub: "Open-Meteo", demo: false },
+  playas: { icon: "🏖️", label: "Oleaje / Playas", value: "Cargando…", sub: "Open-Meteo Marine", demo: false },
+  calidadAire: { icon: "🌬️", label: "Calidad del aire", value: "Cargando…", sub: "Open-Meteo", demo: false },
 };
 
 // ------------------------------------------------------------------

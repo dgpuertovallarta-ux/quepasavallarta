@@ -5,7 +5,6 @@ import { getPublishedArticles, getPublishedExplainers } from "@/lib/db/articles"
 import { EventCard, NewsCard, SectionHead, DemoTag } from "@/components/cards";
 import HeroCarousel from "@/components/HeroCarousel";
 import EditorialLead from "@/components/EditorialLead";
-import CategoryTabs from "@/components/CategoryTabs";
 import LiveFeed from "@/components/LiveFeed";
 import CarouselRow from "@/components/CarouselRow";
 import Reveal from "@/components/Reveal";
@@ -37,13 +36,14 @@ export default async function HomePage() {
   const sorted = (real.length > 0 ? real : demo).sort(
     (a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)
   );
+  // El carrusel es un tratamiento visual aparte (foto completa, una a la
+  // vez) — puede repetir las primeras del arreglo sin sentirse "repetido".
+  // De ahí en adelante, cada sección continúa donde terminó la anterior
+  // para que ninguna tarjeta se muestre dos veces en la portada.
   const heroItems = sorted.slice(0, 5);
-  const lead = sorted[0];
-  const secondary = sorted.slice(1, 6);
-  const latest = sorted.slice(0, 20);
-  // Empieza después de lo ya mostrado en "Lo más importante" (lead + secondary,
-  // índices 0-5) para no repetir la misma noticia dos veces seguidas en la portada.
-  const moreNews = sorted.slice(6, 30);
+  const moreNews = sorted.slice(0, 12);
+  const lead = sorted[12];
+  const secondary = sorted.slice(13, 17);
   const realExplica = await getPublishedExplainers(10);
   const explica = realExplica.length > 0 ? realExplica : EXPLICA.map((e) => ({ ...e, isDemo: true }));
   const events = EVENTS;
@@ -55,25 +55,8 @@ export default async function HomePage() {
         <HeroCarousel items={heroItems} />
       </div>
 
-      <div className="container section">
-        <SectionHead title="Lo más importante" sub="La ciudad ahora mismo" linkHref="/categoria/ultima-hora" linkLabel="Ver todas →" />
-        <div className="grid grid-2" style={{ gridTemplateColumns: "1.7fr 1fr", alignItems: "start" }}>
-          <Reveal>
-            <EditorialLead lead={lead} secondary={secondary} />
-          </Reveal>
-          <Reveal delay={120}>
-            <div className="panel">
-              <strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text-muted)" }}>
-                Lo último
-              </strong>
-              <CategoryTabs items={latest} />
-            </div>
-          </Reveal>
-        </div>
-      </div>
-
       {moreNews.length > 0 && (
-        <div className="container section" style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="container section">
           <Reveal>
             <SectionHead title="Más noticias" sub="Todo lo que está pasando en Puerto Vallarta" linkHref="/categoria/ultima-hora" linkLabel="Ver todas →" />
           </Reveal>
@@ -84,6 +67,15 @@ export default async function HomePage() {
               </Reveal>
             ))}
           </div>
+        </div>
+      )}
+
+      {lead && (
+        <div className="container section" style={{ borderTop: "1px solid var(--border)" }}>
+          <SectionHead title="Lo más importante" sub="La ciudad ahora mismo" linkHref="/categoria/ultima-hora" linkLabel="Ver todas →" />
+          <Reveal>
+            <EditorialLead lead={lead} secondary={secondary} />
+          </Reveal>
         </div>
       )}
 
