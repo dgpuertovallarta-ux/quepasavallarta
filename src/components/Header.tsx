@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { SITE, CATEGORIES, NEWS, AHORA } from "@/lib/data";
+import { fetchCurrentWeather, type WeatherNow } from "@/lib/ahora/weather";
 
 const NAV = [
   { href: "/", label: "Inicio" },
@@ -24,6 +25,11 @@ export default function Header({ hasRealContent = false }: { hasRealContent?: bo
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
   const [compact, setCompact] = useState(false);
+  const [weather, setWeather] = useState<WeatherNow | null>(null);
+
+  useEffect(() => {
+    fetchCurrentWeather().then(setWeather);
+  }, []);
 
   // Re-aplica el tema guardado tras el remount de Strict Mode en desarrollo
   // (el ThemeInitScript ya lo hace antes del primer pintado en producción).
@@ -93,7 +99,9 @@ export default function Header({ hasRealContent = false }: { hasRealContent?: bo
               <button className="icon-btn" style={{ width: 30, height: 30, fontSize: 13 }} aria-label="Buscar" title="Buscar" onClick={() => router.push("/buscar")}>
                 🔎
               </button>
-              <span className="weather-chip">{AHORA.clima.icon} Clima {AHORA.clima.value}</span>
+              <span className="weather-chip">
+                {AHORA.clima.icon} {weather ? `${weather.tempC}°C · ${weather.description}` : "Clima —"}
+              </span>
               <Link href="/admin">Panel editorial</Link>
               <Link href="/#newsletter" className="btn btn-primary btn-sm">Suscríbete</Link>
             </div>

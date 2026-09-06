@@ -3,13 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AHORA } from "@/lib/data";
+import { fetchCurrentWeather, fetchCurrentAirQuality, type WeatherNow, type AirQualityNow } from "@/lib/ahora/weather";
 
 const TRAFFIC_STATES = ["Fluido", "Moderado", "Denso"];
 
 export default function AhoraStrip({ compact }: { compact?: boolean }) {
-  const tiles = Object.values(AHORA);
   const [trafficIdx, setTrafficIdx] = useState(0);
   const [fading, setFading] = useState(false);
+  const [weather, setWeather] = useState<WeatherNow | null>(null);
+  const [airQuality, setAirQuality] = useState<AirQualityNow | null>(null);
+
+  // Clima y calidad del aire reales (Open-Meteo, sin API key) — el resto
+  // de los widgets siguen en demo porque no hay un equivalente gratuito.
+  useEffect(() => {
+    fetchCurrentWeather().then(setWeather);
+    fetchCurrentAirQuality().then(setAirQuality);
+  }, []);
 
   // Microinteracción de ejemplo: el dato de tránsito cambia de estado cada
   // cierto tiempo con una transición suave — así se ve cómo se sentiría un
@@ -25,11 +34,23 @@ export default function AhoraStrip({ compact }: { compact?: boolean }) {
     return () => clearInterval(t);
   }, []);
 
+  const tiles = Object.entries(AHORA).map(([key, t]) => {
+    if (key === "clima" && weather) {
+      return { ...t, key, value: `${weather.tempC}°C · ${weather.description}`, demo: false, sub: "Open-Meteo, en vivo" };
+    }
+    if (key === "calidadAire" && airQuality) {
+      return { ...t, key, value: `${airQuality.aqi} · ${airQuality.label}`, demo: false, sub: "Índice AQI (Open-Meteo), en vivo" };
+    }
+    return { ...t, key };
+  });
+  const anyReal = tiles.some((t) => !t.demo);
+
   return (
     <div className="ahora-strip surface-dark">
       <div className="ahora-strip-head">
         <div className="ahora-strip-title">
-          <span className="live-dot" /> VALLARTA AHORA <span className="chip chip-demo">Demo — datos de ejemplo</span>
+          <span className="live-dot" /> VALLARTA AHORA{" "}
+          <span className="chip chip-demo">{anyReal ? "Clima y aire en vivo · resto demo" : "Demo — datos de ejemplo"}</span>
         </div>
         {compact && (
           <Link href="/ahora" style={{ color: "var(--text)", fontWeight: 700, fontSize: 13 }}>
@@ -39,7 +60,7 @@ export default function AhoraStrip({ compact }: { compact?: boolean }) {
       </div>
       <div className="ahora-grid">
         {tiles.map((t) => {
-          const isTraffic = t === AHORA.trafico;
+          const isTraffic = t.key === "trafico";
           return (
             <div className="ahora-tile" key={t.label}>
               <span className="ahora-tile-label">{t.icon} {t.label}</span>
