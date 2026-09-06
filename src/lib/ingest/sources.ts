@@ -167,6 +167,148 @@ export const SOURCES: Source[] = [
       "Medio real conocido, pero /feed/ respondió 404 al verificar. Falta " +
       "encontrar la URL correcta de su RSS antes de activarlo.",
   },
+  {
+    id: "meridiano-vallarta",
+    name: "Meridiano (Puerto Vallarta y Bahía de Banderas)",
+    type: "rss",
+    url: "https://meridiano.mx/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    note:
+      "Medio real, RSS 2.0 verificado hoy. Es un feed regional de Nayarit " +
+      "que incluye Puerto Vallarta/Bahía de Banderas junto con otras notas " +
+      "de la región — el filtro de relevancia local sigue aplicando igual " +
+      "que con cualquier otra fuente. Misma regla: solo señal, redacción " +
+      "propia, revisión humana obligatoria.",
+  },
+  {
+    id: "el-vallartense",
+    name: "El Vallartense Noticias",
+    type: "rss",
+    url: "https://elvallartense.com.mx/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    note:
+      "Medio local real, RSS 2.0 verificado hoy. Usar el dominio " +
+      "elvallartense.com.mx (el propietario advirtió explícitamente no " +
+      "confundirlo con un restaurante del mismo nombre). Misma regla: " +
+      "solo señal, redacción propia, revisión humana obligatoria.",
+  },
+  {
+    id: "vallarta-online",
+    name: "Vallarta Online",
+    type: "rss",
+    url: "https://vallartaonline.com/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    note:
+      "Medio local real, RSS válido verificado hoy — cobertura orientada a " +
+      "turismo y cultura. Misma regla: solo señal, redacción propia, " +
+      "revisión humana obligatoria.",
+  },
+  {
+    id: "vallarta-hoy",
+    name: "Vallarta Hoy",
+    type: "rss",
+    url: "https://www.vallartahoy.com/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    note:
+      "Medio local real, RSS 2.0 verificado hoy (cobertura de gobierno, " +
+      "comunidad y seguridad en Puerto Vallarta/Bahía de Banderas). Misma " +
+      "regla: solo señal, redacción propia, revisión humana obligatoria.",
+  },
+  {
+    id: "diario-de-vallarta",
+    name: "Diario de Vallarta & Nayarit",
+    type: "rss",
+    url: "https://diariodevallarta.com/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    note:
+      "RSS 2.0 técnicamente válido y con notas de hoy, pero el feed " +
+      "general mezcla mucho contenido nacional/internacional sin conexión " +
+      "obvia con Puerto Vallarta (geopolítica, cultura general) — aplicar " +
+      "el filtro de relevancia local con más cuidado que con otras " +
+      "fuentes de esta lista antes de usar cualquier ítem como señal.",
+  },
+  {
+    id: "vallarta-uno",
+    name: "Vallarta Uno",
+    type: "rss",
+    url: "https://vallartauno.com/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: false,
+    note:
+      "Medio real de periodismo de investigación (vallartauno.com), pero " +
+      "/feed/ respondió error 500 del servidor al verificar. Reintentar " +
+      "más adelante o buscar una URL de RSS alterna.",
+  },
+  {
+    id: "siempre-libres",
+    name: "Siempre Libres",
+    type: "rss",
+    url: "https://www.siemprelibres.com/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: false,
+    note:
+      "Medio real (Casa Editorial Siempre Libres, siemprelibres.com), pero " +
+      "/feed/ respondió 404 al verificar. Falta encontrar la URL correcta " +
+      "de su RSS antes de activarlo.",
+  },
+  {
+    id: "noticias-vallarta-mx",
+    name: "Noticias Vallarta",
+    type: "rss",
+    url: "https://noticiasvallarta.com.mx/feed/",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: false,
+    note:
+      "El feed es técnicamente un RSS 2.0 válido, pero todos los ítems " +
+      "encontrados datan de mayo de 2022 — parece abandonado/inactivo. No " +
+      "activar como fuente en vivo hasta confirmar que vuelve a publicar.",
+  },
+  {
+    id: "vallarta-opina",
+    name: "Vallarta Opina",
+    type: "social",
+    url: "",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: false,
+    note:
+      "Medio real conocido (más de 100k seguidores en Facebook: " +
+      "facebook.com/VallartaOpinaOficial), pero no se encontró un sitio " +
+      "web propio con RSS — parece operar principalmente por redes " +
+      "sociales. Requeriría tratarse como fuente social (API de Meta) en " +
+      "vez de RSS, o verificar manualmente si existe un sitio con feed.",
+  },
 
   // ------------------------------------------------------------------
   // NIVEL B — Cuentas oficiales (gobierno / protección civil / servicios)
