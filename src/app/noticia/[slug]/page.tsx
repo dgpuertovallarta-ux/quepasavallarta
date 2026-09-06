@@ -2,28 +2,43 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data";
-import { NewsListItem, SectionHead, Byline } from "@/components/cards";
+import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
 import { PHOTOS } from "@/lib/photos";
 import { fmtDateTime } from "@/lib/format";
+import { getPublishedArticleBySlug, getPublishedArticlesByCategory } from "@/lib/db/articles";
 
 const SENSITIVE_CATEGORIES = ["seguridad", "politica"];
+
+// Artículos reales se publican después del build — no se pueden pre-generar todos.
+export const dynamicParams = true;
+export const revalidate = 60;
 
 export function generateStaticParams() {
   return NEWS.map((n) => ({ slug: n.slug }));
 }
 
+async function findArticle(slug: string): Promise<NewsItem | undefined> {
+  const real = await getPublishedArticleBySlug(slug);
+  if (real) return real;
+  const demo = getNewsBySlug(slug);
+  return demo ? { ...demo, isDemo: true } : undefined;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const n = getNewsBySlug(slug);
+  const n = await findArticle(slug);
   return { title: n ? `${n.title} — Qué Pasa Vallarta` : "Noticia no encontrada" };
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const n = getNewsBySlug(slug);
+  const n = await findArticle(slug);
   if (!n) notFound();
 
-  const related = NEWS.filter((x) => x.category === n.category && x.slug !== n.slug).slice(0, 4);
+  const relatedReal = n.isDemo ? [] : await getPublishedArticlesByCategory(n.category, 5);
+  const related = n.isDemo
+    ? NEWS.filter((x) => x.category === n.category && x.slug !== n.slug).slice(0, 4)
+    : relatedReal.filter((x) => x.slug !== n.slug).slice(0, 4);
   const showHechos = SENSITIVE_CATEGORIES.includes(n.category);
 
   return (
@@ -44,6 +59,11 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         ) : (
           <span className="chip chip-demo" style={{ marginLeft: 6 }}>
             Sin confirmación oficial
+          </span>
+        )}
+        {n.isDemo && (
+          <span style={{ marginLeft: 6 }}>
+            <DemoTag />
           </span>
         )}
         <h1>{n.title}</h1>
@@ -74,8 +94,10 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           ))}
         </ul>
         <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "10px 0 0" }}>
-          Última actualización: {fmtDateTime(n.updatedAt)} · Este es un artículo de demostración generado
-          para el MVP.
+          Última actualización: {fmtDateTime(n.updatedAt)} ·{" "}
+          {n.isDemo
+            ? "Este es un artículo de demostración generado para el MVP."
+            : "Redactado con asistencia de IA a partir de las fuentes citadas y revisado por el equipo editorial antes de publicarse."}
         </p>
       </div>
 

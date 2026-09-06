@@ -81,6 +81,8 @@ export type NewsItem = {
   image: PhotoKey;
   sources: { label: string; url: string }[];
   body: string[];
+  /** true solo para los artículos de ejemplo de este archivo — nunca para artículos reales publicados desde la base de datos. */
+  isDemo?: boolean;
 };
 
 // News Score: 90-100 urgente · 80-89 publicable · 60-79 revisión · 0-59 descartar

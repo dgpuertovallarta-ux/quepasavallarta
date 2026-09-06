@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { NEWS, CATEGORIES, getCategoryName } from "@/lib/data";
 import { NewsCard } from "@/components/cards";
+import { getPublishedArticlesByCategory } from "@/lib/db/articles";
+
+export const revalidate = 60;
 
 export function generateStaticParams() {
   return CATEGORIES.map((c) => ({ slug: c.slug }));
@@ -13,7 +16,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const items = NEWS.filter((n) => n.category === slug).sort(
+  const real = await getPublishedArticlesByCategory(slug, 30);
+  const demo = NEWS.filter((n) => n.category === slug).map((n) => ({ ...n, isDemo: true }));
+  const items = (real.length > 0 ? real : demo).sort(
     (a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)
   );
   const name = getCategoryName(slug);

@@ -8,7 +8,7 @@ const SOCIAL = [
   { label: "YouTube", href: "#", path: "M22 12s0-3.2-.4-4.7a2.9 2.9 0 0 0-2-2C17.9 5 12 5 12 5s-5.9 0-7.6.3a2.9 2.9 0 0 0-2 2C2 8.8 2 12 2 12s0 3.2.4 4.7c.2 1 1 1.7 2 2C6.1 19 12 19 12 19s5.9 0 7.6-.3a2.9 2.9 0 0 0 2-2C22 15.2 22 12 22 12ZM10 15.5v-7l6 3.5-6 3.5Z" },
 ];
 
-export default function Footer() {
+export default function Footer({ hasRealContent = false }: { hasRealContent?: boolean }) {
   return (
     <footer className="site-footer surface-dark">
       <div className="container">
@@ -66,7 +66,12 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} {SITE.name}. Sitio de demostración (MVP) — todos los datos son ficticios.</span>
+          <span>
+            © {new Date().getFullYear()} {SITE.name}.{" "}
+            {hasRealContent
+              ? "Noticias verificadas por el equipo editorial."
+              : "Sitio de demostración (MVP) — todos los datos son ficticios."}
+          </span>
           <span>Hecho en Puerto Vallarta, para Puerto Vallarta.</span>
         </div>
       </div>

@@ -197,7 +197,12 @@ export async function Cola() {
                   : "Publicable"}
               </td>
               <td>
-                <GenerateArticleButton storyId={story.storyId} hasCorroboration={story.hasCorroboration} />
+                <GenerateArticleButton
+                  storyId={story.storyId}
+                  hasCorroboration={story.hasCorroboration}
+                  categoryGuess={story.items[0].categoryGuess}
+                  newsScore={story.maxNewsScore}
+                />
               </td>
             </tr>
           ))}

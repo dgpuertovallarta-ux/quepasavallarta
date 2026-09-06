@@ -19,7 +19,7 @@ const TICKER_ITEMS = [...NEWS]
   .sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt))
   .slice(0, 5);
 
-export default function Header() {
+export default function Header({ hasRealContent = false }: { hasRealContent?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
@@ -61,14 +61,16 @@ export default function Header() {
       <a href="#main" className="skip-link">
         Saltar al contenido
       </a>
-      <div className="demo-banner">
-        <strong>Demo</strong> — Este sitio muestra datos ficticios para ilustrar el producto. Ninguna
-        noticia, cifra o negocio es real. Ver{" "}
-        <Link href="/admin" style={{ color: "inherit", textDecoration: "underline" }}>
-          panel editorial
-        </Link>
-        .
-      </div>
+      {!hasRealContent && (
+        <div className="demo-banner">
+          <strong>Demo</strong> — Este sitio todavía no tiene artículos reales publicados; muestra datos
+          ficticios para ilustrar el producto. Ver{" "}
+          <Link href="/admin" style={{ color: "inherit", textDecoration: "underline" }}>
+            panel editorial
+          </Link>
+          .
+        </div>
+      )}
       <header className={`site-header${compact ? " is-compact" : ""}`}>
         <div className="header-top surface-dark">
           <div className="container header-top-inner">

@@ -45,6 +45,7 @@ export function NewsCard({ n, compact }: { n: NewsItem; compact?: boolean }) {
       <CardMedia media={n.media} image={n.image} alt={n.title} />
       <div className="card-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
+        {n.isDemo && <DemoTag />}
         <h3 className="card-title">
           <Link href={`/noticia/${n.slug}`}>{n.title}</Link>
         </h3>
@@ -66,6 +67,7 @@ export function NewsListItem({ n }: { n: NewsItem }) {
       </div>
       <div className="card-list-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
+        {n.isDemo && <DemoTag />}
         <h4 className="card-title">
           <Link href={`/noticia/${n.slug}`}>{n.title}</Link>
         </h4>

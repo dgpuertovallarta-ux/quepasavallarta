@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { NEWS, EXPLICA, EVENTS, BUSINESSES } from "@/lib/data";
+import { getPublishedArticles } from "@/lib/db/articles";
 import { EventCard, SectionHead, DemoTag } from "@/components/cards";
 import HeroCarousel from "@/components/HeroCarousel";
 import EditorialLead from "@/components/EditorialLead";
@@ -28,8 +29,14 @@ const GUIDE_CATEGORIES = [
   { name: "Automotriz", icon: "🚗", color: "green" },
 ];
 
-export default function HomePage() {
-  const sorted = [...NEWS].sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt));
+export const revalidate = 60;
+
+export default async function HomePage() {
+  const real = await getPublishedArticles(30);
+  const demo = NEWS.map((n) => ({ ...n, isDemo: true }));
+  const sorted = (real.length > 0 ? real : demo).sort(
+    (a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)
+  );
   const heroItems = sorted.slice(0, 5);
   const lead = sorted[0];
   const secondary = sorted.slice(1, 4);

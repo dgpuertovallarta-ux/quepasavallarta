@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCategoryName, type NewsItem } from "@/lib/data";
-import { CardMedia } from "./cards";
+import { CardMedia, DemoTag } from "./cards";
 import { PHOTOS } from "@/lib/photos";
 import { timeAgo } from "@/lib/format";
 
@@ -16,6 +16,7 @@ export default function EditorialLead({ lead, secondary }: { lead: NewsItem; sec
           ) : (
             <span className="card-kicker">{getCategoryName(lead.category)}</span>
           )}
+          {lead.isDemo && <DemoTag />}
           <h3 className="card-title" style={{ fontSize: 24, margin: "6px 0" }}>
             <Link href={`/noticia/${lead.slug}`}>{lead.title}</Link>
           </h3>
@@ -34,6 +35,7 @@ export default function EditorialLead({ lead, secondary }: { lead: NewsItem; sec
             </div>
             <div className="lead-secondary-body">
               <span className="card-kicker">{getCategoryName(n.category)}</span>
+              {n.isDemo && <DemoTag />}
               <Link href={`/noticia/${n.slug}`}>{n.title}</Link>
               <div className="card-meta" style={{ marginTop: 4 }}>
                 <span>{timeAgo(n.updatedAt || n.publishedAt)}</span>

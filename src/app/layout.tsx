@@ -7,6 +7,12 @@ import IntroScreen from "@/components/IntroScreen";
 import ThemeInitScript from "@/components/ThemeInitScript";
 import Toast from "@/components/Toast";
 import { SITE } from "@/lib/data";
+import { getPublishedArticles } from "@/lib/db/articles";
+
+// La portada consulta si ya existe contenido real publicado (para dejar
+// de mostrar el aviso de demo) — no hace falta en cada request exacto,
+// con refrescar cada minuto basta.
+export const revalidate = 60;
 
 const bodyFont = Inter({ subsets: ["latin"], variable: "--font-body", display: "swap" });
 // Serif editorial — Playfair para titulares grandes de sección ("TOP NEWS"),
@@ -31,7 +37,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const realArticles = await getPublishedArticles(1);
+  const hasRealContent = realArticles.length > 0;
+
   return (
     <html
       lang="es-MX"
@@ -43,9 +52,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <IntroScreen />
-        <Header />
+        <Header hasRealContent={hasRealContent} />
         <main id="main">{children}</main>
-        <Footer />
+        <Footer hasRealContent={hasRealContent} />
         <Toast />
       </body>
     </html>
