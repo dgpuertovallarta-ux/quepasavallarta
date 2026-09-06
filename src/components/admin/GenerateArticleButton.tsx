@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CATEGORIES } from "@/lib/data";
-import { parseArticleDraft } from "@/lib/ingest/articleFormat";
+import { parseArticleDraft, looksLikeInsufficientMaterial } from "@/lib/ingest/articleFormat";
 
 /**
  * Flujo real "IA redacta, humano revisa": genera un borrador llamando a
@@ -31,6 +31,7 @@ export default function GenerateArticleButton({
   const [body, setBody] = useState("");
   const [category, setCategory] = useState(categoryGuess);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const [insufficientMaterial, setInsufficientMaterial] = useState(false);
 
   async function handleGenerate() {
     setState("generating");
@@ -52,6 +53,7 @@ export default function GenerateArticleButton({
       setExcerpt(parsed.excerpt);
       setBody(parsed.bodyParagraphs.join("\n\n"));
       setAiModel(resBody.article.model);
+      setInsufficientMaterial(looksLikeInsufficientMaterial(resBody.article.draft));
       setState("review");
     } catch (err) {
       setState("error");
@@ -96,6 +98,12 @@ export default function GenerateArticleButton({
   if (state === "review" || state === "publishing") {
     return (
       <div style={{ minWidth: 320, maxWidth: 420, fontSize: 12.5 }}>
+        {insufficientMaterial && (
+          <p style={{ color: "var(--danger)", fontWeight: 600, marginBottom: 8 }}>
+            ⚠️ La IA no encontró material suficiente para un artículo completo — esto es apenas un resumen
+            interno. No lo publiques tal cual: complétalo con más investigación o descarta esta Story.
+          </p>
+        )}
         <label style={{ display: "block", marginBottom: 6 }}>
           Titular
           <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", fontSize: 12.5, padding: 4 }} />

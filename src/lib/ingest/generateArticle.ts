@@ -59,18 +59,12 @@ export async function generateArticleDraft(story: Story): Promise<GeneratedArtic
     .join("\n")
     .trim();
 
-  // El propio prompt le pide a la IA que, si el material es insuficiente,
-  // devuelva un "resumen interno" en vez de un artículo (ver
-  // editorialPrompt.ts). Eso pasó una vez sin que nadie lo detectara y se
-  // publicó tal cual como nota principal — bug real ya corregido: se
-  // rechaza aquí, nunca se trata como un borrador publicable.
-  if (/RESUMEN\s+INTERNO|INVESTIGACI[OÓ]N\s+PENDIENTE|no\s+hay\s+suficiente\s+informaci[oó]n/i.test(draft.slice(0, 200))) {
-    throw new Error(
-      `La IA determinó que no hay material suficiente para redactar "${story.labelSeed}" (${story.storyId}) ` +
-        "como artículo completo — devolvió un resumen interno en vez de una nota. No se publica; requiere más fuentes o investigación humana."
-    );
-  }
-
+  // No se bloquea aquí a propósito: esta función la usan tanto la
+  // auto-publicación (sin humano — ahí SÍ se bloquea, ver autoPublish.ts)
+  // como el botón manual del panel, donde un humano pidió explícitamente
+  // generar el borrador y debe poder verlo (aunque sea un "resumen
+  // interno" de material insuficiente) para decidir él mismo — bloquear
+  // aquí le impedía siquiera revisar la Story. Ver looksLikeInsufficientMaterial.
   return { storyId: story.storyId, model: MODEL, draft, generatedAt: new Date().toISOString() };
 }
 

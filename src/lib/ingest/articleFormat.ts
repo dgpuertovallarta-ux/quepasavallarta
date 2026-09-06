@@ -1,6 +1,18 @@
 export type ParsedArticle = { title: string; excerpt: string; bodyParagraphs: string[] };
 
 /**
+ * El prompt editorial le pide a la IA que, si el material es
+ * insuficiente, devuelva un "resumen interno" en vez de un artículo
+ * completo (ver editorialPrompt.ts). Se usa para: (1) en autoPublish.ts,
+ * nunca publicar eso solo, sin excepción; (2) en el flujo manual del
+ * panel, mostrar una advertencia clara sin bloquear la revisión — un
+ * humano decide si investiga más o descarta la Story.
+ */
+export function looksLikeInsufficientMaterial(draft: string): boolean {
+  return /RESUMEN\s+INTERNO|INVESTIGACI[OÓ]N\s+PENDIENTE|no\s+hay\s+suficiente\s+informaci[oó]n/i.test(draft.slice(0, 200));
+}
+
+/**
  * ¿Es "firstLine" un encabezado de sección? La plantilla del prompt
  * editorial sugiere QUÉ PASÓ / LO QUE SABEMOS / LO QUE DICEN LAS
  * AUTORIDADES / CONTEXTO / QUÉ SIGUE, pero el modelo a veces inventa una

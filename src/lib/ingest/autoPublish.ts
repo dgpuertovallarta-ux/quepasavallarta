@@ -1,7 +1,7 @@
 import type { Story } from "./storyGraph";
 import { isAutoPublishEligible } from "./storyGraph";
 import { generateArticleDraft, isAiConfigured } from "./generateArticle";
-import { parseArticleDraft } from "./articleFormat";
+import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
 import { extractOgImage } from "./extractImage";
 import { hasPublishedArticleForStory, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
@@ -48,6 +48,16 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
 
       result.attempted++;
       const draft = await generateArticleDraft(story);
+
+      // Sin excepción en este flujo (sin humano de por medio): si la IA
+      // no tuvo material suficiente, no se publica nada — a diferencia
+      // del botón manual del panel, que sí puede mostrárselo a un humano.
+      if (looksLikeInsufficientMaterial(draft.draft)) {
+        throw new Error(
+          `La IA determinó que no hay material suficiente para "${story.labelSeed}" — no se auto-publica.`
+        );
+      }
+
       const { title, excerpt, bodyParagraphs } = parseArticleDraft(draft.draft);
 
       // Foto real de la fuente (decisión del propietario, con el riesgo de
