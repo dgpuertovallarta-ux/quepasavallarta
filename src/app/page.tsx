@@ -51,6 +51,16 @@ export default async function HomePage() {
 
   return (
     <>
+      <div className="container" style={{ paddingTop: 14 }}>
+        <Link href="/conecta" aria-label="BYD Puerto Vallarta — anúnciate en Qué Pasa Vallarta">
+          <img
+            src="/media/byd-banner.gif"
+            alt="BYD Puerto Vallarta — Vive Vallarta en modo 100% eléctrico"
+            style={{ width: "100%", height: "auto", borderRadius: 12, display: "block" }}
+          />
+        </Link>
+      </div>
+
       <div className="container section-tight">
         <HeroCarousel items={heroItems} />
       </div>
