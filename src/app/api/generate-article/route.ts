@@ -17,7 +17,7 @@ import type { IngestedItem } from "@/lib/ingest/types";
 export async function POST(request: Request) {
   if (!isAiConfigured()) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY no está configurada. Ver /docs/ARCHITECTURE.md §8." },
+      { error: "GEMINI_API_KEY no está configurada. Ver /docs/ARCHITECTURE.md §8." },
       { status: 501 }
     );
   }

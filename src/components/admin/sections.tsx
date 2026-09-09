@@ -150,7 +150,7 @@ export async function Cola() {
         <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
           El botón &ldquo;Generar borrador (IA)&rdquo; ya está conectado a{" "}
           <code>/api/generate-article</code>, pero devolverá un error hasta que
-          configures <code>ANTHROPIC_API_KEY</code> (ver <code>/docs/ARCHITECTURE.md</code> §8).
+          configures <code>GEMINI_API_KEY</code> (ver <code>/docs/ARCHITECTURE.md</code> §8).
         </p>
       )}
       {stories.length === 0 && (
@@ -237,7 +237,7 @@ export async function Fuentes() {
           real ya existe como código (<code>netlify/functions/scheduled-ingest.ts</code>, cada 30 min) —
           se activa solo al desplegar en Netlify. Lo único que falta para producción real: (1) crear un
           proyecto Postgres (Supabase o Neon) y configurar <code>DATABASE_URL</code>, (2) configurar{" "}
-          <code>ANTHROPIC_API_KEY</code> para activar &ldquo;Generar borrador (IA)&rdquo; en la Cola
+          <code>GEMINI_API_KEY</code> para activar &ldquo;Generar borrador (IA)&rdquo; en la Cola
           editorial, (3) desplegar en Netlify. Ver <code>/docs/ARCHITECTURE.md</code> §8 para el detalle
           exacto de cada variable de entorno.
         </p>

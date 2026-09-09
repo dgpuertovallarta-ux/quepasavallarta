@@ -1,11 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { EDITORIAL_SYSTEM_PROMPT, EXPLICA_SYSTEM_PROMPT, buildEditorialUserPrompt } from "./editorialPrompt";
 import type { Story } from "./storyGraph";
 
-const MODEL = "claude-sonnet-5";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 export function isAiConfigured(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+  return !!process.env.GEMINI_API_KEY;
 }
 
 export type GeneratedArticle = {
@@ -18,7 +18,7 @@ export type GeneratedArticle = {
 function assertCanGenerate(story: Story) {
   if (!isAiConfigured()) {
     throw new Error(
-      "ANTHROPIC_API_KEY no está configurada — la redacción con IA está lista " +
+      "GEMINI_API_KEY no está configurada — la redacción con IA está lista " +
         "en el código (editorialPrompt.ts + generateArticle.ts) pero inactiva. " +
         "Ver /docs/ARCHITECTURE.md §8."
     );
@@ -32,30 +32,38 @@ function assertCanGenerate(story: Story) {
   }
 }
 
-async function callClaude(systemPrompt: string, story: Story): Promise<GeneratedArticle> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const response = await client.messages.create({
+// El tier gratuito de Gemini a veces devuelve 503 "high demand" — es
+// transitorio (congestión del lado de Google, no un error de la
+// petición), así que se reintenta una vez antes de darse por vencido.
+async function callGemini(systemPrompt: string, story: Story): Promise<GeneratedArticle> {
+  const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const request = {
     model: MODEL,
-    max_tokens: 2000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: buildEditorialUserPrompt(story) }],
-  });
+    contents: buildEditorialUserPrompt(story),
+    config: { systemInstruction: systemPrompt, maxOutputTokens: 4096 },
+  };
 
-  const draft = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
+  let response;
+  try {
+    response = await client.models.generateContent(request);
+  } catch (err) {
+    const isOverloaded = err instanceof Error && /503|UNAVAILABLE|high demand/i.test(err.message);
+    if (!isOverloaded) throw err;
+    await new Promise((r) => setTimeout(r, 2500));
+    response = await client.models.generateContent(request);
+  }
+
+  const draft = (response.text || "").trim();
 
   return { storyId: story.storyId, model: MODEL, draft, generatedAt: new Date().toISOString() };
 }
 
 /**
- * Genera un borrador de NOTICIA breve llamando a la API de Claude con el
+ * Genera un borrador de NOTICIA breve llamando a la API de Gemini con el
  * prompt editorial completo (editorialPrompt.ts). Dos guardas duras antes
  * de llamar a la IA, ninguna evitable:
  *
- *  1. Sin ANTHROPIC_API_KEY configurada, lanza error explícito — nunca
+ *  1. Sin GEMINI_API_KEY configurada, lanza error explícito — nunca
  *     inventa un borrador falso.
  *  2. Sin corroboración de una fuente NIVEL A o B (story.hasCorroboration),
  *     se niega a redactar — una Story vista solo por NIVEL C/D es apenas
@@ -71,7 +79,7 @@ export async function generateArticleDraft(story: Story): Promise<GeneratedArtic
   // bloquea, ver autoPublish.ts) como el botón manual del panel, donde
   // un humano pidió explícitamente generar el borrador y debe poder
   // verlo para decidir él mismo. Ver looksLikeInsufficientMaterial.
-  return callClaude(EDITORIAL_SYSTEM_PROMPT, story);
+  return callGemini(EDITORIAL_SYSTEM_PROMPT, story);
 }
 
 /**
@@ -82,5 +90,5 @@ export async function generateArticleDraft(story: Story): Promise<GeneratedArtic
  */
 export async function generateExplainerDraft(story: Story): Promise<GeneratedArticle> {
   assertCanGenerate(story);
-  return callClaude(EXPLICA_SYSTEM_PROMPT, story);
+  return callGemini(EXPLICA_SYSTEM_PROMPT, story);
 }

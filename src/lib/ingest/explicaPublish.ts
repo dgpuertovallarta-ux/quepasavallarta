@@ -28,7 +28,7 @@ export type ExplicaPublishResult =
  */
 export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublishResult> {
   if (!isAiConfigured() || !isDatabaseConfigured()) {
-    return { ran: false, reason: "ANTHROPIC_API_KEY o DATABASE_URL no configuradas." };
+    return { ran: false, reason: "GEMINI_API_KEY o DATABASE_URL no configuradas." };
   }
 
   const lastAt = await getLastExplainerPublishedAt();

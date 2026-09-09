@@ -52,7 +52,12 @@ export function parseArticleDraft(draft: string): ParsedArticle {
   const bodyParagraphs: string[] = [];
 
   for (const block of blocks) {
-    const clean = block.replace(/\*\*/g, "");
+    // Gemini a veces devuelve encabezados con varios "#" apilados (p. ej.
+    // "## ### QUÉ PASÓ") en vez de un solo nivel — se limpian todos los
+    // marcadores de encabezado markdown al inicio de línea antes de
+    // detectar si es un encabezado de sección, para no dejarlos pasar
+    // crudos al título ni al cuerpo.
+    const clean = block.replace(/\*\*/g, "").replace(/^(?:#{1,6}\s*)+/gm, "");
     if (/^TITULAR:?/i.test(clean)) {
       title = clean.replace(/^TITULAR:?\s*/i, "").trim();
       continue;
@@ -86,6 +91,6 @@ export function parseArticleDraft(draft: string): ParsedArticle {
   }
 
   if (!title) title = bodyParagraphs[0] || "Sin título";
-  title = title.replace(/^#+\s*/, "").trim(); // nunca dejar pasar un "##" crudo como título
+  title = title.replace(/^(?:#{1,6}\s*)+/, "").trim(); // nunca dejar pasar un "##" crudo como título
   return { title, excerpt, bodyParagraphs };
 }
