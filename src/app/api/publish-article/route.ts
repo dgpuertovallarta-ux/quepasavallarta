@@ -65,8 +65,9 @@ export async function POST(request: Request) {
       newsScore,
       aiModel,
       storyExternalKey,
-      imageUrl: generatedImage?.dataUrl,
+      imageUrl: generatedImage?.url,
       imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
+      imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
     });
     return NextResponse.json({ published: true, slug: result.slug }, { status: 200 });
   } catch (err) {

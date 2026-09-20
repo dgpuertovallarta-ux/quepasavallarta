@@ -5,6 +5,8 @@ import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleForma
 import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
+import { publishToSocial } from "../social/publishToSocial";
+import { siteUrl } from "../storage/imageBlobs";
 
 // Límite por corrida — cada auto-publicación llama a la API de Claude
 // (varios segundos) y ahora también intenta descargar la página de la
@@ -21,6 +23,7 @@ export type AutoPublishResult = {
   published: number;
   alreadyPublished: number;
   errors: { storyId: string; error: string }[];
+  social: { facebookPublished: number; instagramPublished: number; errors: string[] };
 };
 
 /**
@@ -33,7 +36,13 @@ export type AutoPublishResult = {
  * en cada corrida del cron).
  */
 export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResult> {
-  const result: AutoPublishResult = { attempted: 0, published: 0, alreadyPublished: 0, errors: [] };
+  const result: AutoPublishResult = {
+    attempted: 0,
+    published: 0,
+    alreadyPublished: 0,
+    errors: [],
+    social: { facebookPublished: 0, instagramPublished: 0, errors: [] },
+  };
   if (!isAiConfigured() || !isDatabaseConfigured()) return result;
 
   const eligible = stories.filter(isAutoPublishEligible).slice(0, MAX_AUTO_PUBLISH_PER_RUN);
@@ -75,7 +84,7 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
       const primarySource = story.items[0];
       const generatedImage = await generateArticleImage({ title, excerpt, categorySlug: primarySource.categoryGuess });
 
-      await publishArticle({
+      const { slug } = await publishArticle({
         title,
         excerpt,
         body: bodyParagraphs.join("\n\n"),
@@ -83,10 +92,26 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
         newsScore: story.maxNewsScore,
         aiModel: draft.model,
         storyExternalKey: story.storyId,
-        imageUrl: generatedImage?.dataUrl,
+        imageUrl: generatedImage?.url,
         imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
+        imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
       });
       result.published++;
+
+      // Publicación en redes — nunca bloquea ni revierte lo anterior, el
+      // artículo ya quedó publicado en el sitio en este punto. Sin las
+      // variables de entorno de Facebook/Instagram configuradas, esto no
+      // hace nada (ver publishToSocial.ts).
+      const social = await publishToSocial({
+        title,
+        excerpt,
+        articleUrl: `${siteUrl()}/noticia/${slug}`,
+        imageUrl: generatedImage?.url,
+      });
+      if (social.facebook.ok) result.social.facebookPublished++;
+      else if (social.facebook.attempted) result.social.errors.push(`Facebook (${slug}): ${social.facebook.error}`);
+      if (social.instagram.ok) result.social.instagramPublished++;
+      else if (social.instagram.attempted) result.social.errors.push(`Instagram (${slug}): ${social.instagram.error}`);
     } catch (err) {
       result.errors.push({ storyId: story.storyId, error: err instanceof Error ? err.message : "Error desconocido" });
     }

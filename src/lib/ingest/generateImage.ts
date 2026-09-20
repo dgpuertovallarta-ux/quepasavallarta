@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { saveImageBlob } from "../storage/imageBlobs";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 
@@ -7,7 +8,8 @@ export function isImageAiConfigured(): boolean {
 }
 
 export type GeneratedImage = {
-  dataUrl: string;
+  /** URL pública real (Netlify Blobs, servida vía /api/image/[key]) — no un data URL. Publicable en Instagram/Facebook. */
+  url: string;
   model: string;
 };
 
@@ -63,9 +65,13 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string): stri
  * para usarse directamente como `imageUrl` en publishArticle — no
  * requiere almacenamiento externo ni configurar dominios de imágenes.
  *
- * Nunca lanza: si falla, no hay GEMINI_API_KEY, o el modelo no devuelve
- * una imagen, retorna null y el llamador cae de vuelta al banco de fotos
- * ilustrativas por categoría (mismo patrón que extractOgImage antes).
+ * La imagen se guarda en Netlify Blobs y se sirve desde nuestro propio
+ * dominio (/api/image/[key]) — así la URL es públicamente descargable,
+ * requisito de la API de Instagram/Facebook para publicar (ver
+ * lib/social/). Nunca lanza: si falla, no hay GEMINI_API_KEY, o el
+ * modelo no devuelve una imagen, retorna null y el llamador cae de
+ * vuelta al banco de fotos ilustrativas por categoría (mismo patrón que
+ * extractOgImage antes).
  */
 export async function generateArticleImage(input: {
   title: string;
@@ -95,7 +101,9 @@ export async function generateArticleImage(input: {
     if (!imagePart?.inlineData?.data) return null;
 
     const mimeType = imagePart.inlineData.mimeType || "image/png";
-    return { dataUrl: `data:${mimeType};base64,${imagePart.inlineData.data}`, model: IMAGE_MODEL };
+    const bytes = Buffer.from(imagePart.inlineData.data, "base64");
+    const { url } = await saveImageBlob(bytes, mimeType);
+    return { url, model: IMAGE_MODEL };
   } catch (err) {
     console.error("[generateArticleImage] Falló la generación de imagen:", err instanceof Error ? err.message : err);
     return null;

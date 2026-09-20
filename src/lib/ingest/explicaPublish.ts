@@ -66,8 +66,9 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
         newsScore: story.maxNewsScore,
         aiModel: draft.model,
         storyExternalKey: story.storyId,
-        imageUrl: generatedImage?.dataUrl,
+        imageUrl: generatedImage?.url,
         imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
+        imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
         isExplainer: true,
       });
 

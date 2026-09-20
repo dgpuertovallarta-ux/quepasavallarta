@@ -349,14 +349,17 @@ export type PublishArticleInput = {
   aiModel: string | null;
   storyExternalKey: string | null;
   /**
-   * Imagen del artículo. Desde 2026-09 es un data URL (base64) generado
-   * por IA (ver generateImage.ts) — reemplaza la foto real extraída de la
-   * fuente que se usaba antes (ver extractImage.ts, que queda sin usar en
-   * el flujo normal por el riesgo de derechos de autor que traía).
+   * Imagen del artículo. Desde 2026-09 es una URL pública generada por IA
+   * y servida desde /api/image/[key] (ver generateImage.ts + imageBlobs.ts)
+   * — reemplaza la foto real extraída de la fuente que se usaba antes (ver
+   * extractImage.ts, que queda sin usar en el flujo normal por el riesgo
+   * de derechos de autor que traía).
    */
   imageUrl?: string;
   imageSourceUrl?: string;
   imageCredit?: string;
+  /** Explícito porque ya no se puede inferir de la forma de la URL (antes era un data: URL). Default: 'illustrative_fallback' si no hay imageUrl. */
+  imageLicenseStatus?: "ai_generated" | "source_unlicensed" | "illustrative_fallback";
   /** true para "Vallarta Explica" (ver explicaPublish.ts) — false (default) para noticia breve. */
   isExplainer?: boolean;
 };
@@ -393,9 +396,7 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
       suffix++;
     }
 
-    const imageLicenseStatus = input.imageUrl
-      ? (input.imageUrl.startsWith("data:") ? "ai_generated" : "source_unlicensed")
-      : "illustrative_fallback";
+    const imageLicenseStatus = input.imageLicenseStatus || (input.imageUrl ? "source_unlicensed" : "illustrative_fallback");
     const imageExtractedAt = input.imageUrl ? new Date().toISOString() : null;
 
     await client.query(
