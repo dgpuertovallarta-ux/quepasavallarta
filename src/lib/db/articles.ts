@@ -422,3 +422,49 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
     client.release();
   }
 }
+
+// ---------------------------------------------------------------------
+// REGENERAR IMÁGENES DE ARTÍCULOS VIEJOS — el propietario pidió (2026-09)
+// que todos los artículos publicados antes de activar generateImage.ts
+// (que hoy siguen con la foto ilustrativa repetida por categoría) también
+// tengan su propia imagen única generada por IA. Ver backfillImages.ts.
+// ---------------------------------------------------------------------
+
+export type ArticleNeedingImage = { slug: string; title: string; excerpt: string; categorySlug: string };
+
+/** Artículos (noticias y Vallarta Explica) que todavía NO tienen imagen generada por IA. */
+export async function getArticlesNeedingImageBackfill(limit = 8): Promise<ArticleNeedingImage[]> {
+  if (!isDatabaseConfigured()) return [];
+  const pool = getPool();
+  const res = await pool.query<{ slug: string; title: string; excerpt: string | null; category_slug: string | null }>(
+    `select a.slug, a.title, a.excerpt, c.slug as category_slug
+     from articles a
+     left join categories c on c.id = a.category_id
+     where a.status = 'published'
+       and (a.image_license_status is distinct from 'ai_generated' or a.image_license_status is null)
+     order by a.published_at desc nulls last
+     limit $1`,
+    [limit]
+  );
+  return res.rows.map((r) => ({
+    slug: r.slug,
+    title: r.title,
+    excerpt: r.excerpt || "",
+    categorySlug: r.category_slug || "comunidad",
+  }));
+}
+
+/** Reemplaza la imagen de un artículo ya publicado por una generada con IA. */
+export async function updateArticleImage(
+  slug: string,
+  input: { imageUrl: string; imageCredit: string }
+): Promise<void> {
+  const pool = getPool();
+  await pool.query(
+    `update articles
+     set image_url = $1, image_credit = $2, image_source_url = null,
+         image_license_status = 'ai_generated', image_extracted_at = now(), updated_at = now()
+     where slug = $3`,
+    [input.imageUrl, input.imageCredit, slug]
+  );
+}
