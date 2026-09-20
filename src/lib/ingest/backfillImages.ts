@@ -3,10 +3,13 @@ import { getArticlesNeedingImageBackfill, updateArticleImage } from "../db/artic
 import { isDatabaseConfigured } from "../db/client";
 
 // Cada artículo tarda unos segundos (llamada a Gemini + guardar en Netlify
-// Blobs). Un lote chico evita exceder el límite de duración de la función
-// serverless en Netlify (maxDuration=60s en la route). Se corre llamando
-// al endpoint varias veces seguidas hasta que "remaining" salga en false.
-const MAX_BACKFILL_PER_RUN = 6;
+// Blobs). Bajado de 6 a 2 (2026-09) por el mismo motivo que
+// MAX_AUTO_PUBLISH_PER_RUN en autoPublish.ts — con lotes grandes el
+// request completo tardaba más de lo que el proxy de Netlify tolera en
+// una invocación síncrona y la conexión se cortaba sin devolver
+// respuesta. Se corre llamando al endpoint varias veces seguidas hasta
+// que "remaining" salga en false.
+const MAX_BACKFILL_PER_RUN = 2;
 
 export type BackfillResult = {
   attempted: number;

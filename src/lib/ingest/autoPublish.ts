@@ -9,14 +9,17 @@ import { publishToSocial } from "../social/publishToSocial";
 import { siteUrl } from "../storage/imageBlobs";
 
 // Límite por corrida — cada auto-publicación llama a la API de Claude
-// (varios segundos) y ahora también intenta descargar la página de la
-// fuente para extraer su foto (hasta 8s más), todo dentro del mismo
-// request de /api/ingest, que ya gasta tiempo descargando las fuentes
-// RSS. Un número bajo evita exceder el límite de duración de la función
-// serverless en Netlify (maxDuration=60s en la route). Las que no
-// alcancen esta corrida se recogen en la siguiente (cada 30 min) — no
-// se pierden, solo se reparten en el tiempo.
-const MAX_AUTO_PUBLISH_PER_RUN = 3;
+// (varios segundos) y ahora también genera una imagen con IA (otra
+// llamada de varios segundos) y la sube a Netlify Blobs, todo dentro del
+// mismo request de /api/ingest, que ya gasta tiempo descargando las
+// fuentes RSS. Bajado de 3 a 1 (2026-09) porque con 3 el request completo
+// empezó a tardar más de lo que el proxy de Netlify tolera en una
+// invocación síncrona — la conexión se cortaba a medias sin ni siquiera
+// devolver el error, dejando /api/ingest "colgado" para quien lo visita
+// y, más grave, probablemente también para el cron programado. Las
+// Stories que no alcancen esta corrida se recogen en la siguiente (cada
+// 30 min) — no se pierden, solo se reparten en el tiempo.
+const MAX_AUTO_PUBLISH_PER_RUN = 1;
 
 export type AutoPublishResult = {
   attempted: number;
