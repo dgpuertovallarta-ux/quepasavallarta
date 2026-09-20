@@ -2,7 +2,7 @@ import type { Story } from "./storyGraph";
 import { isAutoPublishEligible } from "./storyGraph";
 import { generateArticleDraft, isAiConfigured } from "./generateArticle";
 import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
-import { extractOgImage } from "./extractImage";
+import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 
@@ -69,11 +69,11 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
         throw new Error(`Ya existe un artículo muy similar publicado recientemente (${similarSlug}) — se omite para no duplicar.`);
       }
 
-      // Foto real de la fuente (decisión del propietario, con el riesgo de
-      // derechos de autor ya explicado — ver extractImage.ts). Si falla,
-      // publishArticle cae de vuelta a la imagen ilustrativa por categoría.
+      // Imagen 100% generada por IA (nunca la foto real del hecho) — ver
+      // generateImage.ts. Si falla, publishArticle cae de vuelta a la
+      // imagen ilustrativa por categoría, igual que antes con la fuente.
       const primarySource = story.items[0];
-      const extractedImage = await extractOgImage(primarySource.link);
+      const generatedImage = await generateArticleImage({ title, excerpt, categorySlug: primarySource.categoryGuess });
 
       await publishArticle({
         title,
@@ -83,9 +83,8 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
         newsScore: story.maxNewsScore,
         aiModel: draft.model,
         storyExternalKey: story.storyId,
-        imageUrl: extractedImage?.url,
-        imageSourceUrl: extractedImage?.sourceUrl,
-        imageCredit: primarySource.sourceName,
+        imageUrl: generatedImage?.dataUrl,
+        imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
       });
       result.published++;
     } catch (err) {

@@ -348,7 +348,12 @@ export type PublishArticleInput = {
   newsScore: number;
   aiModel: string | null;
   storyExternalKey: string | null;
-  /** Foto real extraída de la fuente (og:image) — ver extractImage.ts y la advertencia de derechos de autor en /docs/N8N_AUTOMATION.md. */
+  /**
+   * Imagen del artículo. Desde 2026-09 es un data URL (base64) generado
+   * por IA (ver generateImage.ts) — reemplaza la foto real extraída de la
+   * fuente que se usaba antes (ver extractImage.ts, que queda sin usar en
+   * el flujo normal por el riesgo de derechos de autor que traía).
+   */
   imageUrl?: string;
   imageSourceUrl?: string;
   imageCredit?: string;
@@ -388,7 +393,9 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
       suffix++;
     }
 
-    const imageLicenseStatus = input.imageUrl ? "source_unlicensed" : "illustrative_fallback";
+    const imageLicenseStatus = input.imageUrl
+      ? (input.imageUrl.startsWith("data:") ? "ai_generated" : "source_unlicensed")
+      : "illustrative_fallback";
     const imageExtractedAt = input.imageUrl ? new Date().toISOString() : null;
 
     await client.query(

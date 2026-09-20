@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isDatabaseConfigured } from "@/lib/db/client";
-import { publishArticle, getPrimarySourceForStory, findSimilarRecentArticle } from "@/lib/db/articles";
-import { extractOgImage } from "@/lib/ingest/extractImage";
+import { publishArticle, findSimilarRecentArticle } from "@/lib/db/articles";
+import { generateArticleImage } from "@/lib/ingest/generateImage";
 import { CATEGORIES } from "@/lib/data";
 
 /**
@@ -52,12 +52,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Foto real de la fuente (decisión del propietario, con el riesgo de
-    // derechos de autor ya explicado — ver extractImage.ts). Si no hay
-    // storyExternalKey, o falla la extracción, publishArticle cae de
-    // vuelta a la imagen ilustrativa por categoría.
-    const primarySource = storyExternalKey ? await getPrimarySourceForStory(storyExternalKey) : null;
-    const extractedImage = primarySource ? await extractOgImage(primarySource.url) : null;
+    // Imagen 100% generada por IA (nunca la foto real del hecho) — ver
+    // generateImage.ts. Si falla, publishArticle cae de vuelta a la
+    // imagen ilustrativa por categoría.
+    const generatedImage = await generateArticleImage({ title, excerpt, categorySlug });
 
     const result = await publishArticle({
       title,
@@ -67,9 +65,8 @@ export async function POST(request: Request) {
       newsScore,
       aiModel,
       storyExternalKey,
-      imageUrl: extractedImage?.url,
-      imageSourceUrl: extractedImage?.sourceUrl,
-      imageCredit: primarySource?.sourceName,
+      imageUrl: generatedImage?.dataUrl,
+      imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
     });
     return NextResponse.json({ published: true, slug: result.slug }, { status: 200 });
   } catch (err) {

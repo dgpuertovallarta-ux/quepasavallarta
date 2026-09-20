@@ -2,7 +2,7 @@ import type { Story } from "./storyGraph";
 import { isAutoPublishEligible } from "./storyGraph";
 import { generateExplainerDraft, isAiConfigured } from "./generateArticle";
 import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
-import { extractOgImage } from "./extractImage";
+import { generateArticleImage } from "./generateImage";
 import { hasExplainerForStory, getLastExplainerPublishedAt, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 
@@ -56,7 +56,7 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
       }
 
       const primarySource = story.items[0];
-      const extractedImage = await extractOgImage(primarySource.link);
+      const generatedImage = await generateArticleImage({ title, excerpt, categorySlug: primarySource.categoryGuess });
 
       await publishArticle({
         title,
@@ -66,9 +66,8 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
         newsScore: story.maxNewsScore,
         aiModel: draft.model,
         storyExternalKey: story.storyId,
-        imageUrl: extractedImage?.url,
-        imageSourceUrl: extractedImage?.sourceUrl,
-        imageCredit: primarySource.sourceName,
+        imageUrl: generatedImage?.dataUrl,
+        imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
         isExplainer: true,
       });
 
