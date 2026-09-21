@@ -48,12 +48,16 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
   const lines = [
     "Genera UNA fotografía editorial realista (no ilustración, no dibujo, no render 3D evidente) para acompañar una noticia local de un sitio de noticias.",
     context,
-    `Escena sugerida: ${hint}.`,
-    "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9, colores cálidos consistentes con Puerto Vallarta (dorados, azules del mar).",
   ];
   if (hasReference) {
     lines.push(
-      "Se adjunta una fotografía de referencia tomada de la cobertura original del hecho — úsala SOLO para entender el lugar, el tipo de escena y el ambiente real (edificios, entorno, clima, elementos visibles), de modo que tu imagen corresponda de verdad a lo que está pasando, no a una escena genérica sin relación."
+      "Se adjunta una fotografía de referencia tomada de la cobertura original del hecho. Es la fuente principal de la escena: usa su lugar específico, tipo de edificio o entorno, clima, hora del día, colores y composición general como base real de tu imagen — PRIORIZA lo que muestra la referencia por encima de cualquier escena típica o genérica del tema. Si la referencia muestra un interior, una oficina, un vehículo, un objeto concreto, etc., tu imagen debe reflejar ESO específicamente, no una vista genérica de calle o malecón.",
+      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9 — mantén la paleta de color y el ambiente de la referencia en vez de forzar tonos dorados/azules genéricos si no corresponden a la escena real."
+    );
+  } else {
+    lines.push(
+      `Escena sugerida: ${hint}.`,
+      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9, colores cálidos consistentes con Puerto Vallarta (dorados, azules del mar)."
     );
   }
   lines.push(
@@ -62,7 +66,7 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
     "- NO representes a ninguna persona real, famosa o identificable — si aparecen personas, deben ser genéricas y no reconocibles (de espaldas, a distancia, o sin protagonismo del rostro).",
     "- NO copies el estilo, logo o diseño de ningún medio de noticias existente.",
     hasReference
-      ? "- NO reproduzcas ni copies la fotografía de referencia — dibuja una imagen enteramente nueva y original inspirada solo en el entorno/escenario que muestra, nunca una reproducción de ella ni de su encuadre exacto."
+      ? "- NO reproduzcas ni copies la fotografía de referencia tal cual — dibuja una imagen enteramente nueva y original que reinterprete esa misma escena específica, nunca una reproducción de ella ni de su encuadre exacto."
       : "- Es una imagen ilustrativa y genérica del tema, no una fotografía del hecho específico — no la presentes como si fuera evidencia real del suceso."
   );
   return lines.join("\n");
