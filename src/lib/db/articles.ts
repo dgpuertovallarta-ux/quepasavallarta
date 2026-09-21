@@ -430,28 +430,50 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
 // tengan su propia imagen única generada por IA. Ver backfillImages.ts.
 // ---------------------------------------------------------------------
 
-export type ArticleNeedingImage = { slug: string; title: string; excerpt: string; categorySlug: string };
+export type ArticleNeedingImage = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  categorySlug: string;
+  /** Link al artículo original, si quedó registrado — se usa como referencia visual (ver generateImage.ts). */
+  sourceUrl?: string;
+};
 
 /** Artículos (noticias y Vallarta Explica) que todavía NO tienen imagen generada por IA. */
 export async function getArticlesNeedingImageBackfill(limit = 8): Promise<ArticleNeedingImage[]> {
   if (!isDatabaseConfigured()) return [];
   const pool = getPool();
-  const res = await pool.query<{ slug: string; title: string; excerpt: string | null; category_slug: string | null }>(
-    `select a.slug, a.title, a.excerpt, c.slug as category_slug
+  const res = await pool.query<{
+    slug: string;
+    title: string;
+    excerpt: string | null;
+    category_slug: string | null;
+    source_url: string | null;
+  }>(
+    `select a.slug, a.title, a.excerpt, c.slug as category_slug, ss.url as source_url
      from articles a
      left join categories c on c.id = a.category_id
+     left join story_sources ss on ss.story_id = a.story_id
      where a.status = 'published'
        and (a.image_license_status is distinct from 'ai_generated' or a.image_license_status is null)
      order by a.published_at desc nulls last
      limit $1`,
     [limit]
   );
-  return res.rows.map((r) => ({
-    slug: r.slug,
-    title: r.title,
-    excerpt: r.excerpt || "",
-    categorySlug: r.category_slug || "comunidad",
-  }));
+  const seen = new Set<string>();
+  const items: ArticleNeedingImage[] = [];
+  for (const r of res.rows) {
+    if (seen.has(r.slug)) continue; // el join con story_sources puede duplicar filas (varias fuentes por story)
+    seen.add(r.slug);
+    items.push({
+      slug: r.slug,
+      title: r.title,
+      excerpt: r.excerpt || "",
+      categorySlug: r.category_slug || "comunidad",
+      sourceUrl: r.source_url || undefined,
+    });
+  }
+  return items;
 }
 
 /** Reemplaza la imagen de un artículo ya publicado por una generada con IA. */

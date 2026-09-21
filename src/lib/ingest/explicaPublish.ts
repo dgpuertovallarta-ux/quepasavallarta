@@ -56,7 +56,12 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
       }
 
       const primarySource = story.items[0];
-      const generatedImage = await generateArticleImage({ title, excerpt, categorySlug: primarySource.categoryGuess });
+      const generatedImage = await generateArticleImage({
+        title,
+        excerpt,
+        categorySlug: primarySource.categoryGuess,
+        sourceUrl: primarySource.link,
+      });
 
       await publishArticle({
         title,

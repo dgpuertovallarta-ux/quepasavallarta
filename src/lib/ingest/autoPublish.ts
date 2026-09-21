@@ -85,7 +85,12 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
       // generateImage.ts. Si falla, publishArticle cae de vuelta a la
       // imagen ilustrativa por categoría, igual que antes con la fuente.
       const primarySource = story.items[0];
-      const generatedImage = await generateArticleImage({ title, excerpt, categorySlug: primarySource.categoryGuess });
+      const generatedImage = await generateArticleImage({
+        title,
+        excerpt,
+        categorySlug: primarySource.categoryGuess,
+        sourceUrl: primarySource.link,
+      });
 
       const { slug } = await publishArticle({
         title,

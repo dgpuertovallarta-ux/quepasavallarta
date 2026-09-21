@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isDatabaseConfigured } from "@/lib/db/client";
-import { publishArticle, findSimilarRecentArticle } from "@/lib/db/articles";
+import { publishArticle, findSimilarRecentArticle, getPrimarySourceForStory } from "@/lib/db/articles";
 import { generateArticleImage } from "@/lib/ingest/generateImage";
 import { CATEGORIES } from "@/lib/data";
 
@@ -53,9 +53,11 @@ export async function POST(request: Request) {
 
   try {
     // Imagen 100% generada por IA (nunca la foto real del hecho) — ver
-    // generateImage.ts. Si falla, publishArticle cae de vuelta a la
-    // imagen ilustrativa por categoría.
-    const generatedImage = await generateArticleImage({ title, excerpt, categorySlug });
+    // generateImage.ts. Se usa la foto de la fuente solo como referencia
+    // visual para que la escena corresponda al lugar/hecho real. Si todo
+    // falla, publishArticle cae de vuelta a la imagen ilustrativa por categoría.
+    const primarySource = storyExternalKey ? await getPrimarySourceForStory(storyExternalKey) : null;
+    const generatedImage = await generateArticleImage({ title, excerpt, categorySlug, sourceUrl: primarySource?.url });
 
     const result = await publishArticle({
       title,
