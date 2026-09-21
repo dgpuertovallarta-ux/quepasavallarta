@@ -3,13 +3,13 @@ import { getArticlesNeedingImageBackfill, updateArticleImage } from "../db/artic
 import { isDatabaseConfigured } from "../db/client";
 
 // Cada artículo tarda unos segundos (llamada a Gemini + guardar en Netlify
-// Blobs). Bajado de 6 a 2 (2026-09) por el mismo motivo que
-// MAX_AUTO_PUBLISH_PER_RUN en autoPublish.ts — con lotes grandes el
-// request completo tardaba más de lo que el proxy de Netlify tolera en
-// una invocación síncrona y la conexión se cortaba sin devolver
-// respuesta. Se corre llamando al endpoint varias veces seguidas hasta
-// que "remaining" salga en false.
-const MAX_BACKFILL_PER_RUN = 2;
+// Blobs). Subido de 2 a 5 (2026-09) — con 151 artículos pendientes del
+// backfill, 2 por corrida era demasiado lento para procesarlos a mano.
+// Este endpoint (a diferencia de /api/ingest) no descarga fuentes RSS
+// primero, así que tiene más margen de tiempo por corrida. Se corre
+// llamando al endpoint varias veces seguidas hasta que "remaining" salga
+// en false; si empieza a fallar por timeout, bajar este número de nuevo.
+const MAX_BACKFILL_PER_RUN = 5;
 
 export type BackfillResult = {
   attempted: number;
