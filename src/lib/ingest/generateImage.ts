@@ -145,8 +145,8 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
   ];
   if (hasReference) {
     lines.push(
-      "Se adjunta una fotografía de referencia tomada de la cobertura original del hecho. Es la fuente principal de la escena: usa su lugar específico, tipo de edificio o entorno, clima, hora del día, colores y composición general como base real de tu imagen — PRIORIZA lo que muestra la referencia por encima de cualquier escena típica o genérica del tema. Si la referencia muestra un interior, una oficina, un vehículo, un objeto concreto, etc., tu imagen debe reflejar ESO específicamente, no una vista genérica de calle o malecón.",
-      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9 — mantén la paleta de color y el ambiente de la referencia en vez de forzar tonos dorados/azules genéricos si no corresponden a la escena real."
+      "Se adjunta una fotografía de referencia tomada de la cobertura original del hecho. Decisión explícita del propietario del sitio: la imagen generada debe ser una RÉPLICA FIEL de esa referencia — mismo encuadre, mismos sujetos y objetos principales, misma composición, mismos colores, misma iluminación y hora del día. No es una inspiración libre ni una escena alternativa: reproduce lo más fielmente posible lo que se ve en la foto de referencia, redibujándolo como una imagen nueva.",
+      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9 — igual a la de la referencia."
     );
   } else {
     lines.push(
@@ -161,7 +161,7 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
     "- NO representes a ninguna persona real, famosa o identificable — si aparecen personas, deben ser genéricas y no reconocibles (de espaldas, a distancia, o sin protagonismo del rostro).",
     "- NO copies el estilo, logo o diseño de ningún medio de noticias existente.",
     hasReference
-      ? "- NO reproduzcas ni copies la fotografía de referencia tal cual — dibuja una imagen enteramente nueva y original que reinterprete esa misma escena específica, nunca una reproducción de ella ni de su encuadre exacto."
+      ? "- Si en la referencia aparecen personas, consérvalas en la misma posición y actividad para que la réplica sea fiel, pero hazlas no identificables (rostro borroso, de espaldas, o a distancia) — nunca un retrato nítido de una persona real reconocible."
       : "- Es una imagen ilustrativa y genérica del tema, no una fotografía del hecho específico — no la presentes como si fuera evidencia real del suceso."
   );
   return lines.join("\n");
