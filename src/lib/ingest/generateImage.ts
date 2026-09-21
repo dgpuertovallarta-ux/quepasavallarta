@@ -14,36 +14,130 @@ export type GeneratedImage = {
   model: string;
 };
 
-// Vocabulario visual por categoría — mismo criterio que CATEGORY_IMAGES en
-// db/articles.ts, pero como descripción de escena para la IA en vez de un
-// banco de fotos fijo. Mantiene consistencia visual del sitio sin usar
-// nunca la foto real del hecho.
-const CATEGORY_VISUAL_HINTS: Record<string, string> = {
-  "ultima-hora": "el malecón de Puerto Vallarta al atardecer, luces difusas de fondo, tono urgente pero sobrio",
-  seguridad: "una calle de Puerto Vallarta con presencia de autoridad a distancia, luz de tarde, estilo fotoperiodístico sobrio",
-  gobierno: "el palacio municipal o una oficina de gobierno de Puerto Vallarta, fachada institucional",
-  comunidad: "vecinos y vida de barrio en una calle empedrada de Puerto Vallarta",
-  turismo: "la bahía de Banderas con veleros y el malecón, luz cálida de atardecer",
-  economia: "un mercado o zona comercial de Puerto Vallarta, ambiente cotidiano",
-  negocios: "una fachada de negocio local en el centro de Puerto Vallarta",
-  transito: "una avenida de Puerto Vallarta con tráfico y semáforos, vista de calle",
-  playas: "una playa de Puerto Vallarta con palmeras, arena y mar turquesa",
-  clima: "cielo dramático sobre la bahía de Banderas, nubes de tormenta o sol intenso según el tema",
-  cultura: "una plaza o evento cultural en el malecón de Puerto Vallarta",
-  gastronomia: "un puesto de comida callejera o restaurante costero en Puerto Vallarta",
-  eventos: "una multitud genérica en un evento público en el malecón de Puerto Vallarta",
-  entretenimiento: "una escena nocturna de entretenimiento en el malecón de Puerto Vallarta",
-  deportes: "una cancha o actividad deportiva al aire libre en Puerto Vallarta",
-  "medio-ambiente": "la selva costera o el mar de Bahía de Banderas, tono conservacionista",
-  servicios: "trabajadores de servicios públicos en una calle de Puerto Vallarta",
-  politica: "el palacio municipal de Puerto Vallarta o una plaza pública",
-  jalisco: "un paisaje representativo del estado de Jalisco",
-  mexico: "un paisaje representativo de México",
-  mundo: "una imagen editorial genérica de noticias internacionales",
+// Vocabulario visual por categoría — varias variantes por categoría (no
+// una sola frase fija) para que, cuando no haya foto de referencia real,
+// no se repita siempre la misma composición. Se elige una variante de
+// forma determinística según el título del artículo (ver pickVariant).
+const CATEGORY_VISUAL_HINTS: Record<string, string[]> = {
+  "ultima-hora": [
+    "el malecón de Puerto Vallarta al atardecer, luces difusas de fondo, tono urgente pero sobrio",
+    "una esquina del centro de Puerto Vallarta de noche, luces de la calle, ambiente de alerta",
+    "una vista aérea baja del centro de Puerto Vallarta al anochecer, tono informativo",
+  ],
+  seguridad: [
+    "una calle de Puerto Vallarta con presencia de autoridad a distancia, luz de tarde, estilo fotoperiodístico sobrio",
+    "una patrulla estacionada en una avenida de Puerto Vallarta de noche, luces intermitentes difusas",
+    "una zona residencial tranquila de Puerto Vallarta con una caseta de vigilancia, luz de atardecer",
+  ],
+  gobierno: [
+    "el palacio municipal de Puerto Vallarta, fachada institucional de día",
+    "una sala de juntas o auditorio institucional sobrio, sin personas identificables",
+    "una plaza pública frente a un edificio de gobierno de Puerto Vallarta",
+  ],
+  comunidad: [
+    "una calle empedrada de un barrio de Puerto Vallarta, vecinos caminando de espaldas",
+    "un mercado de barrio en Puerto Vallarta, puestos y gente comprando de espaldas",
+    "una banqueta con casas de colores en la Zona Romántica, plantas y macetas",
+    "una plaza de barrio con una fuente pequeña y árboles, gente sentada a distancia",
+  ],
+  turismo: [
+    "la bahía de Banderas con veleros y el malecón, luz cálida de atardecer",
+    "una playa turística de Puerto Vallarta con palapas y camastros, mañana soleada",
+    "un mirador con vista al pueblo y al mar desde las colinas de Puerto Vallarta",
+  ],
+  economia: [
+    "un mercado o zona comercial de Puerto Vallarta, ambiente cotidiano de día",
+    "una fila de comercios pequeños en una calle del centro, movimiento de gente de espaldas",
+    "una oficina bancaria o cajero automático en una calle de Puerto Vallarta",
+  ],
+  negocios: [
+    "una fachada de negocio local en el centro de Puerto Vallarta, letrero genérico sin marca real",
+    "el interior de un pequeño restaurante o tienda local, luz cálida, sin personas identificables",
+    "una terraza de café en la Zona Romántica al atardecer",
+  ],
+  transito: [
+    "una avenida de Puerto Vallarta con tráfico y semáforos, vista de calle de día",
+    "un cruce peatonal concurrido en el centro de Puerto Vallarta",
+    "una vialidad costera con autos y camiones al atardecer",
+  ],
+  playas: [
+    "una playa de Puerto Vallarta con palmeras, arena y mar turquesa, mañana soleada",
+    "una playa rocosa con oleaje en Puerto Vallarta, cielo parcialmente nublado",
+    "una palapa vacía en la orilla del mar al atardecer",
+  ],
+  clima: [
+    "cielo dramático con nubes de tormenta sobre la bahía de Banderas",
+    "un cielo despejado e intenso sol de mediodía sobre el malecón",
+    "lluvia cayendo sobre una calle de Puerto Vallarta, reflejos en el pavimento",
+  ],
+  cultura: [
+    "una plaza con un evento cultural en el malecón de Puerto Vallarta, luces de noche",
+    "un mural o fachada colorida típica del centro de Puerto Vallarta",
+    "un grupo de danza folclórica genérico en una plaza pública, de espaldas o a distancia",
+  ],
+  gastronomia: [
+    "un puesto de comida callejera en Puerto Vallarta, humo y luces cálidas de noche",
+    "una mesa de mariscos frescos en un restaurante costero, luz de día",
+    "un mercado de comida local con puestos coloridos",
+  ],
+  eventos: [
+    "una multitud genérica en un evento público en el malecón de Puerto Vallarta, de noche",
+    "un escenario iluminado en una plaza pública, público de espaldas",
+    "puestos y luces de una feria o festival callejero",
+  ],
+  entretenimiento: [
+    "una escena nocturna de entretenimiento en el malecón de Puerto Vallarta, luces de neón difusas",
+    "una terraza con música en vivo genérica, luces cálidas de noche",
+    "un bar o antro en la Zona Romántica, ambiente nocturno sin rostros reconocibles",
+  ],
+  deportes: [
+    "una cancha o actividad deportiva al aire libre en Puerto Vallarta, día soleado",
+    "corredores en el malecón al amanecer, de espaldas",
+    "una cancha de voleibol de playa con jugadores genéricos a distancia",
+  ],
+  "medio-ambiente": [
+    "la selva costera de Bahía de Banderas, vegetación densa y neblina",
+    "el mar de Puerto Vallarta con manglares en primer plano",
+    "una playa con voluntarios recogiendo basura, de espaldas y a distancia",
+  ],
+  servicios: [
+    "trabajadores de servicios públicos en una calle de Puerto Vallarta, de espaldas",
+    "una cuadrilla reparando una tubería o cableado en la vía pública",
+    "un camión de servicios municipales estacionado en una calle residencial",
+  ],
+  politica: [
+    "el palacio municipal de Puerto Vallarta de día",
+    "una plaza pública con un templete o tarima genérica, sin personas identificables",
+    "un salón de sesiones institucional sobrio",
+  ],
+  jalisco: [
+    "un paisaje representativo del estado de Jalisco, montañas y campo",
+    "una plaza colonial típica de un pueblo de Jalisco",
+  ],
+  mexico: [
+    "un paisaje representativo de México, arquitectura colonial genérica",
+    "una plaza pública mexicana típica, bandera al fondo",
+  ],
+  mundo: [
+    "una imagen editorial genérica de noticias internacionales, mapa o globo terráqueo desenfocado",
+    "un aeropuerto o terminal internacional genérica",
+  ],
 };
 
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/** Elige una variante de forma determinística según el título — mismo artículo siempre da la misma variante, pero artículos distintos varían. */
+function pickVariant(categorySlug: string, title: string): string {
+  const variants = CATEGORY_VISUAL_HINTS[categorySlug] || CATEGORY_VISUAL_HINTS["comunidad"];
+  return variants[hashString(title) % variants.length];
+}
+
 function buildPrompt(title: string, excerpt: string, categorySlug: string, hasReference: boolean): string {
-  const hint = CATEGORY_VISUAL_HINTS[categorySlug] || CATEGORY_VISUAL_HINTS["comunidad"];
+  const hint = pickVariant(categorySlug, title);
   const context = `Tema de la noticia: "${title}". ${excerpt || ""}`.slice(0, 600);
   const lines = [
     "Genera UNA fotografía editorial realista (no ilustración, no dibujo, no render 3D evidente) para acompañar una noticia local de un sitio de noticias.",
@@ -57,7 +151,8 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
   } else {
     lines.push(
       `Escena sugerida: ${hint}.`,
-      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9, colores cálidos consistentes con Puerto Vallarta (dorados, azules del mar)."
+      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9, colores cálidos consistentes con Puerto Vallarta (dorados, azules del mar).",
+      "Varía la composición, el ángulo, la hora del día y los elementos concretos de la escena respecto a otras imágenes que hayas generado antes para este mismo tema — evita repetir siempre la misma toma tipo postal (p. ej. la misma calle empedrada bajando hacia el mar con dos personas caminando de espaldas cargando bolsas)."
     );
   }
   lines.push(
