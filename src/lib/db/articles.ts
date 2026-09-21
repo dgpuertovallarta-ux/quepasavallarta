@@ -267,6 +267,13 @@ export async function getLastExplainerPublishedAt(): Promise<Date | null> {
 
 const TITLE_STOPWORDS = new Set([
   "de", "la", "el", "en", "y", "a", "que", "del", "los", "las", "un", "una", "con", "por", "para", "se", "su", "es", "al",
+  // Palabras específicas del sitio que aparecen en casi cualquier título
+  // (nombre del lugar, verbos de reporte genéricos) — diluían el cálculo
+  // de similitud entre dos títulos sobre el MISMO hecho contado por
+  // fuentes distintas, dejando pasar duplicados reales (bug real: el
+  // mismo sistema tropical publicado 3 veces con títulos "Vigilan..."
+  // ligeramente distintos, cada uno bajo el 60% de umbral anterior).
+  "puerto", "vallarta", "bahia", "banderas", "vigilan", "region",
 ]);
 
 function titleTokens(title: string): Set<string> {
@@ -306,7 +313,13 @@ export async function findSimilarRecentArticle(title: string, opts: { sinceDays?
     [sinceDays, isExplainer]
   );
   for (const row of res.rows) {
-    if (titleSimilarity(title, row.title) >= 0.6) return row.slug;
+    // Bajado de 0.6 a 0.4 (2026-09) — títulos de la misma noticia real
+    // contados por fuentes distintas ("Vigilan perturbación tropical..."
+    // vs "Vigilan zona de inestabilidad...") comparten menos del 60% de
+    // palabras aunque sean el mismo hecho; en la práctica caían entre
+    // 0.4 y 0.5. 0.4 los atrapa sin volverse tan laxo como para bloquear
+    // títulos genuinamente distintos (que en la práctica dan 0).
+    if (titleSimilarity(title, row.title) >= 0.4) return row.slug;
   }
   return null;
 }
