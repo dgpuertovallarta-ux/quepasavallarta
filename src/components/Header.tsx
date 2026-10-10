@@ -5,14 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { CATEGORIES } from "@/lib/data";
 
-// Menú principal corto, al estilo de un diario: un acceso "en vivo" y
-// cuatro secciones. Todo lo demás vive en el menú completo ("Más").
-const PRIMARY = [
-  { href: "/categoria/seguridad", label: "Seguridad" },
-  { href: "/categoria/gobierno", label: "Gobierno" },
-  { href: "/categoria/comunidad", label: "Comunidad" },
-  { href: "/explica", label: "Explica" },
-];
+// Menú principal corto, al estilo de un diario: un acceso "en vivo", tres
+// secciones de noticias y Explica. Se eligen, en este orden de
+// preferencia, las primeras tres categorías que ya tienen notas — nunca
+// se enlaza a una sección vacía. Todo lo demás vive en el menú ("Más").
+const PRIMARY_PREFERENCE = ["seguridad", "gobierno", "comunidad", "turismo", "clima", "servicios", "transito", "playas"];
+const PRIMARY_FALLBACK = ["gobierno", "comunidad", "turismo"];
 
 const SECTIONS = [
   { href: "/", label: "Inicio" },
@@ -66,8 +64,29 @@ function ChevronIcon() {
   );
 }
 
-export default function Header({ hasRealContent = false }: { hasRealContent?: boolean }) {
+export default function Header({
+  hasRealContent = false,
+  activeCategories = [],
+}: {
+  hasRealContent?: boolean;
+  activeCategories?: string[];
+}) {
   const pathname = usePathname();
+  // Sin datos (sitio en demo o base no disponible) se muestran todas.
+  const filterActive = hasRealContent && activeCategories.length > 0;
+  const categories = filterActive
+    ? CATEGORIES.filter((c) => c.slug === "ultima-hora" || activeCategories.includes(c.slug))
+    : CATEGORIES;
+  const primarySlugs = filterActive
+    ? PRIMARY_PREFERENCE.filter((slug) => activeCategories.includes(slug)).slice(0, 3)
+    : PRIMARY_FALLBACK;
+  const primary = [
+    ...primarySlugs.map((slug) => ({
+      href: `/categoria/${slug}`,
+      label: CATEGORIES.find((c) => c.slug === slug)?.name || slug,
+    })),
+    { href: "/explica", label: "Explica" },
+  ];
   const [menuOpen, setMenuOpen] = useState(false);
   const [compact, setCompact] = useState(false);
 
@@ -122,7 +141,7 @@ export default function Header({ hasRealContent = false }: { hasRealContent?: bo
 
   const navLinks = (
     <>
-      {PRIMARY.map((n) => (
+      {primary.map((n) => (
         <Link key={n.href} href={n.href} className={pathname === n.href ? "active" : ""}>
           {n.label}
         </Link>
@@ -240,7 +259,7 @@ export default function Header({ hasRealContent = false }: { hasRealContent?: bo
               <div>
                 <h2>Categorías</h2>
                 <nav className="site-menu-cats" aria-label="Categorías">
-                  {CATEGORIES.map((c) => (
+                  {categories.map((c) => (
                     <Link key={c.slug} href={`/categoria/${c.slug}`} onClick={closeMenu}>
                       {c.name}
                     </Link>

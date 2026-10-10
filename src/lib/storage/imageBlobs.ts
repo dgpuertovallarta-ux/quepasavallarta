@@ -15,7 +15,7 @@ import { getStore } from "@netlify/blobs";
 const STORE_NAME = "article-images";
 
 export function siteUrl(): string {
-  return (process.env.URL || process.env.DEPLOY_URL || "https://quepasavallarta.netlify.app").replace(/\/$/, "");
+  return (process.env.URL || process.env.DEPLOY_URL || "https://quepasavta.com").replace(/\/$/, "");
 }
 
 export async function saveImageBlob(bytes: Buffer, contentType: string): Promise<{ key: string; url: string }> {

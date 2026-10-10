@@ -1,3 +1,4 @@
+import imageLoader from "./imageLoader";
 /**
  * Fotografías reales de Puerto Vallarta, de uso libre (Wikimedia Commons —
  * dominio público o licencias CC that permiten reuso). Se usan como
@@ -204,4 +205,12 @@ export function uniqueIllustrations<T extends { image: PhotoKey; imageUrl?: stri
  */
 export function newsImageSrc(n: { image: PhotoKey; imageUrl?: string }): string {
   return n.imageUrl || PHOTOS[n.image];
+}
+
+/**
+ * Imagen para la vista previa al compartir la nota (Facebook, WhatsApp,
+ * X): la misma foto de la nota, en un ancho que las redes aceptan.
+ */
+export function socialImageSrc(n: { image: PhotoKey; imageUrl?: string }): string {
+  return imageLoader({ src: newsImageSrc(n), width: 960 });
 }

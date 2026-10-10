@@ -140,6 +140,28 @@ export async function getPublishedArticlesByCategory(categorySlug: string, limit
   return rowsToNewsItems(res.rows).slice(0, limit);
 }
 
+/**
+ * Categorías que ya tienen al menos una nota publicada. El menú, el pie
+ * y la fila de filtros solo enlazan a estas — así nadie llega a una
+ * sección vacía (p. ej. Seguridad, que por regla editorial no se
+ * auto-publica).
+ */
+export async function getActiveCategorySlugs(): Promise<string[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const pool = getPool();
+    const res = await pool.query<{ slug: string }>(
+      `select distinct c.slug
+         from articles a
+         join categories c on c.id = a.category_id
+        where a.status = 'published' and a.is_explainer = false and c.slug is not null`
+    );
+    return res.rows.map((r) => r.slug);
+  } catch {
+    return [];
+  }
+}
+
 const SEARCH_HAYSTACK =
   "translate(lower(coalesce(a.title,'') || ' ' || coalesce(a.excerpt,'') || ' ' || coalesce(a.body,'')), 'áéíóúüñ', 'aeiouun')";
 

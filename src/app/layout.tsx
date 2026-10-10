@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 import ThemeInitScript from "@/components/ThemeInitScript";
 import Toast from "@/components/Toast";
 import { SITE } from "@/lib/data";
-import { getPublishedArticles } from "@/lib/db/articles";
+import { getPublishedArticles, getActiveCategorySlugs } from "@/lib/db/articles";
 
 // La portada consulta si ya existe contenido real publicado (para dejar
 // de mostrar el aviso de demo) — no hace falta en cada request exacto,
@@ -27,6 +27,9 @@ const displayFont = Sofia_Sans_Extra_Condensed({
 });
 
 export const metadata: Metadata = {
+  // Base para los enlaces e imágenes de vista previa (Open Graph).
+  metadataBase: new URL(process.env.URL || "https://quepasavta.com"),
+  openGraph: { siteName: SITE.name, locale: "es_MX", type: "website" },
   title: `${SITE.name} — ${SITE.tagline}`,
   description:
     "Qué Pasa Vallarta: noticias de Puerto Vallarta y Bahía de Banderas, Vallarta Ahora, Vallarta Explica, agenda de eventos y guía local.",
@@ -34,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const realArticles = await getPublishedArticles(1);
+  const [realArticles, activeCategories] = await Promise.all([getPublishedArticles(1), getActiveCategorySlugs()]);
   const hasRealContent = realArticles.length > 0;
 
   return (
@@ -47,9 +50,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeInitScript />
       </head>
       <body>
-        <Header hasRealContent={hasRealContent} />
+        <Header hasRealContent={hasRealContent} activeCategories={activeCategories} />
         <main id="main">{children}</main>
-        <Footer hasRealContent={hasRealContent} />
+        <Footer hasRealContent={hasRealContent} activeCategories={activeCategories} />
         <Toast />
       </body>
     </html>

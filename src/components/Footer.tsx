@@ -1,12 +1,27 @@
 import Link from "next/link";
-import { SITE } from "@/lib/data";
+import { SITE, CATEGORIES } from "@/lib/data";
 
 const SOCIAL = [
   { label: "Facebook", href: "https://www.facebook.com/quepasavallarta", path: "M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" },
   { label: "Instagram", href: "https://www.instagram.com/quepasavallarta", path: "M12 2c2.7 0 3.1 0 4.1.1 1.1 0 1.8.2 2.3.4.6.2 1 .5 1.5 1 .4.4.7.9 1 1.5.2.5.4 1.2.4 2.3.1 1 .1 1.4.1 4.1s0 3.1-.1 4.1c0 1.1-.2 1.8-.4 2.3-.2.6-.5 1-1 1.5-.4.4-.9.7-1.5 1-.5.2-1.2.4-2.3.4-1 .1-1.4.1-4.1.1s-3.1 0-4.1-.1c-1.1 0-1.8-.2-2.3-.4-.6-.2-1-.5-1.5-1-.4-.4-.7-.9-1-1.5-.2-.5-.4-1.2-.4-2.3C2 15.1 2 14.7 2 12s0-3.1.1-4.1c0-1.1.2-1.8.4-2.3.2-.6.5-1 1-1.5.4-.4.9-.7 1.5-1 .5-.2 1.2-.4 2.3-.4C8.9 2 9.3 2 12 2Zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 8.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4Zm5.2-8.4a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4Z" },
 ];
 
-export default function Footer({ hasRealContent = false }: { hasRealContent?: boolean }) {
+// Secciones de noticias del pie, en orden de preferencia: solo se
+// muestran las que ya tienen notas publicadas.
+const FOOTER_PREFERENCE = ["gobierno", "comunidad", "turismo", "clima", "servicios", "jalisco", "mexico"];
+
+export default function Footer({
+  hasRealContent = false,
+  activeCategories = [],
+}: {
+  hasRealContent?: boolean;
+  activeCategories?: string[];
+}) {
+  const filterActive = hasRealContent && activeCategories.length > 0;
+  const newsSections = (filterActive ? FOOTER_PREFERENCE.filter((s) => activeCategories.includes(s)) : ["turismo", "jalisco", "mexico"])
+    .slice(0, 3)
+    .map((slug) => ({ slug, name: CATEGORIES.find((c) => c.slug === slug)?.name || slug }));
+
   return (
     <footer className="site-footer surface-dark">
       <div className="container">
@@ -30,9 +45,11 @@ export default function Footer({ hasRealContent = false }: { hasRealContent?: bo
           <div className="footer-col">
             <h4>Secciones</h4>
             <Link href="/categoria/ultima-hora">Última Hora</Link>
-            <Link href="/categoria/turismo">Puerto Vallarta</Link>
-            <Link href="/categoria/jalisco">Jalisco</Link>
-            <Link href="/categoria/mexico">México</Link>
+            {newsSections.map((c) => (
+              <Link key={c.slug} href={`/categoria/${c.slug}`}>
+                {c.name}
+              </Link>
+            ))}
             <Link href="/explica">Explica</Link>
             <Link href="/agenda">Vive Vallarta</Link>
             <Link href="/guia">Guía</Link>

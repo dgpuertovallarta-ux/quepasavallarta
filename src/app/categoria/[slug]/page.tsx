@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { NEWS, CATEGORIES, getCategoryName } from "@/lib/data";
 import { NewsCard } from "@/components/cards";
-import { getPublishedArticles, getPublishedArticlesByCategory, dropNearDuplicates } from "@/lib/db/articles";
+import {
+  getPublishedArticles,
+  getPublishedArticlesByCategory,
+  getActiveCategorySlugs,
+  dropNearDuplicates,
+} from "@/lib/db/articles";
 import { uniqueIllustrations } from "@/lib/photos";
 
 export const revalidate = 60;
@@ -29,6 +34,13 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
     dropNearDuplicates((real.length > 0 ? real : demo).sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)))
   );
   const name = getCategoryName(slug);
+  // La fila de filtros solo ofrece secciones que ya tienen notas (más la
+  // que se está viendo), para no mandar a nadie a una página vacía.
+  const active = siteHasRealContent ? await getActiveCategorySlugs() : [];
+  const chips =
+    active.length > 0
+      ? CATEGORIES.filter((c) => c.slug === "ultima-hora" || c.slug === slug || active.includes(c.slug))
+      : CATEGORIES;
 
   return (
     <div className="container section">
@@ -37,7 +49,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
       </div>
       <h1 style={{ margin: "0 0 16px" }}>{name}</h1>
       <div className="filter-row">
-        {CATEGORIES.map((c) => (
+        {chips.map((c) => (
           <Link
             key={c.slug}
             href={`/categoria/${c.slug}`}

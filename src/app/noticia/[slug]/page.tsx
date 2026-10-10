@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data";
 import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
-import { newsImageSrc, photoCreditLabel } from "@/lib/photos";
+import { newsImageSrc, socialImageSrc, photoCreditLabel } from "@/lib/photos";
 import ArticleBody from "@/components/ArticleBody";
 import { fmtDateTime } from "@/lib/format";
 import { getPublishedArticleBySlug, getPublishedArticlesByCategory } from "@/lib/db/articles";
@@ -26,7 +26,25 @@ async function findArticle(slug: string): Promise<NewsItem | undefined> {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const n = await findArticle(slug);
-  return { title: n ? `${n.title} — Qué Pasa Vallarta` : "Noticia no encontrada" };
+  if (!n) return { title: "Noticia no encontrada" };
+  // Vista previa al compartir el enlace (Facebook, WhatsApp, X).
+  const image = socialImageSrc(n);
+  return {
+    title: `${n.title} — Qué Pasa Vallarta`,
+    description: n.dek,
+    alternates: { canonical: `/noticia/${n.slug}` },
+    openGraph: {
+      type: "article",
+      title: n.title,
+      description: n.dek,
+      url: `/noticia/${n.slug}`,
+      siteName: "Qué Pasa Vallarta",
+      locale: "es_MX",
+      publishedTime: n.publishedAt,
+      images: [{ url: image }],
+    },
+    twitter: { card: "summary_large_image", title: n.title, description: n.dek, images: [image] },
+  };
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {

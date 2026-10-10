@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { EXPLICA, getExplicaBySlug, type ExplicaItem } from "@/lib/data";
 import { DemoTag } from "@/components/cards";
-import { newsImageSrc, photoCreditLabel } from "@/lib/photos";
+import { newsImageSrc, socialImageSrc, photoCreditLabel } from "@/lib/photos";
 import { fmtDate } from "@/lib/format";
 import { getPublishedExplainerBySlug } from "@/lib/db/articles";
 
@@ -24,7 +24,24 @@ async function findExplainer(slug: string): Promise<ExplicaItem | undefined> {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const e = await findExplainer(slug);
-  return { title: e ? `${e.title} — Vallarta Explica` : "No encontrado" };
+  if (!e) return { title: "No encontrado" };
+  const image = socialImageSrc(e);
+  return {
+    title: `${e.title} — Vallarta Explica`,
+    description: e.dek,
+    alternates: { canonical: `/explica/${e.slug}` },
+    openGraph: {
+      type: "article",
+      title: e.title,
+      description: e.dek,
+      url: `/explica/${e.slug}`,
+      siteName: "Qué Pasa Vallarta",
+      locale: "es_MX",
+      publishedTime: e.publishedAt,
+      images: [{ url: image }],
+    },
+    twitter: { card: "summary_large_image", title: e.title, description: e.dek, images: [image] },
+  };
 }
 
 export default async function ExplicaArticlePage({ params }: { params: Promise<{ slug: string }> }) {
