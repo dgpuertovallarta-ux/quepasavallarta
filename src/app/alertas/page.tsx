@@ -11,7 +11,7 @@ export default function AlertasPage() {
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / Alertas
       </div>
-      <h1 style={{ margin: "0 0 6px" }}>🚨 Alertas</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Alertas</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
         Información importante y de alto puntaje (News Score ≥ 80). En producción, estas alertas se envían
         por Push, Email, WhatsApp o Telegram según la preferencia del usuario y sin saturar (ver{" "}

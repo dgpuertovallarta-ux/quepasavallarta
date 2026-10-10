@@ -20,7 +20,7 @@ export default async function AhoraPage() {
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / Vallarta Ahora
       </div>
-      <h1 style={{ margin: "0 0 6px" }}>🟠 Vallarta Ahora</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Vallarta Ahora</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
         Dashboard en tiempo real de la ciudad. Clima, calidad del aire y oleaje son datos reales
         (Open-Meteo, sin costo). Tránsito, aeropuerto y cruceros todavía no están conectados — requieren

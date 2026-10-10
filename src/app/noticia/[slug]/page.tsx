@@ -42,7 +42,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   const showHechos = SENSITIVE_CATEGORIES.includes(n.category);
 
   return (
-    <div className="container section">
+    <div className="container section article-page">
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / <Link href={`/categoria/${n.category}`}>{getCategoryName(n.category)}</Link>
       </div>
@@ -71,15 +71,17 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <Byline n={n} />
       </div>
 
-      <div className="card-media" style={{ maxWidth: 780, aspectRatio: "16/9", borderRadius: "var(--radius-md)", marginBottom: 22 }}>
-        <Image src={newsImageSrc(n)} alt={n.title} fill sizes="780px" priority unoptimized={!!n.imageUrl} />
-        <span className="photo-tag">{n.imageUrl ? `Foto: ${n.imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
-      </div>
+      <figure className="article-figure">
+        <div className="card-media">
+          <Image src={newsImageSrc(n)} alt={n.title} fill sizes="(max-width: 1040px) 100vw, 980px" priority unoptimized={!!n.imageUrl} />
+          <span className="photo-tag">{n.imageUrl ? `Foto: ${n.imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
+        </div>
+      </figure>
 
       <article className="prose">
         {n.body.map((p, i) =>
           p.startsWith("## ") ? (
-            <h3 key={i} style={{ fontSize: 16, marginTop: 22 }}>
+            <h3 key={i}>
               {p.slice(3)}
             </h3>
           ) : (
@@ -130,33 +132,33 @@ function Hechos({ n }: { n: NewsItem }) {
       <div className="hechos-row">
         <span className="hechos-dot dot-green" />
         <div>
-          <strong>🟢 Los hechos:</strong> {n.body[0]}
+          <strong>Los hechos:</strong> {n.body[0]}
         </div>
       </div>
       <div className="hechos-row">
         <span className="hechos-dot dot-blue" />
         <div>
-          <strong>🔵 Lo que dicen las autoridades:</strong> Declaraciones oficiales citadas en fuentes,
+          <strong>Lo que dicen las autoridades:</strong> Declaraciones oficiales citadas en fuentes,
           cuando existan comunicados formales.
         </div>
       </div>
       <div className="hechos-row">
         <span className="hechos-dot dot-purple" />
         <div>
-          <strong>🟣 Otras versiones:</strong> Se incluirán aquí cuando existan versiones alternas
+          <strong>Otras versiones:</strong> Se incluirán aquí cuando existan versiones alternas
           verificables.
         </div>
       </div>
       <div className="hechos-row">
         <span className="hechos-dot dot-yellow" />
         <div>
-          <strong>🟡 Contexto:</strong> Antecedentes relevantes para entender la historia completa.
+          <strong>Contexto:</strong> Antecedentes relevantes para entender la historia completa.
         </div>
       </div>
       <div className="hechos-row">
         <span className="hechos-dot dot-red" />
         <div>
-          <strong>🔴 Lo que todavía no sabemos:</strong> Información pendiente de confirmación oficial.
+          <strong>Lo que todavía no sabemos:</strong> Información pendiente de confirmación oficial.
         </div>
       </div>
     </div>

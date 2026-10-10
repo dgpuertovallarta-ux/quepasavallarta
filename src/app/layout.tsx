@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display, Lora } from "next/font/google";
+import { Work_Sans, Noto_Serif, Sofia_Sans_Extra_Condensed } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -14,19 +14,16 @@ import { getPublishedArticles } from "@/lib/db/articles";
 // con refrescar cada minuto basta.
 export const revalidate = 60;
 
-const bodyFont = Inter({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-// Serif editorial — Playfair para titulares grandes de sección ("TOP NEWS"),
-// Lora para titulares de artículo (más legible en tamaños medianos).
-const displayFont = Playfair_Display({
+// Tipografía editorial limpia:
+// - Work Sans: interfaz, navegación y metadatos.
+// - Noto Serif: titulares secundarios, sumarios y cuerpo de nota.
+// - Sofia Sans Extra Condensed: titulares principales y títulos de sección
+//   (condensada, en mayúsculas).
+const bodyFont = Work_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap" });
+const headlineFont = Noto_Serif({ subsets: ["latin"], variable: "--font-headline", display: "swap" });
+const displayFont = Sofia_Sans_Extra_Condensed({
   subsets: ["latin"],
-  variable: "--font-display-serif",
-  weight: ["700", "800", "900"],
-  display: "swap",
-});
-const headlineFont = Lora({
-  subsets: ["latin"],
-  variable: "--font-headline",
-  weight: ["500", "600", "700"],
+  variable: "--font-display-condensed",
   display: "swap",
 });
 

@@ -12,7 +12,7 @@ export default function ConectaPage() {
       </div>
       <div className="article-head">
         <span className="chip chip-sponsor">Para negocios</span>
-        <h1>💼 Vallarta Conecta</h1>
+        <h1>Vallarta Conecta</h1>
         <p className="article-dek">
           Visibilidad, audiencia y leads reales en Puerto Vallarta. No vendemos &ldquo;un banner&rdquo;:
           vendemos resultados medibles.

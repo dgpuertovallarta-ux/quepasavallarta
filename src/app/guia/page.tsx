@@ -22,7 +22,7 @@ export default async function GuiaPage({
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / Vallarta Guía
       </div>
-      <h1 style={{ margin: "0 0 6px" }}>📖 Vallarta Guía</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Vallarta Guía</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 660, marginBottom: 18 }}>
         Directorio de restaurantes, hoteles, tours, salud, inmobiliarias y más. Los negocios marcados
         como &ldquo;Destacado&rdquo; tienen un plan Vallarta Conecta. <Link href="/conecta">Anuncia tu negocio aquí</Link>.

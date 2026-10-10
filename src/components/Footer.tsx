@@ -14,25 +14,15 @@ export default function Footer({ hasRealContent = false }: { hasRealContent?: bo
       <div className="container">
         <div className="footer-grid">
           <div className="footer-col">
-            <img
-              src="/brand/logo-transparent.png"
-              alt="Qué Pasa Vallarta"
-              style={{ height: 56, width: "auto", marginBottom: 10 }}
-            />
-            <p style={{ fontSize: 13.5, color: "var(--text-muted)", maxWidth: 280, marginBottom: 14 }}>
+            <img src="/brand/logo-transparent.png" alt="Qué Pasa Vallarta" className="brand-logo" />
+            <p style={{ fontSize: 14, color: "var(--text-muted)", maxWidth: 300, margin: "0 0 14px" }}>
               Información clara, útil y confiable para vivir y entender lo que pasa en Puerto Vallarta y el
               municipio.
             </p>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="footer-social">
               {SOCIAL.map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  aria-label={s.label}
-                  className="icon-btn"
-                  style={{ width: 34, height: 34 }}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                <a key={s.label} href={s.href} aria-label={s.label} className="icon-link">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d={s.path} />
                   </svg>
                 </a>
@@ -74,7 +64,9 @@ export default function Footer({ hasRealContent = false }: { hasRealContent?: bo
               ? "Noticias verificadas por el equipo editorial."
               : "Sitio de demostración (MVP) — todos los datos son ficticios."}
           </span>
-          <span>Hecho en Puerto Vallarta, para Puerto Vallarta.</span>
+          <span>
+            Hecho en Puerto Vallarta, para Puerto Vallarta. · <Link href="/admin">Panel editorial</Link>
+          </span>
         </div>
       </div>
     </footer>

@@ -16,6 +16,7 @@ export function CardMedia({
   alt,
   sizes,
   priority,
+  square,
 }: {
   media?: Media;
   image?: keyof typeof PHOTOS;
@@ -24,9 +25,10 @@ export function CardMedia({
   alt: string;
   sizes?: string;
   priority?: boolean;
+  square?: boolean;
 }) {
   return (
-    <div className={`card-media ${media ? mediaClass(media) : ""}`}>
+    <div className={`card-media${square ? " square" : ""}${media ? ` ${mediaClass(media)}` : ""}`}>
       {image ? (
         <>
           <Image
@@ -50,23 +52,49 @@ export function CardMedia({
   );
 }
 
-export function NewsCard({ n, compact }: { n: NewsItem; compact?: boolean }) {
+export function NewsCard({
+  n,
+  compact,
+  square,
+  priority,
+}: {
+  n: NewsItem;
+  compact?: boolean;
+  /** Foto cuadrada en vez de 16:9 (fila de tres de la portada). */
+  square?: boolean;
+  priority?: boolean;
+}) {
   return (
     <article className="card">
-      <CardMedia media={n.media} image={n.image} imageUrl={n.imageUrl} imageCredit={n.imageCredit} alt={n.title} />
+      <CardMedia
+        media={n.media}
+        image={n.image}
+        imageUrl={n.imageUrl}
+        imageCredit={n.imageCredit}
+        alt={n.title}
+        square={square}
+        priority={priority}
+      />
       <div className="card-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
-        {n.isDemo && <DemoTag />}
         <h3 className="card-title">
           <Link href={`/noticia/${n.slug}`}>{n.title}</Link>
         </h3>
         {!compact && <p className="card-dek">{n.dek}</p>}
-        <div className="card-meta">
-          {n.verified && <span className="chip chip-verified">Verificado</span>}
-          <span>{timeAgo(n.updatedAt || n.publishedAt)}</span>
-        </div>
+        <StoryMeta n={n} />
       </div>
     </article>
+  );
+}
+
+/** Línea de metadatos bajo un titular: etiqueta de demo (si aplica) y hace cuánto se publicó. */
+export function StoryMeta({ n }: { n: NewsItem }) {
+  return (
+    <div className="card-meta">
+      {n.isDemo && <DemoTag />}
+      {n.breaking && <span className="chip chip-breaking">Última hora</span>}
+      <span>{timeAgo(n.updatedAt || n.publishedAt)}</span>
+    </div>
   );
 }
 
@@ -78,13 +106,10 @@ export function NewsListItem({ n }: { n: NewsItem }) {
       </div>
       <div className="card-list-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
-        {n.isDemo && <DemoTag />}
         <h4 className="card-title">
           <Link href={`/noticia/${n.slug}`}>{n.title}</Link>
         </h4>
-        <div className="card-meta">
-          <span>{timeAgo(n.updatedAt || n.publishedAt)}</span>
-        </div>
+        <StoryMeta n={n} />
       </div>
     </div>
   );
@@ -142,7 +167,7 @@ export function EventCard({ ev }: { ev: EventItem }) {
           {ev.dek}
         </p>
         <div className="card-meta">
-          📍 {ev.location} &nbsp;·&nbsp; ⏰ {ev.time} h
+          {ev.location} · {ev.time} h
         </div>
       </div>
     </article>
@@ -207,7 +232,8 @@ export function SectionHead({
       </div>
       {linkHref && (
         <Link className="section-link" href={linkHref}>
-          {linkLabel || "Ver todo →"}
+          {(linkLabel || "Ver todo").replace(/\s*→\s*$/, "")}
+          <span className="arrow-line" aria-hidden="true" />
         </Link>
       )}
     </div>

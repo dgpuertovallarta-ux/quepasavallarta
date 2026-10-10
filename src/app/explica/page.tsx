@@ -19,7 +19,7 @@ export default async function ExplicaIndexPage() {
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / Vallarta Explica
       </div>
-      <h1 style={{ margin: "0 0 6px" }}>🧠 Vallarta Explica {items === demo && <DemoTag />}</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Vallarta Explica {items === demo && <DemoTag />}</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
         Para temas complejos: qué pasó, por qué importa, qué sabemos, qué no sabemos y qué sigue.
       </p>

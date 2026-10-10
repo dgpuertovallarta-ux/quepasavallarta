@@ -22,7 +22,7 @@ export default async function AgendaPage({
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / Vive Vallarta
       </div>
-      <h1 style={{ margin: "0 0 6px" }}>🌴 Vive Vallarta — Agenda</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Vive Vallarta — Agenda</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 18 }}>
         Conciertos, festivales, deportes y cultura. Qué hay hoy y esta semana en la ciudad.
       </p>
