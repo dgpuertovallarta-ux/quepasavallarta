@@ -3,7 +3,6 @@ import { Work_Sans, Noto_Serif, Sofia_Sans_Extra_Condensed } from "next/font/goo
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import IntroScreen from "@/components/IntroScreen";
 import ThemeInitScript from "@/components/ThemeInitScript";
 import Toast from "@/components/Toast";
 import { SITE } from "@/lib/data";
@@ -48,7 +47,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeInitScript />
       </head>
       <body>
-        <IntroScreen />
         <Header hasRealContent={hasRealContent} />
         <main id="main">{children}</main>
         <Footer hasRealContent={hasRealContent} />
