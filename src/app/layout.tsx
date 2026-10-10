@@ -33,7 +33,6 @@ export const metadata: Metadata = {
   title: `${SITE.name} — ${SITE.tagline}`,
   description:
     "Qué Pasa Vallarta: noticias de Puerto Vallarta y Bahía de Banderas, Vallarta Ahora, Vallarta Explica, agenda de eventos y guía local.",
-  robots: { index: false, follow: false },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

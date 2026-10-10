@@ -2,7 +2,8 @@ import Link from "next/link";
 import { BUSINESSES } from "@/lib/data";
 import { BusinessCard } from "@/components/cards";
 
-export const metadata = { title: "Vallarta Guía — Qué Pasa Vallarta" };
+// La Guía todavía muestra negocios de ejemplo: no se ofrece a los buscadores.
+export const metadata = { title: "Vallarta Guía — Qué Pasa Vallarta", robots: { index: false, follow: false } };
 
 const CATS = ["Todas", ...Array.from(new Set(BUSINESSES.map((b) => b.category)))];
 

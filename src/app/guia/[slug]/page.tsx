@@ -11,7 +11,8 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const b = getBusinessBySlug(slug);
-  return { title: b ? `${b.name} — Vallarta Guía` : "Negocio no encontrado" };
+  // Negocios de ejemplo: no se ofrecen a los buscadores.
+  return { title: b ? `${b.name} — Vallarta Guía` : "Negocio no encontrado", robots: { index: false, follow: false } };
 }
 
 export default async function NegocioPage({ params }: { params: Promise<{ slug: string }> }) {

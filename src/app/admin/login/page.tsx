@@ -1,6 +1,6 @@
 import LoginForm from "@/components/admin/LoginForm";
 
-export const metadata = { title: "Iniciar sesión — Panel editorial" };
+export const metadata = { title: "Iniciar sesión — Panel editorial", robots: { index: false, follow: false } };
 
 export default function AdminLoginPage() {
   return (

@@ -33,6 +33,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${n.title} — Qué Pasa Vallarta`,
     description: n.dek,
     alternates: { canonical: `/noticia/${n.slug}` },
+    // Las notas de ejemplo nunca se ofrecen a los buscadores.
+    ...(n.isDemo ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       type: "article",
       title: n.title,
@@ -57,8 +59,36 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
     ? NEWS.filter((x) => x.category === n.category && x.slug !== n.slug).slice(0, 4)
     : relatedReal.filter((x) => x.slug !== n.slug).slice(0, 4);
 
+  // Datos estructurados para buscadores (Google Noticias): solo en notas reales.
+  const jsonLd = n.isDemo
+    ? null
+    : {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        headline: n.title,
+        description: n.dek,
+        image: [socialImageSrc(n)],
+        datePublished: n.publishedAt,
+        dateModified: n.updatedAt || n.publishedAt,
+        articleSection: getCategoryName(n.category),
+        inLanguage: "es-MX",
+        mainEntityOfPage: `https://quepasavta.com/noticia/${n.slug}`,
+        author: { "@type": "Organization", name: "Qué Pasa Vallarta", url: "https://quepasavta.com" },
+        publisher: {
+          "@type": "Organization",
+          name: "Qué Pasa Vallarta",
+          logo: { "@type": "ImageObject", url: "https://quepasavta.com/brand/logo-transparent.png" },
+        },
+      };
+
   return (
     <div className="container section article-page">
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
+      )}
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / <Link href={`/categoria/${n.category}`}>{getCategoryName(n.category)}</Link>
       </div>

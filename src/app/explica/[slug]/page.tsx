@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${e.title} — Vallarta Explica`,
     description: e.dek,
     alternates: { canonical: `/explica/${e.slug}` },
+    ...(e.isDemo ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       type: "article",
       title: e.title,

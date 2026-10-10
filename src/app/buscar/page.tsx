@@ -5,7 +5,7 @@ import { searchPublishedArticles, dropNearDuplicates } from "@/lib/db/articles";
 import { timeAgo } from "@/lib/format";
 import SearchBox from "@/components/SearchBox";
 
-export const metadata = { title: "Buscar — Qué Pasa Vallarta" };
+export const metadata = { title: "Buscar — Qué Pasa Vallarta", robots: { index: false, follow: true } };
 
 export default async function BuscarPage({
   searchParams,

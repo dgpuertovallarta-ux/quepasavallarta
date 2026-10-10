@@ -1,7 +1,7 @@
 import { getPool, isDatabaseConfigured } from "./client";
 import type { NewsItem, Media, ExplicaItem } from "../data";
 import { illustrationFor } from "../photos";
-import { repairArticle } from "../ingest/articleFormat";
+import { repairArticle, isBadTitle } from "../ingest/articleFormat";
 
 /**
  * Lectura y publicación real de artículos — conecta la portada pública
@@ -157,6 +157,44 @@ export async function getActiveCategorySlugs(): Promise<string[]> {
         where a.status = 'published' and a.is_explainer = false and c.slug is not null`
     );
     return res.rows.map((r) => r.slug);
+  } catch {
+    return [];
+  }
+}
+
+export type SitemapEntry = { slug: string; isExplainer: boolean; lastModified: string };
+
+/**
+ * Lista ligera (sin el cuerpo de las notas) de todo lo publicado, para el
+ * mapa del sitio que leen los buscadores (ver app/sitemap.ts). Se omiten
+ * las notas sin un titular utilizable, igual que en el resto del sitio.
+ */
+export async function getSitemapEntries(limit = 2000): Promise<SitemapEntry[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const pool = getPool();
+    const res = await pool.query<{
+      slug: string;
+      title: string;
+      body: string | null;
+      is_explainer: boolean;
+      published_at: Date | null;
+      updated_at: Date | null;
+    }>(
+      `select slug, title, left(body, 600) as body, is_explainer, published_at, updated_at
+         from articles
+        where status = 'published'
+        order by published_at desc nulls last
+        limit $1`,
+      [limit]
+    );
+    return res.rows
+      .filter((r) => !isBadTitle(r.title) || !!r.body)
+      .map((r) => ({
+        slug: r.slug,
+        isExplainer: r.is_explainer,
+        lastModified: (r.updated_at || r.published_at || new Date()).toISOString(),
+      }));
   } catch {
     return [];
   }
