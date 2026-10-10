@@ -1,12 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { NEWS, EXPLICA, EVENTS, BUSINESSES, getCategoryName, type NewsItem } from "@/lib/data";
-import { getPublishedArticles, getPublishedExplainers } from "@/lib/db/articles";
+import { NEWS, EXPLICA, getCategoryName, type NewsItem } from "@/lib/data";
+import { getPublishedArticles, getPublishedExplainers, dropNearDuplicates } from "@/lib/db/articles";
+import { upcomingEvents, eventDateLabel } from "@/lib/events";
 import { NewsCard, SectionHead, StoryMeta, DemoTag } from "@/components/cards";
 import CarouselRow from "@/components/CarouselRow";
 import WeatherBar from "@/components/WeatherBar";
 import NewsletterForm from "@/components/NewsletterForm";
-import { PHOTOS, newsImageSrc } from "@/lib/photos";
+import { PHOTOS, newsImageSrc, photoCreditLabel, uniqueIllustrations, type PhotoKey } from "@/lib/photos";
 
 const GUIDE_CATEGORIES = ["Restaurantes", "Hoteles", "Tours y actividades", "Salud", "Inmobiliarias", "Automotriz"];
 
@@ -20,15 +21,11 @@ function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", timeZone: TIME_ZONE }).replace(".", "");
 }
 
-function photoCredit(n: { imageUrl?: string; imageCredit?: string }) {
-  return n.imageUrl ? `Foto: ${n.imageCredit || "fuente original"}` : "Foto ilustrativa";
-}
-
 function StoryPhoto({ n, sizes, priority }: { n: NewsItem; sizes: string; priority?: boolean }) {
   return (
     <Link href={`/noticia/${n.slug}`} className="lead-media" aria-hidden="true" tabIndex={-1}>
       <Image src={newsImageSrc(n)} alt="" fill sizes={sizes} priority={priority} unoptimized={!!n.imageUrl} />
-      <span className="photo-tag">{photoCredit(n)}</span>
+      <span className="photo-tag">{photoCreditLabel(n)}</span>
     </Link>
   );
 }
@@ -36,11 +33,15 @@ function StoryPhoto({ n, sizes, priority }: { n: NewsItem; sizes: string; priori
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const real = await getPublishedArticles(30);
+  const real = await getPublishedArticles(45);
   const demo = NEWS.map((n) => ({ ...n, isDemo: true }));
-  const sorted = (real.length > 0 ? real : demo).sort(
+  const byDate = (real.length > 0 ? real : demo).sort(
     (a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)
   );
+  // En portada: una sola nota por hecho (si se publicaron varias casi
+  // iguales se queda la más reciente) y ninguna foto ilustrativa repetida.
+  const usedPhotos = new Set<PhotoKey>();
+  const sorted = uniqueIllustrations(dropNearDuplicates(byDate), usedPhotos);
   // Cada bloque continúa donde terminó el anterior, para que ninguna
   // nota se repita en la portada.
   const lead = sorted[0];
@@ -53,10 +54,13 @@ export default async function HomePage() {
   const moreNews = rest.length > 4 ? rest.slice(0, Math.floor(rest.length / 4) * 4) : rest;
 
   const realExplica = await getPublishedExplainers(10);
-  const explica = realExplica.length > 0 ? realExplica : EXPLICA.map((e) => ({ ...e, isDemo: true }));
+  const explica = uniqueIllustrations(
+    dropNearDuplicates(realExplica.length > 0 ? realExplica : EXPLICA.map((e) => ({ ...e, isDemo: true }))),
+    usedPhotos
+  );
+  const events = upcomingEvents().slice(0, 8);
   const explicaLead = explica[0];
   const explicaMore = explica.slice(1, 4);
-  const featuredBiz = BUSINESSES.filter((b) => b.featured).length;
 
   return (
     <>
@@ -170,7 +174,7 @@ export default async function HomePage() {
                     sizes="(max-width: 900px) 100vw, 50vw"
                     unoptimized={!!explicaLead.imageUrl}
                   />
-                  <span className="photo-tag">{photoCredit(explicaLead)}</span>
+                  <span className="photo-tag">{photoCreditLabel(explicaLead)}</span>
                 </Link>
                 <h3 className="feature-title-serif">
                   <Link href={`/explica/${explicaLead.slug}`}>{explicaLead.title}</Link>
@@ -212,23 +216,25 @@ export default async function HomePage() {
         </section>
       </div>
 
-      <div className="container section">
-        <SectionHead title="Vive Vallarta" sub="Qué hacer en la ciudad" linkHref="/agenda" linkLabel="Ver más" />
-        <CarouselRow>
-          {EVENTS.map((e) => (
-            <Link key={e.slug} href={`/agenda/${e.slug}`} className="tall-card carousel-item quarter">
-              <Image src={PHOTOS[e.image]} alt="" fill sizes="(max-width: 720px) 78vw, 25vw" />
-              <div className="tall-card-body">
-                <span className="tall-card-kicker">{e.category}</span>
-                <h3 className="tall-card-title">{e.title}</h3>
-                <span className="tall-card-meta">
-                  {shortDate(e.date + "T12:00:00")} · {e.time} h · {e.location}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </CarouselRow>
-      </div>
+      {events.length > 0 && (
+        <div className="container section">
+          <SectionHead title="Vive Vallarta" sub="Qué hacer en la ciudad" linkHref="/agenda" linkLabel="Ver agenda" />
+          <CarouselRow>
+            {events.map((e) => (
+              <Link key={e.slug} href={`/agenda/${e.slug}`} className="tall-card carousel-item quarter">
+                <Image src={PHOTOS[e.image]} alt="" fill sizes="(max-width: 720px) 78vw, 25vw" />
+                <div className="tall-card-body">
+                  <span className="tall-card-kicker">
+                    {e.category} · {eventDateLabel(e)}
+                  </span>
+                  <h3 className="tall-card-title">{e.title}</h3>
+                  <span className="tall-card-meta">{e.location}</span>
+                </div>
+              </Link>
+            ))}
+          </CarouselRow>
+        </div>
+      )}
 
       <div className="container section">
         <SectionHead title="Guía de negocios" linkHref="/guia" linkLabel="Ver guía completa" />
@@ -243,7 +249,6 @@ export default async function HomePage() {
           <div>
             <span className="card-kicker">Vallarta Conecta</span>
             <h3>Impulsa tu negocio con visibilidad real y conectada con tu audiencia</h3>
-            <p>{featuredBiz} negocios ya están destacados en Qué Pasa Vallarta.</p>
           </div>
           <Link className="btn btn-primary" href="/conecta">
             Conoce más

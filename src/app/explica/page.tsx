@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { EXPLICA } from "@/lib/data";
 import { DemoTag } from "@/components/cards";
-import { newsImageSrc } from "@/lib/photos";
+import { newsImageSrc, uniqueIllustrations } from "@/lib/photos";
 import { fmtDate } from "@/lib/format";
 import { getPublishedExplainers } from "@/lib/db/articles";
 
@@ -12,14 +12,14 @@ export const revalidate = 60;
 export default async function ExplicaIndexPage() {
   const real = await getPublishedExplainers(20);
   const demo = EXPLICA.map((e) => ({ ...e, isDemo: true }));
-  const items = real.length > 0 ? real : demo;
+  const items = uniqueIllustrations(real.length > 0 ? real : demo);
 
   return (
     <div className="container section">
       <div className="breadcrumbs">
         <Link href="/">Inicio</Link> / Vallarta Explica
       </div>
-      <h1 style={{ margin: "0 0 6px" }}>Vallarta Explica {items === demo && <DemoTag />}</h1>
+      <h1 style={{ margin: "0 0 6px" }}>Vallarta Explica {real.length === 0 && <DemoTag />}</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
         Para temas complejos: qué pasó, por qué importa, qué sabemos, qué no sabemos y qué sigue.
       </p>

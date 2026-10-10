@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { EXPLICA, getExplicaBySlug, type ExplicaItem } from "@/lib/data";
 import { DemoTag } from "@/components/cards";
-import { newsImageSrc } from "@/lib/photos";
+import { newsImageSrc, photoCreditLabel } from "@/lib/photos";
 import { fmtDate } from "@/lib/format";
 import { getPublishedExplainerBySlug } from "@/lib/db/articles";
 
@@ -60,7 +60,7 @@ export default async function ExplicaArticlePage({ params }: { params: Promise<{
       </div>
       <div className="card-media" style={{ maxWidth: 780, aspectRatio: "16/9", borderRadius: "var(--radius-md)", marginBottom: 22 }}>
         <Image src={newsImageSrc(e)} alt={e.title} fill sizes="780px" priority unoptimized={!!e.imageUrl} />
-        <span className="photo-tag">{e.imageUrl ? `Foto: ${e.imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
+        <span className="photo-tag">{photoCreditLabel(e)}</span>
       </div>
       <div className="panel" style={{ maxWidth: 780 }}>
         {blocks.map(([label, body]) => (

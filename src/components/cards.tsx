@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCategoryName, AUTHORS, type NewsItem, type EventItem, type Business, type Media } from "@/lib/data";
-import { PHOTOS, newsImageSrc } from "@/lib/photos";
+import { PHOTOS, PHOTO_CREDITS, newsImageSrc } from "@/lib/photos";
+import { eventDateLabel } from "@/lib/events";
 import { timeAgo, fmtDate } from "@/lib/format";
 
 function mediaClass(media: Media) {
@@ -39,7 +40,13 @@ export function CardMedia({
             priority={priority}
             unoptimized={!!imageUrl}
           />
-          <span className="photo-tag">{imageUrl ? `Foto: ${imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
+          <span className="photo-tag">
+            {imageUrl
+              ? `Foto: ${imageCredit || "fuente original"}`
+              : PHOTO_CREDITS[image]
+                ? `Foto ilustrativa: ${PHOTO_CREDITS[image]}`
+                : "Foto ilustrativa"}
+          </span>
         </>
       ) : (
         <div className="card-media-label">
@@ -144,31 +151,18 @@ export function HeroCard({ n }: { n: NewsItem }) {
 }
 
 export function EventCard({ ev }: { ev: EventItem }) {
-  const d = new Date(ev.date + "T00:00:00");
-  const day = d.toLocaleDateString("es-MX", { day: "2-digit" });
-  const month = d.toLocaleDateString("es-MX", { month: "short" }).replace(".", "");
   return (
     <article className="card">
       <CardMedia image={ev.image} alt={ev.title} />
       <div className="card-body">
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <div className="event-date">
-            <span className="d">{day}</span>
-            <span className="m">{month}</span>
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <span className="card-kicker">{ev.category}</span>
-            <h4 className="card-title" style={{ margin: "4px 0 6px" }}>
-              <Link href={`/agenda/${ev.slug}`}>{ev.title}</Link>
-            </h4>
-          </div>
-        </div>
-        <p className="card-dek" style={{ margin: 0 }}>
-          {ev.dek}
-        </p>
-        <div className="card-meta">
-          {ev.location} · {ev.time} h
-        </div>
+        <span className="card-kicker">
+          {ev.category} · {eventDateLabel(ev)}
+        </span>
+        <h3 className="card-title">
+          <Link href={`/agenda/${ev.slug}`}>{ev.title}</Link>
+        </h3>
+        <p className="card-dek">{ev.dek}</p>
+        <div className="card-meta">{ev.location}</div>
       </div>
     </article>
   );

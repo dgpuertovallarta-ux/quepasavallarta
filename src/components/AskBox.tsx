@@ -1,106 +1,89 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { searchAsk, type AskResult } from "@/lib/ask";
-import { getCategoryName } from "@/lib/data";
+import { getCategoryName, type NewsItem } from "@/lib/data";
 import { timeAgo } from "@/lib/format";
 
-const SUGGESTIONS = [
-  "¿Qué pasó hoy en Puerto Vallarta?",
-  "¿Hay tráfico?",
-  "¿Qué eventos hay esta semana?",
-  "¿Qué dicen las autoridades sobre seguridad?",
-  "¿Qué pasa con el clima?",
-];
+const SUGGESTIONS = ["Huracán", "Tráfico", "Aeropuerto", "Seguridad", "Playas", "Agua"];
 
-export default function AskBox({ initialQuery }: { initialQuery?: string }) {
-  const [query, setQuery] = useState(initialQuery || "");
-  const [results, setResults] = useState<AskResult[]>(initialQuery ? searchAsk(initialQuery) : []);
-  const [searched, setSearched] = useState(!!initialQuery);
-
-  function run(q: string) {
-    setQuery(q);
-    setResults(searchAsk(q));
-    setSearched(true);
-  }
+/**
+ * "Pregúntale a Vallarta": búsqueda sobre las notas reales publicadas en
+ * el sitio. No redacta respuestas ni inventa datos — devuelve las notas
+ * que hablan del tema, con su fuente y hace cuánto se publicaron. El
+ * formulario es un GET normal a /pregunta?q=…, así funciona sin JavaScript.
+ */
+export default function AskBox({
+  query,
+  results,
+  latest,
+}: {
+  query: string;
+  results: NewsItem[];
+  /** Notas más recientes — se muestran cuando la pregunta no encontró nada o es demasiado general. */
+  latest: NewsItem[];
+}) {
+  const searched = query.trim().length > 0;
+  const list = results.length > 0 ? results : latest;
 
   return (
     <>
       <div className="ask-box">
-        <h1 style={{ margin: "0 0 6px", fontSize: 26 }}>
-          💬 Pregúntale a Vallarta <span className="chip chip-demo" style={{ verticalAlign: "middle" }}>Demo</span>
-        </h1>
-        <p style={{ opacity: 0.85, maxWidth: 640, margin: 0 }}>
-          Búsqueda de palabras clave sobre el contenido de este sitio de demostración —{" "}
-          <strong>no es un modelo de IA conectado</strong>. En producción, esta función usará únicamente
-          información disponible en la plataforma, nunca inventará datos, y siempre distinguirá hechos,
-          declaraciones oficiales, versiones e información no confirmada. Ver <code>/docs/ARCHITECTURE.md</code>.
+        <h1 style={{ margin: "0 0 8px" }}>Pregúntale a Vallarta</h1>
+        <p style={{ maxWidth: 640, margin: 0, color: "var(--text-muted)" }}>
+          Escribe un tema o una pregunta y te mostramos lo que hemos publicado al respecto, con su fuente.
+          Solo responde con información que está en el sitio.
         </p>
-        <div className="ask-input-row">
+        <form className="ask-input-row" action="/pregunta" method="get">
           <input
             className="ask-input"
-            placeholder="Escribe tu pregunta sobre Puerto Vallarta…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && run(query)}
+            name="q"
+            defaultValue={query}
+            placeholder="Por ejemplo: ¿sigue abierto el aeropuerto?"
+            aria-label="Tu pregunta"
           />
-          <button className="btn btn-primary" onClick={() => run(query)}>
+          <button className="btn btn-primary" type="submit">
             Preguntar
           </button>
-        </div>
+        </form>
         <div className="ask-suggestions">
           {SUGGESTIONS.map((s) => (
-            <button key={s} className="ask-suggestion" onClick={() => run(s)}>
+            <Link key={s} className="ask-suggestion" href={`/pregunta?q=${encodeURIComponent(s)}`}>
               {s}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
+
       {searched && (
         <div className="ask-answer">
-          {results.length === 0 ? (
+          {results.length === 0 && (
             <div className="ask-fact">
               <div className="ask-fact-label">Sin resultados</div>
               <p>
-                No encontré información sobre eso dentro del contenido de demostración disponible. En
-                producción, Pregúntale a Vallarta solo responde con información que existe en la
-                plataforma y siempre muestra sus fuentes — nunca inventa datos.
+                No encontramos notas sobre &ldquo;{query}&rdquo;. Prueba con otras palabras; mientras tanto,
+                esto es lo más reciente:
               </p>
             </div>
-          ) : (
-            results.map((r) =>
-              r.kind === "noticia" ? (
-                <div className="ask-fact" key={r.ref.slug}>
-                  <div className="ask-fact-label">
-                    {r.ref.verified ? "Hecho confirmado" : "Información sin confirmar oficialmente"} ·{" "}
-                    {getCategoryName(r.ref.category)}
-                  </div>
-                  <p>
-                    <Link href={`/noticia/${r.ref.slug}`}>
-                      <strong>{r.ref.title}</strong>
-                    </Link>
-                    <br />
-                    {r.ref.dek}
-                  </p>
-                  <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                    Fuente: {r.ref.sources[0]?.label || "N/D"} · {timeAgo(r.ref.updatedAt)}
-                  </p>
-                </div>
-              ) : (
-                <div className="ask-fact" key={r.ref.slug}>
-                  <div className="ask-fact-label">Contexto — Vallarta Explica</div>
-                  <p>
-                    <Link href={`/explica/${r.ref.slug}`}>
-                      <strong>{r.ref.title}</strong>
-                    </Link>
-                    <br />
-                    {r.ref.quePaso}
-                  </p>
-                </div>
-              )
-            )
           )}
+          {list.map((n) => (
+            <div className="ask-fact" key={n.slug}>
+              <div className="ask-fact-label">
+                {getCategoryName(n.category)} · {timeAgo(n.updatedAt || n.publishedAt)}
+              </div>
+              <p>
+                <Link href={`/noticia/${n.slug}`}>
+                  <strong>{n.title}</strong>
+                </Link>
+                {n.dek && (
+                  <>
+                    <br />
+                    {n.dek}
+                  </>
+                )}
+              </p>
+              {n.sources[0] && (
+                <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Fuente: {n.sources[0].label}</p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </>

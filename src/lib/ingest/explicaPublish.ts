@@ -1,7 +1,7 @@
 import type { Story } from "./storyGraph";
 import { isAutoPublishEligible } from "./storyGraph";
 import { generateExplainerDraft, isAiConfigured } from "./generateArticle";
-import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
+import { parseArticleDraft, looksLikeInsufficientMaterial, isBadTitle } from "./articleFormat";
 import { generateArticleImage } from "./generateImage";
 import { hasExplainerForStory, getLastExplainerPublishedAt, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
@@ -49,6 +49,8 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
       if (looksLikeInsufficientMaterial(draft.draft)) continue;
 
       const { title, excerpt, bodyParagraphs } = parseArticleDraft(draft.draft);
+      // Sin un titular real (p. ej. el modelo solo devolvió el STORY ID) no se publica.
+      if (isBadTitle(title)) continue;
 
       const similarSlug = await findSimilarRecentArticle(title, { isExplainer: true });
       if (similarSlug) {

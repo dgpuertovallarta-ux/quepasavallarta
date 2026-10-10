@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { NEWS, EVENTS, BUSINESSES } from "@/lib/data";
+import { BUSINESSES } from "@/lib/data";
+import { upcomingEvents, eventDateLabel } from "@/lib/events";
+import { searchPublishedArticles } from "@/lib/db/articles";
+import { timeAgo } from "@/lib/format";
 import SearchBox from "@/components/SearchBox";
 
 export const metadata = { title: "Buscar — Qué Pasa Vallarta" };
@@ -11,8 +14,8 @@ export default async function BuscarPage({
 }) {
   const { q } = await searchParams;
   const query = (q || "").trim().toLowerCase();
-  const news = query ? NEWS.filter((n) => (n.title + n.dek).toLowerCase().includes(query)) : [];
-  const events = query ? EVENTS.filter((e) => (e.title + e.dek).toLowerCase().includes(query)) : [];
+  const news = query ? await searchPublishedArticles(query, 20) : [];
+  const events = query ? upcomingEvents().filter((e) => (e.title + e.dek + e.location).toLowerCase().includes(query)) : [];
   const biz = query ? BUSINESSES.filter((b) => (b.name + b.dek).toLowerCase().includes(query)) : [];
   const total = news.length + events.length + biz.length;
 
@@ -27,7 +30,7 @@ export default async function BuscarPage({
       {!query ? (
         <div className="empty-state">Escribe algo para buscar en noticias, agenda y directorio.</div>
       ) : total === 0 ? (
-        <div className="empty-state">Sin resultados para &ldquo;{q}&rdquo; en el contenido demo.</div>
+        <div className="empty-state">No encontramos nada con &ldquo;{q}&rdquo;. Prueba con otras palabras.</div>
       ) : (
         <>
           {news.length > 0 && (
@@ -40,6 +43,7 @@ export default async function BuscarPage({
                       <h4 className="card-title">
                         <Link href={`/noticia/${n.slug}`}>{n.title}</Link>
                       </h4>
+                      <div className="card-meta">{timeAgo(n.publishedAt)}</div>
                     </div>
                   </div>
                 ))}
@@ -56,7 +60,9 @@ export default async function BuscarPage({
                       <h4 className="card-title">
                         <Link href={`/agenda/${e.slug}`}>{e.title}</Link>
                       </h4>
-                      <div className="card-meta">{e.location}</div>
+                      <div className="card-meta">
+                        {eventDateLabel(e)} · {e.location}
+                      </div>
                     </div>
                   </div>
                 ))}

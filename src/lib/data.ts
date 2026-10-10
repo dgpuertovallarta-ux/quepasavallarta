@@ -333,77 +333,10 @@ export const EXPLICA: ExplicaItem[] = [
 ];
 
 // ------------------------------------------------------------------
-// AGENDA / VIVE VALLARTA — eventos demo
+// AGENDA / VIVE VALLARTA
 // ------------------------------------------------------------------
-export type EventItem = {
-  slug: string;
-  title: string;
-  category: string;
-  image: PhotoKey;
-  date: string;
-  time: string;
-  location: string;
-  org: string;
-  dek: string;
-};
-
-export const EVENTS: EventItem[] = [
-  {
-    slug: "concierto-malecon-septiembre",
-    title: "Concierto gratuito en el Malecón: Noche de Jazz",
-    category: "Música",
-    image: "bailarines",
-    date: "2026-09-05",
-    time: "19:30",
-    location: "Malecón, frente a Los Arcos",
-    org: "Ayuntamiento de Puerto Vallarta",
-    dek: "Presentación de artistas locales de jazz con entrada libre.",
-  },
-  {
-    slug: "festival-gastronomico-romantica",
-    title: "Festival Gastronómico Zona Romántica",
-    category: "Gastronomía",
-    image: "tacos",
-    date: "2026-10-10",
-    time: "13:00",
-    location: "Calle Basilio Badillo",
-    org: "Asociación de Restauranteros",
-    dek: "Más de 30 restaurantes con menús especiales a precio fijo.",
-  },
-  {
-    slug: "torneo-voleibol-playa-camarones",
-    title: "Torneo Municipal de Vóleibol de Playa",
-    category: "Deportes",
-    image: "playa",
-    date: "2026-09-06",
-    time: "09:00",
-    location: "Playa Camarones",
-    org: "Instituto Municipal del Deporte",
-    dek: "Categorías varonil y femenil, entrada libre para el público.",
-  },
-  {
-    slug: "expo-arte-centro-cultural",
-    title: "Exposición colectiva 'Bahía' — artistas de Jalisco",
-    category: "Cultura",
-    image: "fuenteAmistad",
-    date: "2026-09-12",
-    time: "18:00",
-    location: "Centro Cultural Vallarta",
-    org: "Secretaría de Cultura Municipal",
-    dek: "Pintura y escultura contemporánea inspirada en la costa del Pacífico.",
-  },
-  {
-    slug: "carrera-atletica-malecon",
-    title: "Carrera Atlética 5K/10K Malecón Nocturno",
-    category: "Deportes",
-    image: "ninoCaballito",
-    date: "2026-09-20",
-    time: "20:00",
-    location: "Salida en el Muelle de los Muertos",
-    org: "Club de Corredores PV",
-    dek: "Recorrido iluminado por el malecón con hidratación cada 2 km.",
-  },
-];
+// La agenda real vive en ./events.ts (se actualiza cada mes).
+export { EVENTS, type EventItem } from "./events";
 
 // ------------------------------------------------------------------
 // VALLARTA GUÍA / VALLARTA CONECTA — directorio comercial demo
@@ -536,6 +469,5 @@ export const LIVE_FEED: LiveFeedItem[] = [
 export function getNewsBySlug(slug: string) { return NEWS.find((n) => n.slug === slug); }
 export function getExplicaBySlug(slug: string) { return EXPLICA.find((n) => n.slug === slug); }
 export function getBusinessBySlug(slug: string) { return BUSINESSES.find((n) => n.slug === slug); }
-export function getEventBySlug(slug: string) { return EVENTS.find((e) => e.slug === slug); }
 export function getCategoryName(slug: string) { return CATEGORIES.find((c) => c.slug === slug)?.name || slug; }
 export function getZoneName(slug: string) { return ZONES.find((z) => z.slug === slug)?.name || slug; }

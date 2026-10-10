@@ -43,8 +43,7 @@ export default function ConectaPage() {
       <div className="panel" style={{ maxWidth: 720, marginTop: 16 }}>
         <h3 style={{ marginTop: 0 }}>¿Te interesa? Escríbenos</h3>
         <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-          Este formulario es una demostración de interfaz — en producción se conecta al CRM comercial (ver{" "}
-          <code>/docs/MONETIZATION.md</code>).
+          Déjanos tus datos y te contactamos con las opciones para tu negocio.
         </p>
         <ConectaLeadForm />
       </div>

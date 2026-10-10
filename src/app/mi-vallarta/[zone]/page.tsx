@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { ZONES, NEWS, getZoneName } from "@/lib/data";
+import { ZONES, getZoneName } from "@/lib/data";
+import { searchPublishedArticles } from "@/lib/db/articles";
+import { uniqueIllustrations } from "@/lib/photos";
 import { NewsCard, SectionHead } from "@/components/cards";
+
+export const revalidate = 300;
 
 export function generateStaticParams() {
   return ZONES.map((z) => ({ zone: z.slug }));
@@ -13,7 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ zone: str
 
 export default async function ZonePage({ params }: { params: Promise<{ zone: string }> }) {
   const { zone } = await params;
-  const zoneItems = NEWS.filter((n) => n.zone === zone);
+  // Notas reales que mencionan la colonia o zona por su nombre.
+  const zoneItems = uniqueIllustrations(await searchPublishedArticles(getZoneName(zone), 12, { phrase: true }));
 
   return (
     <div className="container section">
@@ -48,8 +53,7 @@ export default async function ZonePage({ params }: { params: Promise<{ zone: str
           </div>
         ) : (
           <div className="empty-state">
-            Sin noticias demo asignadas a esta zona todavía. En producción, esta vista se llena
-            automáticamente al etiquetar noticias con esta ubicación.
+            Todavía no hay notas recientes que mencionen esta zona. Cuando publiquemos alguna, aparecerá aquí.
           </div>
         )}
       </div>

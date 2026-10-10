@@ -28,6 +28,107 @@ function looksLikeSectionHeader(firstLine: string, hasMoreLines: boolean): boole
   return trimmed === trimmed.toUpperCase() && /[A-ZÁÉÍÓÚÑ]/.test(trimmed);
 }
 
+// Línea que solo es un separador markdown ("---", "***", "___").
+const SEPARATOR_RE = /^(?:[-*_]\s*){3,}$/;
+// Eco del identificador interno que va en el prompt ("STORY ID: story-…").
+// El modelo a veces lo repite al inicio del borrador — nunca es contenido.
+const STORY_ID_RE = /^[`*#\s]*STORY\s*ID\b\s*:?/i;
+
+/** ¿El título no sirve para mostrarse? (vacío, separador o el identificador interno de la historia). */
+export function isBadTitle(title: string): boolean {
+  const t = (title || "").trim();
+  return !t || t === "Sin título" || STORY_ID_RE.test(t) || SEPARATOR_RE.test(t);
+}
+
+/** Quita marcas de markdown en línea (**negritas**, *cursivas*, `código`) dejando solo el texto. */
+export function stripInlineMarkdown(text: string): string {
+  return (text || "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|[\s(¿¡"“|])\*(?!\s)([^*]+?)\*(?=$|[\s).,;:!?"”|])/g, "$1$2")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isShoutedHeader(p: string): boolean {
+  const t = p.replace(/:$/, "").trim();
+  if (t.length === 0 || t.length > 60 || /[.]$/.test(t)) return false;
+  return t === t.toUpperCase() && /[A-ZÁÉÍÓÚÑ]{3,}/.test(t);
+}
+
+/**
+ * Limpia los párrafos del cuerpo de una nota para mostrarlos: quita
+ * separadores y el eco del STORY ID, convierte encabezados en mayúsculas
+ * sueltos en `## ENCABEZADO`, parte listas que vienen pegadas en una sola
+ * línea ("* uno * dos", "1. uno 2. dos") y elimina asteriscos de markdown.
+ * Se aplica tanto al redactar (parseArticleDraft) como al leer notas ya
+ * guardadas (db/articles.ts), para corregir también las publicadas antes.
+ */
+export function sanitizeParagraphs(paragraphs: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of paragraphs) {
+    const p = (raw || "").trim();
+    if (!p || SEPARATOR_RE.test(p) || STORY_ID_RE.test(p)) continue;
+    if (p.startsWith("## ")) {
+      const header = stripInlineMarkdown(p.slice(3)).replace(/:$/, "");
+      if (header) out.push(`## ${header}`);
+      continue;
+    }
+    if (/^[*•-]\s+\S/.test(p)) {
+      p.replace(/^[*•-]\s+/, "")
+        .split(/\s[*•]\s+(?=\S)|\s-\s+(?=[A-ZÁÉÍÓÚÑ¿¡"“])/)
+        .map((item) => stripInlineMarkdown(item))
+        .filter(Boolean)
+        .forEach((item) => out.push(`• ${item}`));
+      continue;
+    }
+    if (/^1[.)]\s+\S/.test(p)) {
+      p.split(/\s(?=\d{1,2}[.)]\s+[A-ZÁÉÍÓÚÑ¿¡"“])/)
+        .map((item) => stripInlineMarkdown(item))
+        .filter(Boolean)
+        .forEach((item) => out.push(item));
+      continue;
+    }
+    const text = stripInlineMarkdown(p);
+    if (!text) continue;
+    out.push(isShoutedHeader(text) ? `## ${text.replace(/:$/, "")}` : text);
+  }
+  return out;
+}
+
+const isPlainParagraph = (p: string | undefined): p is string => !!p && !p.startsWith("## ") && !p.startsWith("• ");
+
+/**
+ * Deja una nota lista para mostrarse: cuerpo limpio (sanitizeParagraphs)
+ * y, si el título guardado no sirve (p. ej. "STORY ID: …"), lo recupera
+ * del primer párrafo del cuerpo — que es donde el modelo puso el titular
+ * real cuando no usó la etiqueta TITULAR — y hace lo mismo con la bajada.
+ * Si no hay de dónde sacarlo, devuelve título vacío para que quien llama
+ * decida no publicarla o no listarla.
+ */
+export function repairArticle(input: ParsedArticle): ParsedArticle {
+  const body = sanitizeParagraphs(input.bodyParagraphs);
+  let title = stripInlineMarkdown(input.title).replace(/^(?:#{1,6}\s*)+/, "").trim();
+  let excerpt = stripInlineMarkdown(input.excerpt);
+
+  if (isBadTitle(title)) {
+    title = "";
+    const first = body[0];
+    if (isPlainParagraph(first) && first.length <= 220) {
+      title = first.replace(/\.$/, "");
+      body.shift();
+      const next = body[0];
+      if (!excerpt && isPlainParagraph(next) && next.length <= 420 && (body[1] === undefined || body[1].startsWith("## "))) {
+        excerpt = next;
+        body.shift();
+      }
+    }
+  }
+  // El titular o la bajada nunca se repiten como primer párrafo del cuerpo.
+  while (body.length && (body[0] === title || body[0] === excerpt)) body.shift();
+  return { title, excerpt, bodyParagraphs: body };
+}
+
 /**
  * Convierte el draft crudo que devuelve la IA (con **TITULAR:**,
  * **BAJADA:** y encabezados de sección en negritas, siguiendo la
@@ -57,7 +158,15 @@ export function parseArticleDraft(draft: string): ParsedArticle {
     // marcadores de encabezado markdown al inicio de línea antes de
     // detectar si es un encabezado de sección, para no dejarlos pasar
     // crudos al título ni al cuerpo.
-    const clean = block.replace(/\*\*/g, "").replace(/^(?:#{1,6}\s*)+/gm, "");
+    const clean = block
+      .replace(/\*\*/g, "")
+      .replace(/^(?:#{1,6}\s*)+/gm, "")
+      // El eco del STORY ID y los separadores "---" nunca son contenido.
+      .split("\n")
+      .filter((line) => !STORY_ID_RE.test(line) && !SEPARATOR_RE.test(line.trim()))
+      .join("\n")
+      .trim();
+    if (!clean) continue;
     if (/^TITULAR:?/i.test(clean)) {
       title = clean.replace(/^TITULAR:?\s*/i, "").trim();
       continue;
@@ -90,7 +199,8 @@ export function parseArticleDraft(draft: string): ParsedArticle {
     bodyParagraphs.push(clean.replace(/\s+/g, " ").trim());
   }
 
-  if (!title) title = bodyParagraphs[0] || "Sin título";
-  title = title.replace(/^(?:#{1,6}\s*)+/, "").trim(); // nunca dejar pasar un "##" crudo como título
-  return { title, excerpt, bodyParagraphs };
+  // Si el modelo no usó la etiqueta TITULAR, repairArticle toma el titular
+  // (y la bajada) de los primeros párrafos; si aun así no hay un título
+  // utilizable lo deja vacío — autoPublish/explicaPublish no publican eso.
+  return repairArticle({ title, excerpt, bodyParagraphs });
 }

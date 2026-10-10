@@ -1,7 +1,7 @@
 import type { Story } from "./storyGraph";
 import { isAutoPublishEligible } from "./storyGraph";
 import { generateArticleDraft, isAiConfigured } from "./generateArticle";
-import { parseArticleDraft, looksLikeInsufficientMaterial } from "./articleFormat";
+import { parseArticleDraft, looksLikeInsufficientMaterial, isBadTitle } from "./articleFormat";
 import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
@@ -71,6 +71,10 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
       }
 
       const { title, excerpt, bodyParagraphs } = parseArticleDraft(draft.draft);
+      // Sin un titular real (p. ej. el modelo solo devolvió el STORY ID) no se publica.
+      if (isBadTitle(title)) {
+        throw new Error(`El borrador de "${story.labelSeed}" no trae un titular utilizable — no se auto-publica.`);
+      }
 
       // Red de seguridad extra: la misma historia real puede generar dos
       // STORY ID distintos entre corridas (si el titular de la fuente

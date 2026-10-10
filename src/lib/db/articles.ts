@@ -1,6 +1,7 @@
 import { getPool, isDatabaseConfigured } from "./client";
 import type { NewsItem, Media, ExplicaItem } from "../data";
-import type { PhotoKey } from "../photos";
+import { illustrationFor } from "../photos";
+import { repairArticle } from "../ingest/articleFormat";
 
 /**
  * Lectura y publicación real de artículos — conecta la portada pública
@@ -10,42 +11,6 @@ import type { PhotoKey } from "../photos";
  * al contenido demo) en lugar de fallar — mismo patrón que el resto del
  * pipeline de ingesta.
  */
-
-// Imagen ilustrativa por categoría — reutiliza las fotos reales de
-// Wikimedia ya verificadas en photos.ts (decisión del propietario:
-// "seguir con ilustrativas por ahora", ver /docs/N8N_AUTOMATION.md).
-// Varias opciones por categoría (no solo una) para que dos artículos
-// de la misma categoría sin foto real extraída no muestren literalmente
-// la misma imagen — se elige una de forma determinística según el slug.
-const CATEGORY_IMAGES: Record<string, PhotoKey[]> = {
-  "ultima-hora": ["malecomAtardecer", "maleconGeneral", "faroMalecon"],
-  seguridad: ["maleconGeneral", "faroMalecon"],
-  gobierno: ["maleconGeneral", "fuenteAmistad"],
-  comunidad: ["fuenteAmistad", "ninoCaballito", "maleconGeneral"],
-  turismo: ["malecomAtardecer", "playaAtardecer"],
-  economia: ["maleconGeneral", "faroMalecon"],
-  negocios: ["maleconGeneral", "faroMalecon"],
-  transito: ["construccion", "maleconGeneral"],
-  playas: ["playa", "playaAtardecer"],
-  clima: ["playaAtardecer", "playa"],
-  cultura: ["bailarines", "maleconGeneral"],
-  gastronomia: ["tacos", "ceviche"],
-  eventos: ["bailarines", "fuenteAmistad"],
-  entretenimiento: ["bailarines", "ninoCaballito"],
-  deportes: ["faroMalecon", "maleconGeneral"],
-  "medio-ambiente": ["ballena", "playa"],
-  servicios: ["construccion", "maleconGeneral"],
-  politica: ["maleconGeneral", "faroMalecon"],
-  jalisco: ["maleconGeneral", "faroMalecon"],
-  mexico: ["maleconGeneral", "faroMalecon"],
-  mundo: ["maleconGeneral", "faroMalecon"],
-};
-
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
 
 const CATEGORY_MEDIA: Record<string, Media> = {
   clima: "ocean",
@@ -60,11 +25,6 @@ const CATEGORY_MEDIA: Record<string, Media> = {
   gobierno: "sand",
   politica: "sand",
 };
-
-function imageForCategory(categorySlug: string, articleSlug: string): PhotoKey {
-  const options = CATEGORY_IMAGES[categorySlug] || ["maleconGeneral"];
-  return options[hashString(articleSlug) % options.length];
-}
 
 function mediaForCategory(slug: string): Media {
   return CATEGORY_MEDIA[slug] || "ocean";
@@ -100,10 +60,18 @@ type ArticleRow = {
 
 function mapRowToNewsItem(row: ArticleRow): NewsItem {
   const category = row.category_slug || "comunidad";
+  // Las notas se limpian al leerlas (no solo al redactarlas) para que
+  // también las ya publicadas con título "STORY ID: …" o con markdown
+  // crudo en el cuerpo se muestren bien — ver repairArticle.
+  const fixed = repairArticle({
+    title: row.title || "",
+    excerpt: row.excerpt || "",
+    bodyParagraphs: (row.body || "").split("\n\n").filter(Boolean),
+  });
   return {
     slug: row.slug,
-    title: row.title,
-    dek: row.excerpt || "",
+    title: fixed.title,
+    dek: fixed.excerpt,
     category,
     zone: null,
     author: row.author_name,
@@ -113,12 +81,25 @@ function mapRowToNewsItem(row: ArticleRow): NewsItem {
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
     media: mediaForCategory(category),
-    image: imageForCategory(category, row.slug),
+    image: illustrationFor(category, row.slug),
     imageUrl: row.image_url || undefined,
     imageCredit: row.image_credit || undefined,
     sources: row.source_url ? [{ label: row.source_name || "Fuente original", url: row.source_url }] : [],
-    body: (row.body || "").split("\n\n").filter(Boolean),
+    body: fixed.bodyParagraphs,
   };
+}
+
+/** Convierte filas en notas: una por slug (el join con fuentes duplica filas) y sin las que no tienen un título utilizable. */
+function rowsToNewsItems(rows: ArticleRow[]): NewsItem[] {
+  const seen = new Set<string>();
+  const items: NewsItem[] = [];
+  for (const row of rows) {
+    if (seen.has(row.slug)) continue;
+    seen.add(row.slug);
+    const item = mapRowToNewsItem(row);
+    if (item.title) items.push(item);
+  }
+  return items;
 }
 
 const SELECT_BASE = `
@@ -140,19 +121,13 @@ const SELECT_BASE = `
 export async function getPublishedArticles(limit = 30): Promise<NewsItem[]> {
   if (!isDatabaseConfigured()) return [];
   const pool = getPool();
+  // Se piden más filas que el límite porque el join con story_sources
+  // puede repetir una nota varias veces (una por fuente).
   const res = await pool.query<ArticleRow>(
     `${SELECT_BASE} order by a.published_at desc nulls last limit $1`,
-    [limit]
+    [limit * 3]
   );
-  // left join con story_sources puede duplicar filas (varias fuentes por story) — quedarnos con una por slug.
-  const seen = new Set<string>();
-  const items: NewsItem[] = [];
-  for (const row of res.rows) {
-    if (seen.has(row.slug)) continue;
-    seen.add(row.slug);
-    items.push(mapRowToNewsItem(row));
-  }
-  return items;
+  return rowsToNewsItems(res.rows).slice(0, limit);
 }
 
 export async function getPublishedArticlesByCategory(categorySlug: string, limit = 30): Promise<NewsItem[]> {
@@ -160,24 +135,69 @@ export async function getPublishedArticlesByCategory(categorySlug: string, limit
   const pool = getPool();
   const res = await pool.query<ArticleRow>(
     `${SELECT_BASE} and c.slug = $1 order by a.published_at desc nulls last limit $2`,
-    [categorySlug, limit]
+    [categorySlug, limit * 3]
   );
-  const seen = new Set<string>();
-  const items: NewsItem[] = [];
-  for (const row of res.rows) {
-    if (seen.has(row.slug)) continue;
-    seen.add(row.slug);
-    items.push(mapRowToNewsItem(row));
-  }
-  return items;
+  return rowsToNewsItems(res.rows).slice(0, limit);
 }
+
+const SEARCH_HAYSTACK =
+  "translate(lower(coalesce(a.title,'') || ' ' || coalesce(a.excerpt,'') || ' ' || coalesce(a.body,'')), 'áéíóúüñ', 'aeiouun')";
+
+function normalizeForSearch(text: string): string {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Búsqueda real sobre las notas publicadas (título, bajada y cuerpo) —
+ * la usan /buscar, /pregunta y Mi Vallarta. Sin acentos ni mayúsculas en
+ * la comparación. Primero exige todas las palabras; si así no hay nada,
+ * acepta cualquiera de ellas. Con `phrase: true` busca la frase tal cual
+ * (nombres de colonia como "5 de Diciembre").
+ */
+export async function searchPublishedArticles(
+  query: string,
+  limit = 20,
+  opts: { phrase?: boolean } = {}
+): Promise<NewsItem[]> {
+  if (!isDatabaseConfigured()) return [];
+  const pool = getPool();
+  const run = async (where: string, params: string[]) => {
+    const res = await pool.query<ArticleRow>(
+      `${SELECT_BASE} and (${where}) order by a.published_at desc nulls last limit $${params.length + 1}`,
+      [...params, limit * 3]
+    );
+    return rowsToNewsItems(res.rows).slice(0, limit);
+  };
+
+  if (opts.phrase) {
+    const phrase = normalizeForSearch(query).trim();
+    return phrase ? run(`${SEARCH_HAYSTACK} like $1`, [`%${phrase}%`]) : [];
+  }
+
+  const words = normalizeForSearch(query)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2 && !SEARCH_STOPWORDS.has(w))
+    .slice(0, 6);
+  if (words.length === 0) return [];
+  const params = words.map((w) => `%${w}%`);
+  const likes = words.map((_, i) => `${SEARCH_HAYSTACK} like $${i + 1}`);
+  const all = await run(likes.join(" and "), params);
+  if (all.length > 0 || words.length === 1) return all;
+  return run(likes.join(" or "), params);
+}
+
+const SEARCH_STOPWORDS = new Set([
+  "que", "los", "las", "del", "con", "por", "para", "una", "uno", "hay", "hoy", "esta", "este", "sobre", "como",
+  "paso", "pasa", "dicen", "puerto", "vallarta",
+]);
 
 export async function getPublishedArticleBySlug(slug: string): Promise<NewsItem | null> {
   if (!isDatabaseConfigured()) return null;
   const pool = getPool();
   const res = await pool.query<ArticleRow>(`${SELECT_BASE} and a.slug = $1 limit 1`, [slug]);
   if (res.rows.length === 0) return null;
-  return mapRowToNewsItem(res.rows[0]);
+  const item = mapRowToNewsItem(res.rows[0]);
+  return item.title ? item : { ...item, title: item.dek || "Nota de Qué Pasa Vallarta" };
 }
 
 // ---------------------------------------------------------------------
@@ -199,16 +219,21 @@ function sectionFrom(bodyParagraphs: string[], headerMatch: RegExp): string {
 
 function mapRowToExplicaItem(row: ArticleRow): ExplicaItem {
   const category = row.category_slug || "comunidad";
-  const paragraphs = (row.body || "").split("\n\n").filter(Boolean);
+  const fixed = repairArticle({
+    title: row.title || "",
+    excerpt: row.excerpt || "",
+    bodyParagraphs: (row.body || "").split("\n\n").filter(Boolean),
+  });
+  const paragraphs = fixed.bodyParagraphs;
   return {
     slug: row.slug,
-    title: row.title,
-    dek: row.excerpt || "",
-    image: imageForCategory(category, row.slug),
+    title: fixed.title,
+    dek: fixed.excerpt,
+    image: illustrationFor(category, row.slug),
     imageUrl: row.image_url || undefined,
     imageCredit: row.image_credit || undefined,
     publishedAt: row.published_at,
-    quePaso: sectionFrom(paragraphs, /QU[EÉ] PAS[OÓ]/i),
+    quePaso: sectionFrom(paragraphs, /QU[EÉ] (EST[AÁ] )?PAS(Ó|O|ANDO)/i),
     porQueImporta: sectionFrom(paragraphs, /POR QU[EÉ] IMPORTA/i),
     queSabemos: sectionFrom(paragraphs, /^LO QUE SABEMOS$/i),
     queNoSabemos: sectionFrom(paragraphs, /LO QUE NO SABEMOS/i),
@@ -223,16 +248,17 @@ export async function getPublishedExplainers(limit = 20): Promise<ExplicaItem[]>
   const pool = getPool();
   const res = await pool.query<ArticleRow>(
     `${EXPLICA_SELECT_BASE} order by a.published_at desc nulls last limit $1`,
-    [limit]
+    [limit * 3]
   );
   const seen = new Set<string>();
   const items: ExplicaItem[] = [];
   for (const row of res.rows) {
     if (seen.has(row.slug)) continue;
     seen.add(row.slug);
-    items.push(mapRowToExplicaItem(row));
+    const item = mapRowToExplicaItem(row);
+    if (item.title) items.push(item);
   }
-  return items;
+  return items.slice(0, limit);
 }
 
 export async function getPublishedExplainerBySlug(slug: string): Promise<ExplicaItem | null> {
@@ -282,17 +308,54 @@ function titleTokens(title: string): Set<string> {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w));
+    .filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w))
+    // "costa"/"costas", "vuelo"/"vuelos" cuentan como la misma palabra.
+    .map((w) => (w.length > 4 && w.endsWith("s") ? w.slice(0, -1) : w));
   return new Set(clean);
 }
 
-function titleSimilarity(a: string, b: string): number {
+export function titleSimilarity(a: string, b: string): number {
   const ta = titleTokens(a);
   const tb = titleTokens(b);
   if (ta.size === 0 || tb.size === 0) return 0;
   let intersection = 0;
   for (const w of ta) if (tb.has(w)) intersection++;
   return intersection / Math.min(ta.size, tb.size);
+}
+
+/**
+ * Para las portadas: de varias notas publicadas con horas de diferencia
+ * sobre el mismo hecho (títulos muy parecidos) deja solo la primera de la
+ * lista — que, con la lista ordenada de más nueva a más vieja, es la más
+ * reciente. No borra nada: las demás siguen en su categoría y su URL.
+ *
+ * Para no confundir notas distintas de un mismo tema del día (en un
+ * huracán casi todos los títulos comparten "huracán" y su nombre), las
+ * palabras que aparecen en buena parte de la lista no cuentan como
+ * coincidencia: hacen falta al menos 3 palabras en común fuera de esas.
+ */
+export function dropNearDuplicates<T extends { title: string; publishedAt: string }>(items: T[], threshold = 0.4): T[] {
+  const tokens = items.map((i) => titleTokens(i.title));
+  const frequency = new Map<string, number>();
+  for (const set of tokens) for (const w of set) frequency.set(w, (frequency.get(w) || 0) + 1);
+  const commonAt = Math.max(3, Math.ceil(items.length * 0.2));
+  const distinctiveShared = (a: Set<string>, b: Set<string>) => {
+    let n = 0;
+    for (const w of a) if (b.has(w) && (frequency.get(w) || 0) < commonAt) n++;
+    return n;
+  };
+
+  const kept: number[] = [];
+  items.forEach((item, idx) => {
+    const duplicate = kept.some(
+      (k) =>
+        Math.abs(+new Date(items[k].publishedAt) - +new Date(item.publishedAt)) < 36 * 3_600_000 &&
+        titleSimilarity(items[k].title, item.title) >= threshold &&
+        distinctiveShared(tokens[k], tokens[idx]) >= 3
+    );
+    if (!duplicate) kept.push(idx);
+  });
+  return kept.map((k) => items[k]);
 }
 
 /**

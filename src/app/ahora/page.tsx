@@ -22,10 +22,8 @@ export default async function AhoraPage() {
       </div>
       <h1 style={{ margin: "0 0 6px" }}>Vallarta Ahora</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 640, marginBottom: 20 }}>
-        Dashboard en tiempo real de la ciudad. Clima, calidad del aire y oleaje son datos reales
-        (Open-Meteo, sin costo). Tránsito, aeropuerto y cruceros todavía no están conectados — requieren
-        una API de pago o con registro (Google Maps, AviationStack, etc.), así que por ahora no se
-        muestran en vez de aparecer con datos de relleno. Ver <code>/docs/ARCHITECTURE.md</code>.
+        El estado de la ciudad en este momento: clima, oleaje y calidad del aire con datos en vivo, y las
+        noticias conforme se van actualizando.
       </p>
       <AhoraStrip />
 

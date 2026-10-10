@@ -918,3 +918,27 @@ table.data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border);
   .compact-bar { transition: none; }
   .site-menu { animation: none; }
 }
+
+/* ---------- Lista de datos (ficha de evento) ---------- */
+.fact-list { max-width: 720px; margin: 0; border-top: 1px solid var(--border-strong); }
+.fact-list > div { display: grid; grid-template-columns: 170px 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.fact-list dt { font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); padding-top: 4px; }
+.fact-list dd { margin: 0; font-family: var(--font-serif); font-size: 18px; }
+.fact-list a { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 560px) { .fact-list > div { grid-template-columns: 1fr; gap: 4px; } }
+
+/* ---------- Listas dentro de una nota ---------- */
+.prose ul, .prose ol { margin: 0 0 22px; padding-left: 1.2em; }
+.prose ul { list-style: disc; }
+.prose ol { list-style: decimal; }
+.prose li { margin-bottom: 8px; padding-left: 4px; }
+
+/* ---------- Pregúntale a Vallarta ---------- */
+.ask-box { background: transparent; padding: 0 0 26px; border-bottom: 1px solid var(--border-strong); }
+.ask-input { border: 1px solid var(--border-strong); background: transparent; color: var(--text); }
+.ask-input::placeholder { color: var(--text-muted); }
+.ask-suggestion { text-decoration: none; }
+.ask-suggestion:hover { background: var(--chip-bg); text-decoration: none; }
+.ask-fact { border-left: 0; padding: 18px 0; margin: 0; border-bottom: 1px solid var(--border); }
+.ask-fact p { margin: 6px 0 0; font-family: var(--font-serif); font-size: 16.5px; }
+.ask-fact strong { font-weight: 500; font-size: 20px; }

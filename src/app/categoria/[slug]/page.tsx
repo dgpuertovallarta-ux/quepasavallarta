@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { NEWS, CATEGORIES, getCategoryName } from "@/lib/data";
 import { NewsCard } from "@/components/cards";
-import { getPublishedArticlesByCategory } from "@/lib/db/articles";
+import { getPublishedArticles, getPublishedArticlesByCategory } from "@/lib/db/articles";
+import { uniqueIllustrations } from "@/lib/photos";
 
 export const revalidate = 60;
 
@@ -16,10 +17,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const real = await getPublishedArticlesByCategory(slug, 30);
-  const demo = NEWS.filter((n) => n.category === slug).map((n) => ({ ...n, isDemo: true }));
-  const items = (real.length > 0 ? real : demo).sort(
-    (a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)
+  // "Última Hora" no es una categoría en la que se archive nada: es
+  // simplemente todo lo más reciente del sitio.
+  const latest = await getPublishedArticles(slug === "ultima-hora" ? 36 : 1);
+  const real = slug === "ultima-hora" ? latest : await getPublishedArticlesByCategory(slug, 36);
+  // Las notas de ejemplo solo se usan mientras el sitio no tiene ninguna
+  // nota real — nunca se mezclan con contenido real.
+  const siteHasRealContent = latest.length > 0;
+  const demo = siteHasRealContent ? [] : NEWS.filter((n) => n.category === slug).map((n) => ({ ...n, isDemo: true }));
+  const items = uniqueIllustrations(
+    (real.length > 0 ? real : demo).sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt))
   );
   const name = getCategoryName(slug);
 
@@ -49,10 +56,10 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         </div>
       ) : (
         <div className="empty-state">
-          <h3>Sin noticias demo en esta categoría todavía</h3>
+          <h3>Todavía no hay notas en {name}</h3>
           <p>
-            En producción, esta vista se llenará automáticamente conforme el motor de recopilación
-            (RSS/APIs) publique historias en &ldquo;{name}&rdquo;.
+            Cuando publiquemos algo en esta sección aparecerá aquí. Mientras tanto, revisa{" "}
+            <Link href="/categoria/ultima-hora">lo más reciente</Link>.
           </p>
         </div>
       )}

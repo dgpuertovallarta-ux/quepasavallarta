@@ -3,11 +3,10 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data";
 import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
-import { newsImageSrc } from "@/lib/photos";
+import { newsImageSrc, photoCreditLabel } from "@/lib/photos";
+import ArticleBody from "@/components/ArticleBody";
 import { fmtDateTime } from "@/lib/format";
 import { getPublishedArticleBySlug, getPublishedArticlesByCategory } from "@/lib/db/articles";
-
-const SENSITIVE_CATEGORIES = ["seguridad", "politica"];
 
 // Artículos reales se publican después del build — no se pueden pre-generar todos.
 export const dynamicParams = true;
@@ -39,7 +38,6 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   const related = n.isDemo
     ? NEWS.filter((x) => x.category === n.category && x.slug !== n.slug).slice(0, 4)
     : relatedReal.filter((x) => x.slug !== n.slug).slice(0, 4);
-  const showHechos = SENSITIVE_CATEGORIES.includes(n.category);
 
   return (
     <div className="container section article-page">
@@ -74,23 +72,11 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       <figure className="article-figure">
         <div className="card-media">
           <Image src={newsImageSrc(n)} alt={n.title} fill sizes="(max-width: 1040px) 100vw, 980px" priority unoptimized={!!n.imageUrl} />
-          <span className="photo-tag">{n.imageUrl ? `Foto: ${n.imageCredit || "fuente original"}` : "Foto ilustrativa"}</span>
+          <span className="photo-tag">{photoCreditLabel(n)}</span>
         </div>
       </figure>
 
-      <article className="prose">
-        {n.body.map((p, i) =>
-          p.startsWith("## ") ? (
-            <h3 key={i}>
-              {p.slice(3)}
-            </h3>
-          ) : (
-            <p key={i}>{p}</p>
-          )
-        )}
-      </article>
-
-      {showHechos && <Hechos n={n} />}
+      <ArticleBody paragraphs={n.body} />
 
       <div className="panel" style={{ maxWidth: 780, marginTop: 24 }}>
         <strong style={{ fontSize: 13 }}>Fuentes</strong>
@@ -115,50 +101,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
           {related.length ? (
             related.map((r) => <NewsListItem n={r} key={r.slug} />)
           ) : (
-            <p style={{ color: "var(--text-muted)" }}>Sin artículos relacionados en la demo.</p>
+            <p style={{ color: "var(--text-muted)" }}>Todavía no hay más notas de esta categoría.</p>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Hechos({ n }: { n: NewsItem }) {
-  return (
-    <div className="panel" style={{ maxWidth: 780, marginTop: 20 }}>
-      <strong style={{ fontSize: 13, display: "block", marginBottom: 8 }}>
-        Los hechos, separados de las versiones
-      </strong>
-      <div className="hechos-row">
-        <span className="hechos-dot dot-green" />
-        <div>
-          <strong>Los hechos:</strong> {n.body[0]}
-        </div>
-      </div>
-      <div className="hechos-row">
-        <span className="hechos-dot dot-blue" />
-        <div>
-          <strong>Lo que dicen las autoridades:</strong> Declaraciones oficiales citadas en fuentes,
-          cuando existan comunicados formales.
-        </div>
-      </div>
-      <div className="hechos-row">
-        <span className="hechos-dot dot-purple" />
-        <div>
-          <strong>Otras versiones:</strong> Se incluirán aquí cuando existan versiones alternas
-          verificables.
-        </div>
-      </div>
-      <div className="hechos-row">
-        <span className="hechos-dot dot-yellow" />
-        <div>
-          <strong>Contexto:</strong> Antecedentes relevantes para entender la historia completa.
-        </div>
-      </div>
-      <div className="hechos-row">
-        <span className="hechos-dot dot-red" />
-        <div>
-          <strong>Lo que todavía no sabemos:</strong> Información pendiente de confirmación oficial.
         </div>
       </div>
     </div>
