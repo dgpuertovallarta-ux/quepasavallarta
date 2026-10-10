@@ -77,7 +77,8 @@ export default function Footer({
               : "Sitio de demostración (MVP) — todos los datos son ficticios."}
           </span>
           <span>
-            Hecho en Puerto Vallarta, para Puerto Vallarta. · <Link href="/admin">Panel editorial</Link>
+            Hecho en Puerto Vallarta, para Puerto Vallarta. · <Link href="/privacidad">Aviso de privacidad</Link> ·{" "}
+            <Link href="/admin">Panel editorial</Link>
           </span>
         </div>
       </div>
