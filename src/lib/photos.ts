@@ -27,8 +27,7 @@ export const PHOTOS = {
     "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Malec%C3%B3n_Lighthouse%2C_Puerto_Vallarta%2C_2014.jpg/1280px-Malec%C3%B3n_Lighthouse%2C_Puerto_Vallarta%2C_2014.jpg",
   bailarines:
     "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b3/Vallarta_Dancers%2C_Malec%C3%B3n%2C_Puerto_Vallarta%2C_2014.jpg/1280px-Vallarta_Dancers%2C_Malec%C3%B3n%2C_Puerto_Vallarta%2C_2014.jpg",
-  playaAtardecer:
-    "https://upload.wikimedia.org/wikipedia/commons/d/df/Atardecer_en_una_playa_de_Puerto_Vallarta.jpg",
+  playaAtardecer: commons("d/df", "Atardecer_en_una_playa_de_Puerto_Vallarta.jpg"),
   playa:
     "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/34/Vallarta_Beach.JPG/1280px-Vallarta_Beach.JPG",
   fuenteAmistad:
@@ -39,7 +38,7 @@ export const PHOTOS = {
     "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Ceviche%2C_seafood_tacos%2C_chips%2C_guacamole%2C_beans_%2834662952704%29.jpg/1280px-Ceviche%2C_seafood_tacos%2C_chips%2C_guacamole%2C_beans_%2834662952704%29.jpg",
   tacos:
     "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Pulpo_taco_shrimp_taco_%2838526611045%29.jpg/1280px-Pulpo_taco_shrimp_taco_%2838526611045%29.jpg",
-  ballena: "https://upload.wikimedia.org/wikipedia/commons/6/6a/Humpback_whale_jumping.jpg",
+  ballena: commons("6/6a", "Humpback_whale_jumping.jpg"),
   construccion:
     "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Road_Construction_Worker_-_Controlling_Traffic.jpg/1280px-Road_Construction_Worker_-_Controlling_Traffic.jpg",
   maleconGeneral:

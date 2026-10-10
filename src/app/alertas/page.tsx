@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { NewsListItem } from "@/components/cards";
-import { getPublishedArticles } from "@/lib/db/articles";
+import { getPublishedArticles, dropNearDuplicates } from "@/lib/db/articles";
 
 export const metadata = { title: "Alertas — Qué Pasa Vallarta" };
 export const revalidate = 60;
 
 export default async function AlertasPage() {
   // Lo más importante de los últimos días: las notas con mayor puntaje editorial.
-  const recent = await getPublishedArticles(60);
+  const recent = dropNearDuplicates(await getPublishedArticles(60));
   const urgent = recent.filter((n) => n.score >= 80).slice(0, 15);
   const items = urgent.length > 0 ? urgent : recent.slice(0, 10);
 

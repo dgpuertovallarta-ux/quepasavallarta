@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BUSINESSES } from "@/lib/data";
 import { upcomingEvents, eventDateLabel } from "@/lib/events";
-import { searchPublishedArticles } from "@/lib/db/articles";
+import { searchPublishedArticles, dropNearDuplicates } from "@/lib/db/articles";
 import { timeAgo } from "@/lib/format";
 import SearchBox from "@/components/SearchBox";
 
@@ -14,7 +14,7 @@ export default async function BuscarPage({
 }) {
   const { q } = await searchParams;
   const query = (q || "").trim().toLowerCase();
-  const news = query ? await searchPublishedArticles(query, 20) : [];
+  const news = query ? dropNearDuplicates(await searchPublishedArticles(query, 24)) : [];
   const events = query ? upcomingEvents().filter((e) => (e.title + e.dek + e.location).toLowerCase().includes(query)) : [];
   const biz = query ? BUSINESSES.filter((b) => (b.name + b.dek).toLowerCase().includes(query)) : [];
   const total = news.length + events.length + biz.length;

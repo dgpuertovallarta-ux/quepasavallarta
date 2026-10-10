@@ -40,7 +40,9 @@ export default async function HomePage() {
   );
   // En portada: una sola nota por hecho (si se publicaron varias casi
   // iguales se queda la más reciente) y ninguna foto ilustrativa repetida.
-  const usedPhotos = new Set<PhotoKey>();
+  const events = upcomingEvents().slice(0, 8);
+  // Las fotos de la agenda ya están tomadas: ninguna nota las repite.
+  const usedPhotos = new Set<PhotoKey>(events.map((e) => e.image));
   const sorted = uniqueIllustrations(dropNearDuplicates(byDate), usedPhotos);
   // Cada bloque continúa donde terminó el anterior, para que ninguna
   // nota se repita en la portada.
@@ -58,7 +60,6 @@ export default async function HomePage() {
     dropNearDuplicates(realExplica.length > 0 ? realExplica : EXPLICA.map((e) => ({ ...e, isDemo: true }))),
     usedPhotos
   );
-  const events = upcomingEvents().slice(0, 8);
   const explicaLead = explica[0];
   const explicaMore = explica.slice(1, 4);
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { NEWS, CATEGORIES, getCategoryName } from "@/lib/data";
 import { NewsCard } from "@/components/cards";
-import { getPublishedArticles, getPublishedArticlesByCategory } from "@/lib/db/articles";
+import { getPublishedArticles, getPublishedArticlesByCategory, dropNearDuplicates } from "@/lib/db/articles";
 import { uniqueIllustrations } from "@/lib/photos";
 
 export const revalidate = 60;
@@ -26,7 +26,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
   const siteHasRealContent = latest.length > 0;
   const demo = siteHasRealContent ? [] : NEWS.filter((n) => n.category === slug).map((n) => ({ ...n, isDemo: true }));
   const items = uniqueIllustrations(
-    (real.length > 0 ? real : demo).sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt))
+    dropNearDuplicates((real.length > 0 ? real : demo).sort((a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)))
   );
   const name = getCategoryName(slug);
 
