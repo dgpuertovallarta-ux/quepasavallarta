@@ -43,28 +43,26 @@ export async function GET() {
 }
 
 async function runIngest() {
-  const results: { sourceId: string; ok: boolean; items?: IngestedItem[]; error?: string }[] = [];
-
-  for (const source of SOURCES) {
-    if (!source.verified) {
-      results.push({
-        sourceId: source.id,
-        ok: false,
-        error: `Fuente no verificada todavía: ${source.note}`,
-      });
-      continue;
-    }
-    try {
-      const items = await fetchSource(source);
-      results.push({ sourceId: source.id, ok: true, items });
-    } catch (err) {
-      results.push({
-        sourceId: source.id,
-        ok: false,
-        error: err instanceof Error ? err.message : "Error desconocido al descargar la fuente.",
-      });
-    }
-  }
+  // Todas las fuentes se consultan al mismo tiempo (antes era una tras
+  // otra y la corrida completa llegaba a tardar ~40 s, al filo del
+  // límite de tiempo). El orden del resultado es el mismo de SOURCES.
+  const results: { sourceId: string; ok: boolean; items?: IngestedItem[]; error?: string }[] = await Promise.all(
+    SOURCES.map(async (source) => {
+      if (!source.verified) {
+        return { sourceId: source.id, ok: false, error: `Fuente no verificada todavía: ${source.note}` };
+      }
+      try {
+        const items = await fetchSource(source);
+        return { sourceId: source.id, ok: true, items };
+      } catch (err) {
+        return {
+          sourceId: source.id,
+          ok: false,
+          error: err instanceof Error ? err.message : "Error desconocido al descargar la fuente.",
+        };
+      }
+    })
+  );
 
   const allItems = results.flatMap((r) => r.items || []);
   const stories = buildStoryGraph(allItems);
@@ -97,6 +95,19 @@ async function runIngest() {
     autoPublish,
     explicaPublish,
   };
+
+  // Queda en los registros de la función (Netlify → Logs) para poder ver
+  // qué pasó en cada corrida: qué se publicó y qué error dio cada paso.
+  console.log(
+    "[ingest]",
+    JSON.stringify({
+      sourcesOk: summary.sourcesOk,
+      itemsFound: summary.itemsFound,
+      storiesFound: summary.storiesFound,
+      autoPublish,
+      sourceErrors: results.filter((r) => !r.ok && r.error && !r.error.startsWith("Fuente no verificada")).map((r) => `${r.sourceId}: ${r.error}`),
+    })
+  );
 
   return NextResponse.json({ summary, stories, results }, { status: 200 });
 }

@@ -31,7 +31,7 @@ export async function fetchSource(source: Source): Promise<IngestedItem[]> {
     })
     // Un agregador ordena por relevancia, no por fecha: aquí interesa lo más nuevo.
     .sort((a, b) => (source.aggregator ? +new Date(b.isoDate || 0) - +new Date(a.isoDate || 0) : 0))
-    .slice(0, source.aggregator ? 30 : 20)
+    .slice(0, 20)
     .map((item) => {
       let title = item.title?.trim() || "(sin título)";
       let sourceName = source.name;
