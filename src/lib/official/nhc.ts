@@ -22,9 +22,28 @@ export type OfficialAdvisory = {
 
 const parser = new Parser({ timeout: 6000 });
 
-function sentenceCase(text: string): string {
-  const lower = text.toLowerCase().trim();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
+// Nombres propios que el aviso trae en mayúsculas y hay que devolver con su inicial.
+const PROPER_NOUNS: [RegExp, string][] = [
+  [/\bm[eé]xico\b/g, "México"],
+  [/\bjalisco\b/g, "Jalisco"],
+  [/\bnayarit\b/g, "Nayarit"],
+  [/\bcolima\b/g, "Colima"],
+  [/\bmanzanillo\b/g, "Manzanillo"],
+  [/\bcabo corrientes\b/g, "Cabo Corrientes"],
+  [/\bpuerto vallarta\b/g, "Puerto Vallarta"],
+  [/\bbaja california\b/g, "Baja California"],
+  [/\bpac[ií]fico\b/g, "Pacífico"],
+];
+
+/** "CATEGORIA 4 SIMON A LA DERIVA" → "Categoría 4 Simon a la deriva" (el aviso viene todo en mayúsculas). */
+function sentenceCase(text: string, stormName: string): string {
+  let out = text.toLowerCase().trim();
+  for (const [pattern, proper] of PROPER_NOUNS) out = out.replace(pattern, proper);
+  if (stormName) {
+    const name = stormName.toLowerCase();
+    out = out.split(" ").map((w) => (w === name ? stormName : w)).join(" ");
+  }
+  return out.charAt(0).toUpperCase() + out.slice(1);
 }
 
 /** Avisos públicos vigentes que mencionan la costa de Jalisco o Nayarit. Nunca lanza: sin conexión devuelve []. */
@@ -40,10 +59,12 @@ export async function getLocalStormAdvisories(): Promise<OfficialAdvisory[]> {
         const body = item.contentSnippet || "";
         // El aviso abre con una o dos frases entre puntos suspensivos: "...SIMON SE FORTALECE...".
         const lead = body.match(/\.\.\.([^.]{12,220})\.\.\./);
+        const system = match ? match[1].trim() : title;
+        const stormName = system.split(" ").pop() || "";
         return {
-          system: match ? match[1].trim() : title,
+          system,
           label: match ? `Aviso público núm. ${match[2]}` : "Aviso público",
-          headline: lead ? sentenceCase(lead[1].replace(/\s+/g, " ")) : null,
+          headline: lead ? sentenceCase(lead[1].replace(/\s+/g, " "), stormName) : null,
           publishedAt: item.isoDate || null,
           url: item.link || "https://www.nhc.noaa.gov/?epac",
         };
