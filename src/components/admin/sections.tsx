@@ -140,7 +140,7 @@ export async function Cola() {
         otros publican, investigamos lo que está pasando&rdquo; — ver{" "}
         <code>src/lib/ingest/storyGraph.ts</code> y <code>src/lib/ingest/editorialPrompt.ts</code>). Todo
         Desde que se activó la auto-publicación (decisión del propietario, 2026-09), las Stories NIVEL A o
-        B corroboradas y sin contenido sensible se publican solas cada 30 min ({" "}
+        B corroboradas y sin contenido sensible se publican solas cada 10 min ({" "}
         <code>netlify/functions/scheduled-ingest.ts</code> → <code>autoPublish.ts</code>) — el botón de
         abajo solo sirve para forzar la redacción/publicación de una Story ahora mismo, en vez de esperar
         al siguiente ciclo. Contenido sensible (seguridad, salud, política, muertes) y fuentes NIVEL C/D
@@ -234,7 +234,7 @@ export async function Fuentes() {
           <code>GET /api/ingest</code> ya ejecuta de verdad: descarga las fuentes → normaliza → agrupa en
           Stories (Story Graph) → calcula News Score → clasifica → decide auto-publicable / revisión /
           descarte → intenta persistir en Postgres si <code>DATABASE_URL</code> está configurada. El cron
-          real ya existe como código (<code>netlify/functions/scheduled-ingest.ts</code>, cada 30 min) —
+          real ya existe como código (<code>netlify/functions/scheduled-ingest.ts</code>, cada 10 min) —
           se activa solo al desplegar en Netlify. Lo único que falta para producción real: (1) crear un
           proyecto Postgres (Supabase o Neon) y configurar <code>DATABASE_URL</code>, (2) configurar{" "}
           <code>GEMINI_API_KEY</code> para activar &ldquo;Generar borrador (IA)&rdquo; en la Cola

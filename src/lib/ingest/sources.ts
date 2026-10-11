@@ -499,6 +499,27 @@ export const SOURCES: Source[] = [
       "como hecho confirmado — solo como señal para investigar y " +
       "corroborar con NIVEL A o B.",
   },
+  {
+    id: "meteoromex",
+    name: "Meteoromex (página de meteorología en Facebook)",
+    type: "social",
+    url: "https://www.facebook.com/METEOROMEX/",
+    level: "C",
+    trustLevel: 4,
+    allowImageExtraction: false,
+    autoDetectOnly: true,
+    verified: false,
+    note:
+      "Página de Facebook pedida por el propietario (2026-10-10, huracán " +
+      "Simón) como fuente de clima. Registrada pero INACTIVA: solo existe " +
+      "en Facebook y el pipeline hoy solo lee feeds RSS — leer sus " +
+      "publicaciones requiere acceso autorizado a la API de Meta (igual " +
+      "que Protección Civil y SEAPAL) o que la página tenga un sitio con " +
+      "RSS. Queda en NIVEL C por defecto (no es dependencia oficial ni " +
+      "medio periodístico): señal para detectar, se corrobora con los " +
+      "avisos oficiales del NHC antes de publicar. El nivel lo decide el " +
+      "propietario.",
+  },
 
   // ------------------------------------------------------------------
   // NIVEL D — Comunidad y redes sociales: SOLO DETECCIÓN.

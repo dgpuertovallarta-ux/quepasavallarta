@@ -448,33 +448,67 @@ export function dropNearDuplicates<T extends { title: string; publishedAt: strin
   return kept.map((k) => items[k]);
 }
 
+export type RecentTitle = { slug: string; title: string };
+
+/**
+ * ¿Este título cuenta el mismo hecho que alguna nota ya publicada?
+ * Devuelve el slug de la nota parecida, o null.
+ *
+ * Las palabras que se repiten en buena parte de lo publicado esos días
+ * (en un huracán: "huracán", su nombre, "Jalisco"…) NO cuentan como
+ * coincidencia: son el tema del día, no el hecho. Bug real (2026-10-10,
+ * huracán Simón): la regla anterior comparaba todas las palabras y una
+ * sola nota vieja ("Emiten vigilancia de huracán… Simón") bastaba para
+ * descartar como "duplicado" casi cualquier titular nuevo con "huracán
+ * Simón" — el sitio se quedó horas sin publicar justo cuando más
+ * noticias había. Ahora solo cuentan las palabras fuera del tema del
+ * día: hacen falta tres en común (y que sean el 40% o más del título más
+ * corto), o dos si son casi todo el título (60% o más). Es la misma idea
+ * que ya usa dropNearDuplicates en las portadas. Probado con los 80
+ * titulares publicados del 8 al 10 de octubre de 2026: sigue atrapando
+ * los duplicados reales (Volaris, Profepa, IMSS-VPH, Capitán Sol) y deja
+ * pasar notas distintas del mismo huracán.
+ */
+export function findDuplicateTitle(title: string, recent: RecentTitle[]): string | null {
+  const sets = recent.map((r) => titleTokens(r.title));
+  const frequency = new Map<string, number>();
+  for (const set of sets) for (const w of set) frequency.set(w, (frequency.get(w) || 0) + 1);
+  const commonAt = Math.max(3, Math.ceil(recent.length * 0.1));
+  const distinctive = (set: Set<string>) => [...set].filter((w) => (frequency.get(w) || 0) < commonAt);
+
+  const mine = distinctive(titleTokens(title));
+  for (let i = 0; i < recent.length; i++) {
+    const theirs = new Set(distinctive(sets[i]));
+    const shared = mine.filter((w) => theirs.has(w)).length;
+    if (shared < 2) continue;
+    const ratio = shared / Math.min(mine.length, theirs.size);
+    if ((shared >= 3 && ratio >= 0.4) || ratio >= 0.6) return recent[i].slug;
+  }
+  return null;
+}
+
+/** Títulos publicados en los últimos días, para comparar contra ellos sin consultar la base en cada intento. */
+export async function getRecentArticleTitles(opts: { sinceDays?: number; isExplainer?: boolean } = {}): Promise<RecentTitle[]> {
+  if (!isDatabaseConfigured()) return [];
+  const { sinceDays = 3, isExplainer = false } = opts;
+  const pool = getPool();
+  const res = await pool.query<RecentTitle>(
+    "select slug, title from articles where published_at > now() - interval '1 day' * $1 and is_explainer = $2",
+    [sinceDays, isExplainer]
+  );
+  return res.rows;
+}
+
 /**
  * Red de seguridad extra contra duplicados: la misma noticia real puede
  * generar dos STORY ID distintos en corridas diferentes del Story Graph
  * (si el titular de la fuente varió mínimamente entre fetches), lo cual
  * hace que hasPublishedArticleForStory (por storyId) no detecte que ya
  * se cubrió. Esto compara por SIMILITUD DE TÍTULO contra lo publicado en
- * los últimos días — bug real que ya pasó una vez y publicó la misma
- * historia dos veces con títulos ligeramente distintos.
+ * los últimos días — ver findDuplicateTitle para la regla.
  */
 export async function findSimilarRecentArticle(title: string, opts: { sinceDays?: number; isExplainer?: boolean } = {}): Promise<string | null> {
-  if (!isDatabaseConfigured()) return null;
-  const { sinceDays = 3, isExplainer = false } = opts;
-  const pool = getPool();
-  const res = await pool.query<{ slug: string; title: string }>(
-    "select slug, title from articles where published_at > now() - interval '1 day' * $1 and is_explainer = $2",
-    [sinceDays, isExplainer]
-  );
-  for (const row of res.rows) {
-    // Bajado de 0.6 a 0.4 (2026-09) — títulos de la misma noticia real
-    // contados por fuentes distintas ("Vigilan perturbación tropical..."
-    // vs "Vigilan zona de inestabilidad...") comparten menos del 60% de
-    // palabras aunque sean el mismo hecho; en la práctica caían entre
-    // 0.4 y 0.5. 0.4 los atrapa sin volverse tan laxo como para bloquear
-    // títulos genuinamente distintos (que en la práctica dan 0).
-    if (titleSimilarity(title, row.title) >= 0.4) return row.slug;
-  }
-  return null;
+  return findDuplicateTitle(title, await getRecentArticleTitles(opts));
 }
 
 /** Para el flujo manual de publicación: recupera un link+nombre de fuente de una Story ya persistida, para poder extraer su foto real. */
@@ -495,7 +529,7 @@ export async function getPrimarySourceForStory(storyExternalKey: string): Promis
   return { url: res.rows[0].url, sourceName: res.rows[0].name };
 }
 
-/** Evita republicar la misma Story en cada corrida del cron (cada 30 min). */
+/** Evita republicar la misma Story en cada corrida del cron (cada 10 min). */
 export async function hasPublishedArticleForStory(storyExternalKey: string): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
   const pool = getPool();

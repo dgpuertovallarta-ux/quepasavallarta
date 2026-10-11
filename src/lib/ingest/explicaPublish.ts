@@ -26,9 +26,16 @@ export type ExplicaPublishResult =
  * corroboración NIVEL A/B, nunca contenido sensible vía NIVEL C/D, nunca
  * un "resumen interno" publicado como si fuera una pieza real.
  */
-export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublishResult> {
+export async function runExplicaPublish(stories: Story[], options: { startBefore?: number } = {}): Promise<ExplicaPublishResult> {
   if (!isAiConfigured() || !isDatabaseConfigured()) {
     return { ran: false, reason: "GEMINI_API_KEY o DATABASE_URL no configuradas." };
+  }
+  // Un explicador tarda lo mismo que una nota (texto + imagen). Si a esta
+  // corrida ya no le queda tiempo, se deja para la siguiente en vez de
+  // arriesgar que Netlify corte el request a medias.
+  const outOfTime = () => options.startBefore !== undefined && Date.now() > options.startBefore;
+  if (outOfTime()) {
+    return { ran: false, reason: "Sin tiempo en esta corrida — se intenta en la siguiente." };
   }
 
   const lastAt = await getLastExplainerPublishedAt();
@@ -42,6 +49,7 @@ export async function runExplicaPublish(stories: Story[]): Promise<ExplicaPublis
   const eligible = stories.filter(isAutoPublishEligible);
 
   for (const story of eligible) {
+    if (outOfTime()) break;
     if (await hasExplainerForStory(story.storyId)) continue;
 
     try {
