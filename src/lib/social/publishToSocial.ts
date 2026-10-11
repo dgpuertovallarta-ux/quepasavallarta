@@ -42,6 +42,37 @@ export type SocialPublishResult = {
   instagram: { attempted: boolean; ok: boolean; error?: string; mediaId?: string };
 };
 
+/**
+ * Instagram solo acepta fotos JPEG y las imágenes generadas se guardan en
+ * PNG. El servicio de imágenes de Netlify (/.netlify/images) convierte al
+ * vuelo cualquier imagen de nuestro propio dominio, así que para las
+ * imágenes propias se le pide la versión JPEG; cualquier otra URL se
+ * deja igual.
+ */
+function instagramImageUrl(imageUrl: string): string {
+  try {
+    const url = new URL(imageUrl);
+    if (!url.pathname.startsWith("/api/image/")) return imageUrl;
+    return `${url.origin}/.netlify/images?url=${encodeURIComponent(url.pathname)}&fm=jpg&q=88&w=1440`;
+  } catch {
+    return imageUrl;
+  }
+}
+
+/**
+ * Texto para Instagram: ahí los enlaces del texto no se pueden abrir, así
+ * que en vez de la dirección completa se menciona el sitio, y se agregan
+ * las etiquetas con las que la gente busca noticias de Vallarta.
+ */
+function buildInstagramCaption(input: SocialPublishInput): string {
+  const parts = [input.title.trim()];
+  if (input.excerpt.trim()) parts.push(input.excerpt.trim());
+  parts.push("Lee la nota completa en quepasavta.com");
+  parts.push("Imagen ilustrativa generada con inteligencia artificial.");
+  parts.push("#PuertoVallarta #Vallarta #BahíaDeBanderas #Jalisco #QuéPasaVallarta #Noticias");
+  return parts.join("\n\n").slice(0, 2100);
+}
+
 function buildCaption(input: SocialPublishInput): string {
   const parts = [input.title.trim()];
   if (input.excerpt.trim()) parts.push(input.excerpt.trim());
@@ -94,14 +125,29 @@ async function postToInstagram(input: SocialPublishInput): Promise<SocialPublish
     // Paso 1: crear el contenedor de medios.
     const createBody = new URLSearchParams({
       access_token: token,
-      image_url: input.imageUrl,
-      caption: buildCaption(input),
+      image_url: instagramImageUrl(input.imageUrl),
+      caption: buildInstagramCaption(input),
       is_ai_generated: "true",
     });
     const createRes = await fetch(`${GRAPH_BASE}/${igUserId}/media`, { method: "POST", body: createBody });
     const createJson = (await createRes.json()) as { id?: string; error?: { message?: string } };
     if (!createRes.ok || createJson.error || !createJson.id) {
       return { attempted: true, ok: false, error: createJson.error?.message || `HTTP ${createRes.status} al crear el contenedor` };
+    }
+
+    // Instagram procesa la foto antes de dejarla publicar; casi siempre
+    // está lista al instante, pero si se publica antes de tiempo falla.
+    // Se consulta el estado unas pocas veces (máximo ~6 s).
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const statusRes = await fetch(`${GRAPH_BASE}/${createJson.id}?fields=status_code`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const statusJson = (await statusRes.json().catch(() => null)) as { status_code?: string } | null;
+      if (!statusJson?.status_code || statusJson.status_code === "FINISHED") break;
+      if (statusJson.status_code === "ERROR" || statusJson.status_code === "EXPIRED") {
+        return { attempted: true, ok: false, error: `Instagram no pudo procesar la imagen (${statusJson.status_code}).` };
+      }
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
     // Paso 2: publicar el contenedor ya creado.
