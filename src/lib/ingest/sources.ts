@@ -79,6 +79,12 @@ export type Source = {
   mustMention?: RegExp;
   /** Largo máximo del extracto que se guarda y se le pasa a la redacción (por defecto 240). */
   maxExcerpt?: number;
+  /**
+   * Nombre o ID de la página de Facebook (lo que va después de
+   * facebook.com/). Con esto la fuente se lee por la API de Meta — ver
+   * fetchFacebookPage.ts para lo que hace falta antes de activarla.
+   */
+  facebookPage?: string;
 };
 
 // Zona de interés para avisos oficiales de ciclones: costa de Jalisco y
@@ -429,27 +435,30 @@ export const SOURCES: Source[] = [
     name: "Protección Civil y Bomberos Puerto Vallarta",
     type: "social",
     url: "https://www.facebook.com/ProteccionCivilPV",
+    facebookPage: "ProteccionCivilPV",
     level: "B",
     trustLevel: 1,
     allowImageExtraction: true,
     autoDetectOnly: false,
     verified: false,
     note:
-      "Cuenta oficial real conocida. Requiere credenciales de API de Meta " +
-      "(Facebook Graph API) que el propietario todavía no ha dado — no " +
-      "activar hasta tener acceso autorizado.",
+      "Cuenta oficial real conocida. El lector ya existe " +
+      "(fetchFacebookPage.ts) pero está apagado: falta que Meta apruebe " +
+      "\"Page Public Content Access\" para la app. No activar " +
+      "(verified: true) hasta tener ese permiso.",
   },
   {
     id: "seapal-vallarta",
     name: "SEAPAL Vallarta (agua potable y drenaje)",
     type: "social",
     url: "https://www.facebook.com/SEAPALVallarta",
+    facebookPage: "SEAPALVallarta",
     level: "B",
     trustLevel: 1,
     allowImageExtraction: true,
     autoDetectOnly: false,
     verified: false,
-    note: "Cuenta oficial real conocida. Misma limitación: requiere API de Meta autorizada.",
+    note: "Cuenta oficial real conocida. Misma situación: lector listo, falta el permiso de Meta.",
   },
   {
     id: "gobierno-jalisco",
@@ -504,6 +513,7 @@ export const SOURCES: Source[] = [
     name: "Meteoromex (página de meteorología en Facebook)",
     type: "social",
     url: "https://www.facebook.com/METEOROMEX/",
+    facebookPage: "METEOROMEX",
     level: "C",
     trustLevel: 4,
     allowImageExtraction: false,
@@ -512,11 +522,11 @@ export const SOURCES: Source[] = [
     note:
       "Página de Facebook pedida por el propietario (2026-10-10, huracán " +
       "Simón) como fuente de clima. Registrada pero INACTIVA: solo existe " +
-      "en Facebook y el pipeline hoy solo lee feeds RSS — leer sus " +
-      "publicaciones requiere acceso autorizado a la API de Meta (igual " +
-      "que Protección Civil y SEAPAL) o que la página tenga un sitio con " +
-      "RSS. Queda en NIVEL C por defecto (no es dependencia oficial ni " +
-      "medio periodístico): señal para detectar, se corrobora con los " +
+      "en Facebook. El lector ya existe (fetchFacebookPage.ts); falta que " +
+      "Meta apruebe \"Page Public Content Access\" para la app, igual que " +
+      "con Protección Civil y SEAPAL. Queda en NIVEL C por defecto (no es " +
+      "dependencia oficial ni medio periodístico): señal para detectar, se " +
+      "corrobora con los " +
       "avisos oficiales del NHC antes de publicar. El nivel lo decide el " +
       "propietario.",
   },
