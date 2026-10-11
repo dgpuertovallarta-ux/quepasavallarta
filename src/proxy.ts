@@ -3,7 +3,8 @@ import type { NextRequest } from "next/server";
 import { verifySessionToken, ADMIN_SESSION_COOKIE } from "@/lib/auth/session";
 
 // Protege el panel editorial (/admin) y las acciones que redactan o
-// publican contenido (/api/generate-article, /api/publish-article) con
+// publican contenido (/api/generate-article, /api/publish-article) y la
+// prueba del lector de Facebook (/api/facebook-preview, usa el token) con
 // una sesión real firmada — ver src/lib/auth/session.ts. /admin/login
 // se deja pasar sin sesión (es la página para conseguirla).
 // /api/ingest NO se protege aquí: lo dispara el cron de Netlify
@@ -33,5 +34,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/generate-article", "/api/publish-article"],
+  matcher: ["/admin/:path*", "/api/generate-article", "/api/publish-article", "/api/facebook-preview"],
 };

@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import { type Source } from "./sources";
 import { type IngestedItem } from "./types";
 import { guessCategory, computeNewsScore, decideStatus } from "./classify";
+import { fetchFacebookPage } from "./fetchFacebookPage";
 
 const parser = new Parser({ timeout: 10000 });
 
@@ -12,6 +13,10 @@ const parser = new Parser({ timeout: 10000 });
  * panel de "Fuentes y automatización".
  */
 export async function fetchSource(source: Source): Promise<IngestedItem[]> {
+  // Páginas de Facebook: se leen por la API de Meta (ver fetchFacebookPage.ts).
+  if (source.type === "social" && source.facebookPage) {
+    return fetchFacebookPage(source);
+  }
   if (source.type !== "rss") {
     throw new Error(`Fuente "${source.id}" no es de tipo RSS todavía (tipo: ${source.type}). No implementado.`);
   }
