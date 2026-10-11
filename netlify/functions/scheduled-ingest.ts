@@ -2,8 +2,11 @@ import type { Config } from "@netlify/functions";
 
 /**
  * Cron real (Netlify Scheduled Function) — llama a /api/ingest cada
- * 30 minutos en producción. Netlify inyecta automáticamente `URL` con el
- * dominio real del sitio desplegado; no hace falta configurarlo a mano.
+ * 10 minutos en producción (antes cada 30). Cada corrida publica a lo más
+ * una nota, así que el ritmo máximo es de 6 notas por hora: en un día
+ * con muchas noticias (huracán) cada 30 minutos se quedaba muy corto.
+ * Netlify inyecta automáticamente `URL` con el dominio real del sitio
+ * desplegado; no hace falta configurarlo a mano.
  *
  * Esto reemplaza el "falta programar un cron" que hasta ahora estaba
  * documentado como pendiente en /docs/N8N_AUTOMATION.md — en cuanto el
@@ -31,5 +34,5 @@ async function scheduledIngest() {
 export default scheduledIngest;
 
 export const config: Config = {
-  schedule: "*/30 * * * *",
+  schedule: "*/10 * * * *",
 };
