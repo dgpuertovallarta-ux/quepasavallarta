@@ -11,7 +11,7 @@ export type PersistResult = {
 /**
  * Persiste una corrida real de ingesta (fuentes + Stories agrupadas) en
  * Postgres. Upsert idempotente por `external_key` — correr esto cada
- * 30 min (ver netlify/functions/scheduled-ingest.ts) no duplica filas,
+ * 10 min (ver netlify/functions/scheduled-ingest.ts) no duplica filas,
  * solo actualiza `news_score`/`updated_at` y agrega fuentes nuevas a una
  * Story existente.
  *
