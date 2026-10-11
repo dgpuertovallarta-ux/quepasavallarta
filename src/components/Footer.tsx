@@ -56,6 +56,7 @@ export default function Footer({
           </div>
           <div className="footer-col">
             <h4>Herramientas</h4>
+            <Link href="/proteccion-civil">Protección Civil</Link>
             <Link href="/ahora">Vallarta Ahora</Link>
             <Link href="/mi-vallarta">Mi Zona</Link>
             <Link href="/alertas">Alertas</Link>

@@ -162,6 +162,36 @@ export async function getActiveCategorySlugs(): Promise<string[]> {
   }
 }
 
+// Raíces de palabras (sin acentos) que identifican una nota de
+// Protección Civil / emergencia en su título o bajada.
+const EMERGENCY_SQL_TERMS = [
+  "proteccion civil", "huracan", "tormenta tropical", "ciclon", "evacu", "refugio", "albergue", "inundaci",
+  "desbord", "deslave", "marejada", "oleaje", "suspenden clases", "suspension de clases", "suspenden actividades",
+  "alerta", "bomberos", "zona de riesgo", "zonas de riesgo", "damnificad", "lluvias intensas", "rafagas", "sismo",
+];
+
+/**
+ * Notas de Protección Civil y emergencias de los últimos días (por
+ * palabras clave en título y bajada) — alimenta /proteccion-civil y la
+ * franja de aviso de la portada.
+ */
+export async function getEmergencyArticles(limit = 30, sinceDays = 7): Promise<NewsItem[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const pool = getPool();
+    const res = await pool.query<ArticleRow>(
+      `${SELECT_BASE}
+        and a.published_at > now() - interval '1 day' * $2
+        and translate(lower(coalesce(a.title,'') || ' ' || coalesce(a.excerpt,'')), 'áéíóúüñ', 'aeiouun') like any($3)
+        order by a.published_at desc nulls last limit $1`,
+      [limit * 3, sinceDays, EMERGENCY_SQL_TERMS.map((t) => `%${t}%`)]
+    );
+    return rowsToNewsItems(res.rows).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 export type SitemapEntry = { slug: string; isExplainer: boolean; lastModified: string };
 
 /**

@@ -14,6 +14,7 @@ const PRIMARY_FALLBACK = ["gobierno", "comunidad", "turismo"];
 
 const SECTIONS = [
   { href: "/", label: "Inicio" },
+  { href: "/proteccion-civil", label: "Protección Civil" },
   { href: "/ahora", label: "Vallarta Ahora" },
   { href: "/explica", label: "Vallarta Explica" },
   { href: "/agenda", label: "Vive Vallarta" },
@@ -78,9 +79,10 @@ export default function Header({
     ? CATEGORIES.filter((c) => c.slug === "ultima-hora" || activeCategories.includes(c.slug))
     : CATEGORIES;
   const primarySlugs = filterActive
-    ? PRIMARY_PREFERENCE.filter((slug) => activeCategories.includes(slug)).slice(0, 3)
-    : PRIMARY_FALLBACK;
-  const primary = [
+    ? PRIMARY_PREFERENCE.filter((slug) => activeCategories.includes(slug)).slice(0, 2)
+    : PRIMARY_FALLBACK.slice(0, 2);
+  const primary: { href: string; label: string; alert?: boolean }[] = [
+    { href: "/proteccion-civil", label: "Protección Civil", alert: true },
     ...primarySlugs.map((slug) => ({
       href: `/categoria/${slug}`,
       label: CATEGORIES.find((c) => c.slug === slug)?.name || slug,
@@ -142,7 +144,11 @@ export default function Header({
   const navLinks = (
     <>
       {primary.map((n) => (
-        <Link key={n.href} href={n.href} className={pathname === n.href ? "active" : ""}>
+        <Link
+          key={n.href}
+          href={n.href}
+          className={[pathname === n.href ? "active" : "", n.alert ? "nav-alert" : ""].filter(Boolean).join(" ")}
+        >
           {n.label}
         </Link>
       ))}

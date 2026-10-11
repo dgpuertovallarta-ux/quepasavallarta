@@ -35,6 +35,7 @@ export type Story = {
 };
 
 const SOURCE_LEVEL_BY_ID = new Map(SOURCES.map((s) => [s.id, s.level]));
+const AGGREGATOR_IDS = new Set(SOURCES.filter((s) => s.aggregator).map((s) => s.id));
 
 const STOPWORDS = new Set([
   "de", "la", "el", "en", "y", "a", "que", "del", "los", "las", "un", "una", "con", "por", "para", "se", "su",
@@ -95,7 +96,16 @@ function slugify(text: string): string {
  * correcto explícitamente.
  */
 export function isAutoPublishEligible(story: Story): boolean {
-  return story.hasCorroboration && story.items.some((it) => it.status === "auto_publishable");
+  if (!story.hasCorroboration || !story.items.some((it) => it.status === "auto_publishable")) return false;
+  // Una historia que solo aparece en un agregador de titulares (Google
+  // Noticias) necesita que al menos DOS medios distintos la reporten:
+  // un solo titular suelto no basta para darla por confirmada.
+  const onlyAggregators = story.items.every((it) => AGGREGATOR_IDS.has(it.sourceId));
+  if (onlyAggregators) {
+    const outlets = new Set(story.items.map((it) => it.sourceName));
+    if (outlets.size < 2) return false;
+  }
+  return true;
 }
 
 /**

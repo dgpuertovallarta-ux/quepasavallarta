@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { NEWS, EXPLICA, getCategoryName, type NewsItem } from "@/lib/data";
-import { getPublishedArticles, getPublishedExplainers, dropNearDuplicates } from "@/lib/db/articles";
+import { getPublishedArticles, getPublishedExplainers, dropNearDuplicates, getEmergencyArticles } from "@/lib/db/articles";
 import { upcomingEvents, eventDateLabel } from "@/lib/events";
 import { NewsCard, SectionHead, StoryMeta, DemoTag } from "@/components/cards";
 import CarouselRow from "@/components/CarouselRow";
@@ -33,7 +33,10 @@ function StoryPhoto({ n, sizes, priority }: { n: NewsItem; sizes: string; priori
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const real = await getPublishedArticles(45);
+  const [real, emergency] = await Promise.all([getPublishedArticles(45), getEmergencyArticles(6, 2)]);
+  // Franja de aviso: solo aparece cuando hay actividad real de Protección
+  // Civil (tres o más notas de emergencia en las últimas 48 horas).
+  const alertNote = emergency.length >= 3 ? emergency[0] : null;
   const demo = NEWS.map((n) => ({ ...n, isDemo: true }));
   const byDate = (real.length > 0 ? real : demo).sort(
     (a, b) => +new Date(b.publishedAt) - +new Date(a.publishedAt)
@@ -66,6 +69,13 @@ export default async function HomePage() {
   return (
     <>
       <div className="container">
+        {alertNote && (
+          <Link href="/proteccion-civil" className="alert-band">
+            <strong>Protección Civil</strong>
+            <span>{alertNote.title}</span>
+            <em>Avisos oficiales y cobertura →</em>
+          </Link>
+        )}
         <WeatherBar />
       </div>
 

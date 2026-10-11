@@ -7,6 +7,7 @@ import { hasPublishedArticleForStory, findSimilarRecentArticle, publishArticle }
 import { isDatabaseConfigured } from "../db/client";
 import { publishToSocial } from "../social/publishToSocial";
 import { siteUrl } from "../storage/imageBlobs";
+import { sortByEditorialFocus, isOffTopicStory, isOfficialBulletinStory } from "./localFocus";
 
 // Límite por corrida — cada auto-publicación llama a la API de Claude
 // (varios segundos) y ahora también genera una imagen con IA (otra
@@ -48,9 +49,22 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
   };
   if (!isAiConfigured() || !isDatabaseConfigured()) return result;
 
-  const eligible = stories.filter(isAutoPublishEligible).slice(0, MAX_AUTO_PUBLISH_PER_RUN);
+  // Enfoque editorial (ver localFocus.ts): se descartan las historias que
+  // claramente son de otro lugar y se ordena lo demás poniendo primero
+  // los avisos oficiales, Protección Civil y lo que pasa en Vallarta.
+  const candidates = sortByEditorialFocus(stories.filter((s) => isAutoPublishEligible(s) && !isOffTopicStory(s)));
 
-  for (const story of eligible) {
+  // Antes se tomaba solo la primera historia de la lista, aunque ya
+  // estuviera publicada — y esa corrida no publicaba nada. Ahora se
+  // recorre la lista hasta encontrar una que todavía no haya salido.
+  // Límites para no pasarse del tiempo del request: se revisan a lo más
+  // 25 historias y se intenta redactar a lo más dos (la segunda solo si
+  // la primera falló antes de publicarse).
+  let publishedThisRun = 0;
+  const MAX_ATTEMPTS_PER_RUN = MAX_AUTO_PUBLISH_PER_RUN + 1;
+
+  for (const story of candidates.slice(0, 25)) {
+    if (publishedThisRun >= MAX_AUTO_PUBLISH_PER_RUN || result.attempted >= MAX_ATTEMPTS_PER_RUN) break;
     try {
       const already = await hasPublishedArticleForStory(story.storyId);
       if (already) {
@@ -80,7 +94,10 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
       // STORY ID distintos entre corridas (si el titular de la fuente
       // varió mínimamente) — ya pasó una vez y publicó la misma noticia
       // dos veces. Se compara por similitud de título, no solo por storyId.
-      const similarSlug = await findSimilarRecentArticle(title);
+      // Excepción: los boletines oficiales periódicos (aviso de huracán
+      // cada 3 h) siempre se parecen al anterior y aun así cada emisión
+      // es una actualización que sí se publica.
+      const similarSlug = isOfficialBulletinStory(story) ? null : await findSimilarRecentArticle(title);
       if (similarSlug) {
         throw new Error(`Ya existe un artículo muy similar publicado recientemente (${similarSlug}) — se omite para no duplicar.`);
       }
@@ -109,6 +126,7 @@ export async function runAutoPublish(stories: Story[]): Promise<AutoPublishResul
         imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
       });
       result.published++;
+      publishedThisRun++;
 
       // Publicación en redes — nunca bloquea ni revierte lo anterior, el
       // artículo ya quedó publicado en el sitio en este punto. Sin las

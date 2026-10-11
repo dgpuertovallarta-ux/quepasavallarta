@@ -64,9 +64,95 @@ export type Source = {
   autoDetectOnly: boolean;
   verified: boolean;
   note: string;
+  /**
+   * Agregador de titulares (p. ej. Google Noticias): no es un medio en sí,
+   * solo reúne titulares de muchos. Una historia que venga ÚNICAMENTE de
+   * agregadores necesita al menos dos titulares de medios distintos para
+   * auto-publicarse (ver isAutoPublishEligible en storyGraph.ts).
+   */
+  aggregator?: boolean;
+  /** Boletín oficial periódico (p. ej. avisos de huracán cada 3 h): cada emisión es una nota nueva aunque se parezca a la anterior. */
+  bulletin?: boolean;
+  /** Solo se toman los ítems cuyo título cumpla esta expresión. */
+  titleInclude?: RegExp;
+  /** Solo se toman los ítems cuyo texto completo mencione esto (filtro de relevancia local). */
+  mustMention?: RegExp;
+  /** Largo máximo del extracto que se guarda y se le pasa a la redacción (por defecto 240). */
+  maxExcerpt?: number;
 };
 
+// Zona de interés para avisos oficiales de ciclones: costa de Jalisco y
+// sur de Nayarit. Un aviso que no mencione ninguno de estos puntos no es
+// para Vallarta (p. ej. una tormenta frente a Baja California).
+const COSTA_LOCAL = /cabo corrientes|puerto vallarta|vallarta|jalisco|nayarit|punta mita|san blas|islas mar[ií]as|playa p[eé]rula|manzanillo/i;
+
 export const SOURCES: Source[] = [
+  // ------------------------------------------------------------------
+  // NIVEL B — Fuente oficial con feed verificado (2026-10-10)
+  // ------------------------------------------------------------------
+  {
+    id: "nhc-pacifico-oriental",
+    name: "Centro Nacional de Huracanes (NHC/NOAA) — avisos oficiales en español",
+    type: "rss",
+    url: "https://www.nhc.noaa.gov/index-ep-sp.xml",
+    level: "B",
+    trustLevel: 1,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    bulletin: true,
+    titleInclude: /aviso p[uú]blico/i,
+    mustMention: COSTA_LOCAL,
+    maxExcerpt: 3200,
+    note:
+      "Feed RSS oficial del Centro Nacional de Huracanes de EE. UU., el " +
+      "centro meteorológico regional designado para el Pacífico oriental " +
+      "(sus avisos son la base de los del SMN/Conagua). Verificado " +
+      "2026-10-10: trae el Aviso Público de cada ciclón activo, en " +
+      "español, cada 3 horas. Solo se toman los Avisos Públicos que " +
+      "mencionan la costa de Jalisco/Nayarit; la nota se redacta con " +
+      "los datos del aviso (posición, vientos, zonas bajo aviso).",
+  },
+
+  // ------------------------------------------------------------------
+  // Agregador — Google Noticias (verificado 2026-10-10). Reúne titulares
+  // de medios nacionales y regionales sobre Puerto Vallarta. Solo señal:
+  // hacen falta dos medios distintos con el mismo hecho para publicar.
+  // ------------------------------------------------------------------
+  {
+    id: "google-noticias-pc-vallarta",
+    name: "Google Noticias — Protección Civil en Puerto Vallarta",
+    type: "rss",
+    url: "https://news.google.com/rss/search?q=%22Protecci%C3%B3n+Civil%22+%22Puerto+Vallarta%22+when:1d&hl=es-419&gl=MX&ceid=MX:es-419",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    aggregator: true,
+    note:
+      "Búsqueda de Google Noticias (últimas 24 h) de notas que mencionan " +
+      "Protección Civil y Puerto Vallarta en medios nacionales y " +
+      "regionales. Solo señal y corroboración: nunca se copia el texto, " +
+      "y una historia que solo venga de aquí necesita dos medios distintos.",
+  },
+  {
+    id: "google-noticias-vallarta",
+    name: "Google Noticias — Puerto Vallarta",
+    type: "rss",
+    url: "https://news.google.com/rss/search?q=%22Puerto+Vallarta%22+when:1d&hl=es-419&gl=MX&ceid=MX:es-419",
+    level: "A",
+    trustLevel: 3,
+    allowImageExtraction: false,
+    autoDetectOnly: false,
+    verified: true,
+    aggregator: true,
+    note:
+      "Búsqueda de Google Noticias (últimas 24 h) de notas que mencionan " +
+      "Puerto Vallarta. Misma regla: solo señal y corroboración, dos " +
+      "medios distintos para publicar, redacción siempre propia.",
+  },
+
   // ------------------------------------------------------------------
   // NIVEL A — Medios periodísticos locales (RSS verificado hoy)
   // ------------------------------------------------------------------
