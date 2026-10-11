@@ -4,8 +4,8 @@ import { fetchSource } from "@/lib/ingest/fetchSource";
 import { buildStoryGraph } from "@/lib/ingest/storyGraph";
 import { persistIngestRun } from "@/lib/db/persistIngest";
 import { isDatabaseConfigured } from "@/lib/db/client";
-import { runAutoPublish } from "@/lib/ingest/autoPublish";
-import { runExplicaPublish } from "@/lib/ingest/explicaPublish";
+import { runAutoPublish, type AutoPublishResult } from "@/lib/ingest/autoPublish";
+import { runExplicaPublish, type ExplicaPublishResult } from "@/lib/ingest/explicaPublish";
 import type { IngestedItem } from "@/lib/ingest/types";
 
 export const maxDuration = 60;
@@ -23,7 +23,7 @@ export const maxDuration = 60;
  * sensible y fuentes NIVEL C/D nunca se auto-publican, sin excepción.
  *
  * Probarlo: GET /api/ingest
- * En producción, este endpoint se llama automáticamente cada 30 min por
+ * En producción, este endpoint se llama automáticamente cada 10 min por
  * netlify/functions/scheduled-ingest.ts — ver /docs/N8N_AUTOMATION.md.
  */
 export async function GET() {
@@ -42,7 +42,13 @@ export async function GET() {
   }
 }
 
+// Reparto del tiempo del request (maxDuration = 60 s). Publicar una nota
+// completa (texto + imagen + redes) tarda unos 25-35 s, así que un
+// intento nuevo solo puede EMPEZAR mientras todavía quepa uno completo.
+const RETRY_WINDOW_MS = 22_000;
+
 async function runIngest() {
+  const startedAt = Date.now();
   // Todas las fuentes se consultan al mismo tiempo (antes era una tras
   // otra y la corrida completa llegaba a tardar ~40 s, al filo del
   // límite de tiempo). El orden del resultado es el mismo de SOURCES.
@@ -79,8 +85,23 @@ async function runIngest() {
     }
   }
 
-  const autoPublish = await runAutoPublish(stories);
-  const explicaPublish = await runExplicaPublish(stories);
+  // Una corrida publica UNA pieza: una nota o un explicador. Las notas
+  // van primero, salvo en la corrida de la hora en punto (minuto 0-9),
+  // donde un explicador pendiente tiene preferencia — así "Vallarta
+  // Explica" no se queda sin salir en los días en que cada corrida
+  // publica una nota, y las notas conservan 5 de cada 6 corridas.
+  const retryUntil = startedAt + RETRY_WINDOW_MS;
+  const explainerSlot = new Date(startedAt).getUTCMinutes() < 10;
+  let autoPublish: AutoPublishResult;
+  let explicaPublish: ExplicaPublishResult;
+  if (explainerSlot) {
+    explicaPublish = await runExplicaPublish(stories, { startBefore: retryUntil });
+    const explainerPublished = explicaPublish.ran && explicaPublish.published;
+    autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil, startBefore: explainerPublished ? startedAt : retryUntil });
+  } else {
+    autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil });
+    explicaPublish = await runExplicaPublish(stories, { startBefore: autoPublish.published > 0 ? startedAt : retryUntil });
+  }
 
   const summary = {
     fetchedAt: new Date().toISOString(),
