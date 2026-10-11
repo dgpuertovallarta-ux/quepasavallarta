@@ -27,6 +27,19 @@ const MAX_DRAFTS_PER_RUN = 4;
 
 const HOUR = 3_600_000;
 
+// Qué notas se mandan a Facebook/Instagram. Por decisión del propietario
+// (2026-10-11, huracán Simón): por ahora SOLO las que vienen de una
+// fuente oficial (NIVEL B, p. ej. el aviso del Centro Nacional de
+// Huracanes). Las notas hechas a partir de medios siguen saliendo en el
+// sitio, pero no en redes: mezcladas daban mensajes contradictorios
+// (unas "todo en calma", otras alarmistas). Para volver a mandar todas,
+// poner la variable SOCIAL_ALL_STORIES=true en Netlify.
+const SOCIAL_ALL_STORIES = process.env.SOCIAL_ALL_STORIES === "true";
+
+function goesToSocial(story: Story): boolean {
+  return SOCIAL_ALL_STORIES || story.levels.includes("B");
+}
+
 /**
  * Descarte definitivo de una historia en esta corrida (no es una falla
  * técnica): se anota para no volver a intentarla hasta que pase
@@ -194,6 +207,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
       // artículo ya quedó publicado en el sitio en este punto. Sin las
       // variables de entorno de Facebook/Instagram configuradas, esto no
       // hace nada (ver publishToSocial.ts).
+      if (!goesToSocial(story)) continue;
       const social = await publishToSocial({
         title,
         excerpt,
