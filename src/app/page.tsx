@@ -5,6 +5,8 @@ import { getPublishedArticles, getPublishedExplainers, dropNearDuplicates, getEm
 import { upcomingEvents, eventDateLabel } from "@/lib/events";
 import { NewsCard, SectionHead, StoryMeta, DemoTag } from "@/components/cards";
 import CarouselRow from "@/components/CarouselRow";
+import ReelsCarousel from "@/components/ReelsCarousel";
+import { getPageReels } from "@/lib/social/reels";
 import WeatherBar from "@/components/WeatherBar";
 import NewsletterForm from "@/components/NewsletterForm";
 import { PHOTOS, newsImageSrc, photoCreditLabel, uniqueIllustrations, type PhotoKey } from "@/lib/photos";
@@ -33,7 +35,11 @@ function StoryPhoto({ n, sizes, priority }: { n: NewsItem; sizes: string; priori
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [real, emergency] = await Promise.all([getPublishedArticles(45), getEmergencyArticles(6, 2)]);
+  const [real, emergency, reels] = await Promise.all([
+    getPublishedArticles(45),
+    getEmergencyArticles(6, 2),
+    getPageReels(20),
+  ]);
   // Franja de aviso: solo aparece cuando hay actividad real de Protección
   // Civil (tres o más notas de emergencia en las últimas 48 horas).
   const alertNote = emergency.length >= 3 ? emergency[0] : null;
@@ -159,6 +165,18 @@ export default async function HomePage() {
               <StoryMeta n={feature} />
             </article>
           </div>
+        </div>
+      )}
+
+      {reels.length > 0 && (
+        <div className="container section">
+          <SectionHead
+            title="Reels"
+            sub="Lo último en video desde nuestra página de Facebook"
+            linkHref="https://www.facebook.com/quepasavallarta/reels"
+            linkLabel="Ver en Facebook"
+          />
+          <ReelsCarousel reels={reels} pageUrl="https://www.facebook.com/quepasavallarta/reels" />
         </div>
       )}
 
