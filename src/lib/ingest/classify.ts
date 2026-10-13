@@ -114,11 +114,10 @@ export function decideStatus(params: {
   if (score < 60) {
     return { status: "discard", reason: `News Score ${score} < 60 — no se publica.` };
   }
-  // Solo fuentes NIVEL A/B con score alto generan borradores candidatos
-  // a aprobación. El estado auto_publishable conserva el nombre histórico
-  // del clasificador; no hace público el artículo por sí solo.
+  // Solo fuentes NIVEL A/B con score alto y neutrales pueden publicarse
+  // automáticamente. La comprobación final también considera toda la Story.
   if (score >= 80 && (source.level === "A" || source.level === "B")) {
-    return { status: "auto_publishable", reason: `News Score ${score} y fuente NIVEL ${source.level} — cumple el umbral para crear un borrador revisable.` };
+    return { status: "auto_publishable", reason: `News Score ${score} y fuente NIVEL ${source.level} — cumple el umbral de publicación automática.` };
   }
   return { status: "needs_review", reason: `News Score ${score} en rango de revisión (60-79).` };
 }
