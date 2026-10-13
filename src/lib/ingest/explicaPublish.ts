@@ -14,10 +14,10 @@ const MIN_HOURS_BETWEEN_EXPLAINERS = 5.5;
 
 export type ExplicaPublishResult =
   | { ran: false; reason: string }
-  | { ran: true; published: boolean; storyId?: string; error?: string };
+  | { ran: true; queuedForReview: boolean; storyId?: string; error?: string };
 
 /**
- * Genera y publica UN artículo real de "Vallarta Explica" por corrida,
+ * Genera y envía a aprobación UN artículo real de "Vallarta Explica" por corrida,
  * como mucho — y solo si ya pasó suficiente tiempo desde el último (ver
  * MIN_HOURS_BETWEEN_EXPLAINERS). Elige la Story elegible con mejor
  * puntaje que todavía no tenga un explicador (puede ser la misma que ya
@@ -62,7 +62,7 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
 
       const similarSlug = await findSimilarRecentArticle(title, { isExplainer: true });
       if (similarSlug) {
-        return { ran: true, published: false, storyId: story.storyId, error: `Ya existe un explicador muy similar (${similarSlug}).` };
+        return { ran: true, queuedForReview: false, storyId: story.storyId, error: `Ya existe un explicador muy similar (${similarSlug}).` };
       }
 
       const primarySource = story.items[0];
@@ -85,13 +85,14 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
         imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
         imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
         isExplainer: true,
+        status: "pending_review",
       });
 
-      return { ran: true, published: true, storyId: story.storyId };
+      return { ran: true, queuedForReview: true, storyId: story.storyId };
     } catch (err) {
-      return { ran: true, published: false, storyId: story.storyId, error: err instanceof Error ? err.message : "Error desconocido" };
+      return { ran: true, queuedForReview: false, storyId: story.storyId, error: err instanceof Error ? err.message : "Error desconocido" };
     }
   }
 
-  return { ran: true, published: false };
+  return { ran: true, queuedForReview: false };
 }

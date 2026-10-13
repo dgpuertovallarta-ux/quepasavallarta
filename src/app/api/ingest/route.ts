@@ -16,11 +16,9 @@ export const maxDuration = 60;
  * agrupa en Stories (Story Graph) y calcula su News Score real. Persiste
  * el resultado en Postgres si DATABASE_URL está configurada.
  *
- * Además, dispara la auto-publicación real (runAutoPublish): decisión
- * explícita del propietario (2026-09) de que las Stories NIVEL A/B con
- * corroboración, sin contenido sensible y con score alto se publiquen
- * solas, sin revisión humana — ver /lib/ingest/autoPublish.ts. Contenido
- * sensible y fuentes NIVEL C/D nunca se auto-publican, sin excepción.
+ * Además, redacta borradores elegibles para la cola de aprobación
+ * (runAutoPublish). Nada se publica en el sitio ni en redes hasta que un
+ * administrador lo apruebe.
  *
  * Probarlo: GET /api/ingest
  * En producción, este endpoint se llama automáticamente cada 10 min por
@@ -85,7 +83,7 @@ async function runIngest() {
     }
   }
 
-  // Una corrida publica UNA pieza: una nota o un explicador. Las notas
+  // Una corrida prepara UNA pieza para revisión: una nota o un explicador. Las notas
   // van primero, salvo en la corrida de la hora en punto (minuto 0-9),
   // donde un explicador pendiente tiene preferencia — así "Vallarta
   // Explica" no se queda sin salir en los días en que cada corrida
@@ -96,11 +94,11 @@ async function runIngest() {
   let explicaPublish: ExplicaPublishResult;
   if (explainerSlot) {
     explicaPublish = await runExplicaPublish(stories, { startBefore: retryUntil });
-    const explainerPublished = explicaPublish.ran && explicaPublish.published;
-    autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil, startBefore: explainerPublished ? startedAt : retryUntil });
+    const explainerQueued = explicaPublish.ran && explicaPublish.queuedForReview;
+    autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil, startBefore: explainerQueued ? startedAt : retryUntil });
   } else {
     autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil });
-    explicaPublish = await runExplicaPublish(stories, { startBefore: autoPublish.published > 0 ? startedAt : retryUntil });
+    explicaPublish = await runExplicaPublish(stories, { startBefore: autoPublish.queuedForReview > 0 ? startedAt : retryUntil });
   }
 
   const summary = {

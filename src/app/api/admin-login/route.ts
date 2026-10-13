@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkCredentials } from "@/lib/auth/credentials";
+import { authenticateAdmin } from "@/lib/auth/credentials";
 import { createSessionToken, ADMIN_SESSION_COOKIE, ADMIN_SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
 
 export async function POST(request: Request) {
@@ -13,12 +13,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Body inválido." }, { status: 400 });
   }
 
-  if (!username || !password || !checkCredentials(username, password)) {
+  const admin = username && password ? authenticateAdmin(username, password) : null;
+  if (!admin) {
     return NextResponse.json({ error: "Usuario o contraseña incorrectos." }, { status: 401 });
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(ADMIN_SESSION_COOKIE, createSessionToken(username), {
+  response.cookies.set(ADMIN_SESSION_COOKIE, createSessionToken(admin.username), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
-import { Resumen, Cola, Fuentes, Roles, Comercial } from "@/components/admin/sections";
+import { Resumen, Cola, Aprobaciones, Fuentes, Roles, Comercial } from "@/components/admin/sections";
 
 type SectionComponent = () => React.ReactNode | Promise<React.ReactNode>;
 
 const SECTIONS: Record<string, SectionComponent> = {
   resumen: Resumen,
   cola: Cola,
+  aprobaciones: Aprobaciones,
   fuentes: Fuentes,
   roles: Roles,
   comercial: Comercial,
@@ -15,6 +16,7 @@ const SECTIONS: Record<string, SectionComponent> = {
 const SECTION_LABELS: Record<string, string> = {
   resumen: "Resumen",
   cola: "Cola editorial",
+  aprobaciones: "Aprobaciones",
   fuentes: "Fuentes y automatización",
   roles: "Usuarios y roles",
   comercial: "Comercial / Leads",

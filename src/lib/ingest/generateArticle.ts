@@ -75,10 +75,8 @@ async function callGemini(systemPrompt: string, story: Story): Promise<Generated
 export async function generateArticleDraft(story: Story): Promise<GeneratedArticle> {
   assertCanGenerate(story);
   // No se bloquea aquí el caso de "resumen interno" a propósito: esta
-  // función la usan tanto la auto-publicación (sin humano — ahí SÍ se
-  // bloquea, ver autoPublish.ts) como el botón manual del panel, donde
-  // un humano pidió explícitamente generar el borrador y debe poder
-  // verlo para decidir él mismo. Ver looksLikeInsufficientMaterial.
+  // función la usan el armado automático de la cola de aprobación y el
+  // botón manual del panel. Ver looksLikeInsufficientMaterial.
   return callGemini(EDITORIAL_SYSTEM_PROMPT, story);
 }
 
