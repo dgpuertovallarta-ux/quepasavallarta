@@ -16,9 +16,8 @@ export const maxDuration = 60;
  * agrupa en Stories (Story Graph) y calcula su News Score real. Persiste
  * el resultado en Postgres si DATABASE_URL está configurada.
  *
- * Además, redacta borradores elegibles para la cola de aprobación
- * (runAutoPublish). Nada se publica en el sitio ni en redes hasta que un
- * administrador lo apruebe.
+ * Además, redacta y publica automáticamente notas neutrales corroboradas;
+ * las noticias con señales sensibles quedan en la cola de aprobación.
  *
  * Probarlo: GET /api/ingest
  * En producción, este endpoint se llama automáticamente cada 10 min por
@@ -98,7 +97,7 @@ async function runIngest() {
     autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil, startBefore: explainerQueued ? startedAt : retryUntil });
   } else {
     autoPublish = await runAutoPublish(stories, { attemptsUntil: retryUntil });
-    explicaPublish = await runExplicaPublish(stories, { startBefore: autoPublish.queuedForReview > 0 ? startedAt : retryUntil });
+    explicaPublish = await runExplicaPublish(stories, { startBefore: autoPublish.queuedForReview + autoPublish.autoPublished > 0 ? startedAt : retryUntil });
   }
 
   const summary = {
