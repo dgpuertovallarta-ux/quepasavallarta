@@ -120,8 +120,8 @@ export async function Resumen() {
       <div className="panel">
         <strong style={{ fontSize: 13 }}>¿Está funcionando el sistema?</strong>
         <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-          Consulta fuentes reales en cada carga. Las notas elegibles se guardan como pendientes y no se
-          hacen públicas hasta que un administrador las aprueba.
+          La automatización revisa fuentes cada 10 minutos. Las notas confiables y corroboradas se
+          publican automáticamente; las que requieren revisión quedan en la cola para los administradores.
           {!isDatabaseConfigured() && " Falta configurar DATABASE_URL para guardar y compartir la cola."}
         </p>
         <SourcesTable results={results} />
@@ -141,9 +141,9 @@ export async function Cola() {
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
         Cada fila es una <strong>Story</strong>: si dos o más fuentes cubren el mismo evento, se agrupan
         bajo un solo STORY ID en vez de generar un artículo por fuente (regla &ldquo;no copiamos lo que
-        otros publican, investigamos lo que está pasando&rdquo;). El sistema prepara borradores elegibles,
-        pero no los hace públicos: quedan en Aprobaciones hasta que uno de los administradores los revise.
-        El botón permite generar y enviar una nota a esa misma cola.
+        otros publican, investigamos lo que está pasando&rdquo;). Las notas confiables se publican automáticamente;
+        las sensibles o que requieren revisión quedan en Aprobaciones. El botón permite generar y enviar
+        una nota a esa misma cola.
       </p>
       {!isAiConfigured() && (
         <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
@@ -241,7 +241,7 @@ export async function Fuentes() {
         <strong style={{ fontSize: 13 }}>Pipeline de ingesta real</strong>
         <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
           <code>GET /api/ingest</code> ya ejecuta de verdad: descarga las fuentes → normaliza → agrupa en
-          Stories (Story Graph) → calcula News Score → clasifica → prepara pendientes de aprobación →
+          Stories (Story Graph) → calcula News Score → clasifica → publica notas confiables y prepara las demás para revisión →
           intenta persistir en Postgres si <code>DATABASE_URL</code> está configurada. El cron
           real ya existe como código (<code>netlify/functions/scheduled-ingest.ts</code>, cada 10 min) —
           se activa solo al desplegar en Netlify. Para activar la cola hay que configurar las variables
