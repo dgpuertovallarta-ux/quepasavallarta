@@ -83,9 +83,8 @@ function slugify(text: string): string {
 }
 
 /**
- * Elegible para entrar automáticamente a la cola de aprobación: requiere
- * corroboración NIVEL A o B y al menos un ítem "auto_publishable" (score
- * alto, no sensible, no NIVEL C/D — ver decideStatus en classify.ts).
+ * Elegible para publicación automática: requiere corroboración NIVEL A/B,
+ * score alto y que ningún elemento de la historia requiera revisión humana.
  *
  * BUG REAL ya corregido: antes esto solo revisaba "ningún ítem en
  * needs_review", lo cual también dejaba pasar historias en estado
@@ -96,6 +95,7 @@ function slugify(text: string): string {
  */
 export function isAutoPublishEligible(story: Story): boolean {
   if (!story.hasCorroboration || !story.items.some((it) => it.status === "auto_publishable")) return false;
+  if (story.needsReview) return false;
   // Una historia que solo aparece en un agregador de titulares (Google
   // Noticias) necesita que al menos DOS medios distintos la reporten:
   // un solo titular suelto no basta para darla por confirmada.
@@ -105,6 +105,13 @@ export function isAutoPublishEligible(story: Story): boolean {
     if (outlets.size < 2) return false;
   }
   return true;
+}
+
+/** Historias corroboradas con señales de revisión: pueden entrar a la cola,
+ * pero nunca se publican automáticamente. */
+export function isHumanReviewEligible(story: Story): boolean {
+  return story.hasCorroboration && story.needsReview && story.maxNewsScore >= 60 &&
+    story.items.some((item) => item.status === "needs_review");
 }
 
 /**

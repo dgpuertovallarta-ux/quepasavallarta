@@ -1,5 +1,5 @@
 import type { Story } from "./storyGraph";
-import { isAutoPublishEligible } from "./storyGraph";
+import { isAutoPublishEligible, isHumanReviewEligible } from "./storyGraph";
 import { generateArticleDraft, isAiConfigured } from "./generateArticle";
 import { parseArticleDraft, looksLikeInsufficientMaterial, isBadTitle } from "./articleFormat";
 import { generateArticleImage } from "./generateImage";
@@ -7,14 +7,17 @@ import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles
 import { isDatabaseConfigured } from "../db/client";
 import { sortByEditorialFocus, isOffTopicStory, isOfficialBulletinStory } from "./localFocus";
 import { loadSkips, saveSkips } from "./skipMemory";
+import { publishToSocial } from "../social/publishToSocial";
+import { isHurricaneSimonContent } from "../social/editorialPolicy";
+import { siteUrl } from "../storage/imageBlobs";
 
-// Un borrador para revisión por corrida. La generación del texto y de la
-// imagen ocurre dentro del request de ingesta; mantener el límite evita
+// Una noticia publicada o enviada a revisión por corrida. El texto y la
+// imagen se generan dentro de la ingesta; mantener el límite evita
 // acercarse al máximo de tiempo de Netlify.
-const MAX_AUTO_QUEUE_PER_RUN = 1;
+const MAX_ARTICLES_PER_RUN = 1;
 
-// Borradores que se pueden pedir a la IA en una corrida mientras no se
-// se haya puesto nada en la cola. El primero siempre se intenta; los siguientes
+// Borradores que se pueden pedir a la IA por corrida mientras no se haya
+// creado una noticia. El primero siempre se intenta; los siguientes
 // solo si todavía queda tiempo (ver `attemptsUntil`).
 const MAX_DRAFTS_PER_RUN = 4;
 
@@ -43,7 +46,9 @@ export type AutoPublishOptions = {
 
 export type AutoPublishResult = {
   attempted: number;
+  autoPublished: number;
   queuedForReview: number;
+  socialResults: { storyId: string; facebook: "published" | "failed" | "skipped"; instagram: "published" | "failed" | "skipped" }[];
   alreadyPublished: number;
   /** Historias cuyo titular de origen ya coincide con una nota publicada: se saltan sin gastar una redacción. */
   sameAsPublished: number;
@@ -53,14 +58,15 @@ export type AutoPublishResult = {
 };
 
 /**
- * Prepara automáticamente para aprobación las Stories NIVEL A/B elegibles
- * (corroboradas, no sensibles y no NIVEL C/D). Nada se hace público ni se
- * envía a redes hasta que un administrador lo apruebe.
+ * Publica las Stories NIVEL A/B corroboradas y neutrales. Las historias con
+ * señales sensibles o de revisión quedan en la cola del panel administrativo.
  */
 export async function runAutoPublish(stories: Story[], options: AutoPublishOptions = {}): Promise<AutoPublishResult> {
   const result: AutoPublishResult = {
     attempted: 0,
+    autoPublished: 0,
     queuedForReview: 0,
+    socialResults: [],
     alreadyPublished: 0,
     sameAsPublished: 0,
     skippedKnown: 0,
@@ -72,9 +78,9 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
   // Enfoque editorial (ver localFocus.ts): se descartan las historias que
   // claramente son de otro lugar y se ordena lo demás poniendo primero
   // los avisos oficiales, Protección Civil y lo que pasa en Vallarta.
-  const candidates = sortByEditorialFocus(stories.filter((s) => isAutoPublishEligible(s) && !isOffTopicStory(s)));
+  const candidates = sortByEditorialFocus(stories.filter((s) => (isAutoPublishEligible(s) || isHumanReviewEligible(s)) && !isOffTopicStory(s)));
 
-  // Se recorre la lista hasta publicar una nota. Las historias ya
+  // Se recorre la lista hasta publicar o enviar a revisión una nota. Las historias ya
   // publicadas y las que ya se descartaron en una corrida anterior se
   // saltan sin gastar un intento, para que no dejen atorada la fila.
   // Límites para no pasarse del tiempo del request: se revisan a lo más
@@ -92,10 +98,10 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
     result.errors.push({ storyId: "-", error: `No se pudo leer lo ya publicado: ${err instanceof Error ? err.message : "error desconocido"}` });
     return result;
   }
-  let queuedThisRun = 0;
+  let createdThisRun = 0;
 
   for (const story of candidates.slice(0, 40)) {
-    if (queuedThisRun >= MAX_AUTO_QUEUE_PER_RUN || result.attempted >= MAX_DRAFTS_PER_RUN) break;
+    if (createdThisRun >= MAX_ARTICLES_PER_RUN || result.attempted >= MAX_DRAFTS_PER_RUN) break;
     if (result.attempted > 0 && Date.now() > attemptsUntil) break;
     if (skips[story.storyId]) {
       result.skippedKnown++;
@@ -158,6 +164,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         sourceUrl: primarySource.link,
       });
 
+      const automatic = isAutoPublishEligible(story);
       const { slug } = await publishArticle({
         title,
         excerpt,
@@ -169,10 +176,25 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         imageUrl: generatedImage?.url,
         imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
         imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
-        status: "pending_review",
+        status: automatic ? "published" : "pending_review",
       });
-      result.queuedForReview++;
-      queuedThisRun++;
+      if (automatic) {
+        result.autoPublished++;
+        const content = `${title} ${excerpt} ${bodyParagraphs.join(" ")}`;
+        if (isHurricaneSimonContent(content)) {
+          result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
+        } else {
+          const social = await publishToSocial({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage?.url });
+          result.socialResults.push({
+            storyId: story.storyId,
+            facebook: social.facebook.ok ? "published" : social.facebook.attempted ? "failed" : "skipped",
+            instagram: social.instagram.ok ? "published" : social.instagram.attempted ? "failed" : "skipped",
+          });
+        }
+      } else {
+        result.queuedForReview++;
+      }
+      createdThisRun++;
       recentTitles.push({ slug, title });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido";
