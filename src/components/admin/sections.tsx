@@ -4,6 +4,10 @@ import { SOURCES } from "@/lib/ingest/sources";
 import { fetchSource } from "@/lib/ingest/fetchSource";
 import { buildStoryGraph, isAutoPublishEligible } from "@/lib/ingest/storyGraph";
 import { isAiConfigured } from "@/lib/ingest/generateArticle";
+import { getPendingArticles } from "@/lib/db/articles";
+import { getConfiguredAdmins } from "@/lib/auth/credentials";
+import { isDatabaseConfigured } from "@/lib/db/client";
+import ApprovalQueue from "./ApprovalQueue";
 import GenerateArticleButton from "./GenerateArticleButton";
 import type { IngestedItem } from "@/lib/ingest/types";
 
@@ -99,6 +103,7 @@ export async function Resumen() {
   const results = await fetchAllSources();
   const allItems = results.flatMap((r) => r.items);
   const pendientes = allItems.filter((i) => i.status === "needs_review").length;
+  const pendingApprovals = await getPendingArticles();
   const urgentes = allItems.filter((i) => i.newsScore >= 90).length;
   const sourcesOk = results.filter((r) => r.ok).length;
 
@@ -108,17 +113,16 @@ export async function Resumen() {
         <StatTile n={allItems.length} l="Historias reales descubiertas ahora" />
         <StatTile n={sourcesOk} l={`Fuentes OK de ${SOURCES.length}`} />
         <StatTile n={pendientes} l="Pendientes de revisión humana" />
+        <StatTile n={pendingApprovals.length} l="Publicaciones por aprobar" />
         <StatTile n={urgentes} l="Marcadas urgentes" />
         <StatTile n={BUSINESSES.length} l="Negocios en directorio (demo)" />
       </div>
       <div className="panel">
         <strong style={{ fontSize: 13 }}>¿Está funcionando el sistema?</strong>
         <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-          Este bloque ya no es una simulación: en cada carga consulta en vivo las fuentes reales
-          registradas en <code>src/lib/ingest/sources.ts</code> y calcula su News Score real. Todavía no
-          escribe en una base de datos (falta conectar Postgres/Supabase — ver{" "}
-          <code>/docs/ARCHITECTURE.md</code>), así que lo que ves aquí es el resultado de la consulta más
-          reciente, no un histórico.
+          Consulta fuentes reales en cada carga. Las notas elegibles se guardan como pendientes y no se
+          hacen públicas hasta que un administrador las aprueba.
+          {!isDatabaseConfigured() && " Falta configurar DATABASE_URL para guardar y compartir la cola."}
         </p>
         <SourcesTable results={results} />
       </div>
@@ -137,14 +141,9 @@ export async function Cola() {
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
         Cada fila es una <strong>Story</strong>: si dos o más fuentes cubren el mismo evento, se agrupan
         bajo un solo STORY ID en vez de generar un artículo por fuente (regla &ldquo;no copiamos lo que
-        otros publican, investigamos lo que está pasando&rdquo; — ver{" "}
-        <code>src/lib/ingest/storyGraph.ts</code> y <code>src/lib/ingest/editorialPrompt.ts</code>). Todo
-        Desde que se activó la auto-publicación (decisión del propietario, 2026-09), las Stories NIVEL A o
-        B corroboradas y sin contenido sensible se publican solas cada 10 min ({" "}
-        <code>netlify/functions/scheduled-ingest.ts</code> → <code>autoPublish.ts</code>) — el botón de
-        abajo solo sirve para forzar la redacción/publicación de una Story ahora mismo, en vez de esperar
-        al siguiente ciclo. Contenido sensible (seguridad, salud, política, muertes) y fuentes NIVEL C/D
-        nunca se auto-publican, sin excepción.
+        otros publican, investigamos lo que está pasando&rdquo;). El sistema prepara borradores elegibles,
+        pero no los hace públicos: quedan en Aprobaciones hasta que uno de los administradores los revise.
+        El botón permite generar y enviar una nota a esa misma cola.
       </p>
       {!isAiConfigured() && (
         <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>
@@ -197,7 +196,7 @@ export async function Cola() {
                 {!story.hasCorroboration
                   ? "Sin corroborar (solo C/D)"
                   : isAutoPublishEligible(story)
-                  ? "Se auto-publica sola (o ya se publicó)"
+                  ? "Puede pasar a aprobación"
                   : "Revisión humana"}
               </td>
               <td>
@@ -212,6 +211,16 @@ export async function Cola() {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export async function Aprobaciones() {
+  const articles = await getPendingArticles();
+  return (
+    <div className="panel">
+      <strong style={{ fontSize: 13 }}>Publicaciones pendientes ({articles.length})</strong>
+      <ApprovalQueue initialArticles={articles} />
     </div>
   );
 }
@@ -232,14 +241,12 @@ export async function Fuentes() {
         <strong style={{ fontSize: 13 }}>Pipeline de ingesta real</strong>
         <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
           <code>GET /api/ingest</code> ya ejecuta de verdad: descarga las fuentes → normaliza → agrupa en
-          Stories (Story Graph) → calcula News Score → clasifica → decide auto-publicable / revisión /
-          descarte → intenta persistir en Postgres si <code>DATABASE_URL</code> está configurada. El cron
+          Stories (Story Graph) → calcula News Score → clasifica → prepara pendientes de aprobación →
+          intenta persistir en Postgres si <code>DATABASE_URL</code> está configurada. El cron
           real ya existe como código (<code>netlify/functions/scheduled-ingest.ts</code>, cada 10 min) —
-          se activa solo al desplegar en Netlify. Lo único que falta para producción real: (1) crear un
-          proyecto Postgres (Supabase o Neon) y configurar <code>DATABASE_URL</code>, (2) configurar{" "}
-          <code>GEMINI_API_KEY</code> para activar &ldquo;Generar borrador (IA)&rdquo; en la Cola
-          editorial, (3) desplegar en Netlify. Ver <code>/docs/ARCHITECTURE.md</code> §8 para el detalle
-          exacto de cada variable de entorno.
+          se activa solo al desplegar en Netlify. Para activar la cola hay que configurar las variables
+          necesarias, aplicar <code>database/migrations/002_admin_approvals.sql</code> y desplegar.
+          Ver <code>ADMIN_SETUP.md</code> para las cuentas y variables requeridas.
         </p>
       </div>
     </>
@@ -247,6 +254,7 @@ export async function Fuentes() {
 }
 
 export function Roles() {
+  const admins = getConfiguredAdmins();
   const rows: [string, string][] = [
     ["Super Admin", "Control total: configuración, usuarios, integraciones, automatizaciones, editorial, monetización"],
     ["Administrador", "Gestión general según permisos asignados"],
@@ -257,6 +265,20 @@ export function Roles() {
   ];
   return (
     <div className="panel">
+      <strong style={{ fontSize: 13 }}>Administradores con acceso ({admins.length}/3)</strong>
+      {admins.length > 0 ? (
+        <ul>{admins.map((admin) => <li key={admin.username}>{admin.displayName}</li>)}</ul>
+      ) : (
+        <p style={{ color: "var(--danger)" }}>No hay cuentas de administrador configuradas.</p>
+      )}
+      {admins.length < 3 && (
+        <p style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+          Faltan cuentas por configurar. Define ADMIN_USER_3 y ADMIN_PASSWORD_3 en el entorno privado del sitio.
+        </p>
+      )}
+      <p style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+        Las tres cuentas tienen el mismo permiso para aprobar o rechazar publicaciones.
+      </p>
       <strong style={{ fontSize: 13 }}>Roles del sistema (configurable)</strong>
       <table className="data-table">
         <thead>

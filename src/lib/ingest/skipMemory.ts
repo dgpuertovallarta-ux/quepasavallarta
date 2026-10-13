@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
 
 /**
- * Memoria de historias descartadas por la auto-publicación.
+ * Memoria de historias descartadas antes de crear borradores para aprobación.
  *
  * Bug real (2026-10-10): una historia que la redacción descartaba (ya
  * había una nota parecida, o no traía material suficiente) no quedaba

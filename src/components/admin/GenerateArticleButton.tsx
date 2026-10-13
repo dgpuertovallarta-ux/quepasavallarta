@@ -6,10 +6,10 @@ import { parseArticleDraft, looksLikeInsufficientMaterial } from "@/lib/ingest/a
 
 /**
  * Flujo real "IA redacta, humano revisa": genera un borrador llamando a
- * /api/generate-article (Claude + prompt editorial real), deja los campos
- * EDITABLES para que un humano los revise/corrija, y solo publica de
- * verdad en la portada cuando el humano da click en "Publicar" — nunca
- * automático. Sin ANTHROPIC_API_KEY, o sin corroboración NIVEL A/B de
+ * /api/generate-article, deja los campos EDITABLES para que un humano los
+ * revise/corrija y los envía a la cola. Otro administrador debe aprobarlos
+ * antes de que aparezcan en el sitio o se envíen a redes. Sin GEMINI_API_KEY
+ * o sin corroboración NIVEL A/B de
  * esta Story, el paso de generar devuelve el motivo exacto.
  */
 export default function GenerateArticleButton({
@@ -23,14 +23,13 @@ export default function GenerateArticleButton({
   categoryGuess: string;
   newsScore: number;
 }) {
-  const [state, setState] = useState<"idle" | "generating" | "review" | "publishing" | "published" | "error">("idle");
+  const [state, setState] = useState<"idle" | "generating" | "review" | "publishing" | "pending" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [aiModel, setAiModel] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [body, setBody] = useState("");
   const [category, setCategory] = useState(categoryGuess);
-  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [insufficientMaterial, setInsufficientMaterial] = useState(false);
 
   async function handleGenerate() {
@@ -76,21 +75,18 @@ export default function GenerateArticleButton({
         setMessage(resBody.error || `Error ${res.status}`);
         return;
       }
-      setPublishedSlug(resBody.slug);
-      setState("published");
+      setState("pending");
     } catch (err) {
       setState("error");
       setMessage(err instanceof Error ? err.message : "Error de red");
     }
   }
 
-  if (state === "published") {
+  if (state === "pending") {
     return (
       <div style={{ fontSize: 12.5 }}>
-        <span className="chip chip-verified">Publicado</span>{" "}
-        <a href={`/noticia/${publishedSlug}`} target="_blank" rel="noopener">
-          Ver artículo →
-        </a>
+        <span className="chip">Enviada a aprobación</span>{" "}
+        <a href="/admin/aprobaciones">Ver cola →</a>
       </div>
     );
   }
@@ -128,7 +124,7 @@ export default function GenerateArticleButton({
         </label>
         {message && <p style={{ color: "var(--danger)" }}>{message}</p>}
         <button className="btn btn-primary btn-sm" onClick={handlePublish} disabled={state === "publishing" || !title || !body}>
-          {state === "publishing" ? "Publicando..." : "Publicar en la portada"}
+          {state === "publishing" ? "Enviando..." : "Enviar a aprobación"}
         </button>
       </div>
     );

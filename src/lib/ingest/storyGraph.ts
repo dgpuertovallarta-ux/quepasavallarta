@@ -83,10 +83,9 @@ function slugify(text: string): string {
 }
 
 /**
- * Elegible para auto-publicación real (decisión explícita del propietario,
- * 2026-09): requiere corroboración NIVEL A o B Y que al menos un ítem haya
- * quedado explícitamente como "auto_publishable" (score >= 80, no
- * sensible, no NIVEL C/D — ver decideStatus en classify.ts).
+ * Elegible para entrar automáticamente a la cola de aprobación: requiere
+ * corroboración NIVEL A o B y al menos un ítem "auto_publishable" (score
+ * alto, no sensible, no NIVEL C/D — ver decideStatus en classify.ts).
  *
  * BUG REAL ya corregido: antes esto solo revisaba "ningún ítem en
  * needs_review", lo cual también dejaba pasar historias en estado

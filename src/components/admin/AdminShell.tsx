@@ -4,6 +4,7 @@ import LogoutButton from "./LogoutButton";
 const SECTIONS = [
   { id: "resumen", label: "Resumen" },
   { id: "cola", label: "Cola editorial" },
+  { id: "aprobaciones", label: "Aprobaciones" },
   { id: "fuentes", label: "Fuentes y automatización" },
   { id: "roles", label: "Usuarios y roles" },
   { id: "comercial", label: "Comercial / Leads" },
@@ -23,11 +24,9 @@ export default function AdminShell({ active, children }: { active: string; child
       </div>
       <h1 style={{ margin: "0 0 6px" }}>Panel editorial</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 700, marginBottom: 18 }}>
-        Resumen, Cola editorial y Fuentes ya consultan el pipeline de ingesta real en cada visita (fuentes
-        RSS reales → Story Graph → News Score → clasificación) — no son datos de ejemplo. Lo que todavía no
-        está conectado: persistencia en base de datos sin <code>DATABASE_URL</code> configurada. Roles y
-        Comercial siguen siendo vistas de referencia. Ver <code>/docs/ARCHITECTURE.md</code> §8 para activar
-        lo que falta.
+        Las noticias quedan pendientes hasta que uno de los administradores las aprueba. La cola de
+        aprobación requiere la base de datos y la migración editorial; las cuentas se configuran con
+        variables de entorno privadas.
       </p>
       <div className="admin-shell panel" style={{ padding: 0 }}>
         <div className="admin-side">

@@ -2,9 +2,8 @@ import type { Config } from "@netlify/functions";
 
 /**
  * Cron real (Netlify Scheduled Function) — llama a /api/ingest cada
- * 10 minutos en producción (antes cada 30). Cada corrida publica a lo más
- * una nota, así que el ritmo máximo es de 6 notas por hora: en un día
- * con muchas noticias (huracán) cada 30 minutos se quedaba muy corto.
+ * 10 minutos en producción (antes cada 30). Cada corrida prepara como
+ * máximo una nota para aprobación editorial.
  * Netlify inyecta automáticamente `URL` con el dominio real del sitio
  * desplegado; no hace falta configurarlo a mano.
  *

@@ -140,19 +140,20 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
   const hint = pickVariant(categorySlug, title);
   const context = `Tema de la noticia: "${title}". ${excerpt || ""}`.slice(0, 600);
   const lines = [
-    "Genera UNA fotografía editorial realista (no ilustración, no dibujo, no render 3D evidente) para acompañar una noticia local de un sitio de noticias.",
+    "Crea UNA imagen editorial para acompañar una noticia local. Debe parecer una fotografía documental espontánea tomada por un fotoperiodista local, no una imagen publicitaria ni una recreación del hecho.",
+    "Busca un aspecto natural y creíble: luz ambiente disponible, exposición realista, encuadre ligeramente imperfecto, texturas auténticas y colores moderados. Evita el acabado pulido típico de imágenes sintéticas.",
     context,
   ];
   if (hasReference) {
     lines.push(
-      "Se adjunta una fotografía de referencia tomada de la cobertura original del hecho. Decisión explícita del propietario del sitio: la imagen generada debe ser una RÉPLICA FIEL de esa referencia — mismo encuadre, mismos sujetos y objetos principales, misma composición, mismos colores, misma iluminación y hora del día. No es una inspiración libre ni una escena alternativa: reproduce lo más fielmente posible lo que se ve en la foto de referencia, redibujándolo como una imagen nueva.",
-      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9 — igual a la de la referencia."
+      "Usa la foto adjunta como referencia factual para entender el asunto principal de la noticia, el tipo de lugar y la relación general entre los elementos. Conserva ese tema reconocible, pero crea una fotografía editorial nueva: toma la escena desde otro ángulo, con otro encuadre y una composición distinta.",
+      "No calques la imagen ni hagas una variación superficial. No reutilices la misma persona, rostro, vehículo, objeto distintivo, posición exacta o composición. Si aparece una persona real, sustitúyela por una figura genérica no identificable o enfoca la escena en el entorno y el asunto de la noticia.",
+      "La imagen final es ilustrativa, no evidencia fotográfica del suceso. No inventes acciones, daños, declaraciones, ubicaciones específicas ni detalles que el texto de la noticia no confirme; si no hay información suficiente, representa únicamente el contexto general."
     );
   } else {
     lines.push(
       `Escena sugerida: ${hint}.`,
-      "Estilo: fotoperiodismo, luz natural, composición horizontal 16:9, colores cálidos consistentes con Puerto Vallarta (dorados, azules del mar).",
-      "Varía la composición, el ángulo, la hora del día y los elementos concretos de la escena respecto a otras imágenes que hayas generado antes para este mismo tema — evita repetir siempre la misma toma tipo postal (p. ej. la misma calle empedrada bajando hacia el mar con dos personas caminando de espaldas cargando bolsas)."
+      "Usa una composición horizontal 16:9 de reportaje local, con luz y colores propios del lugar; evita la postal turística y la puesta en escena."
     );
   }
   lines.push(
@@ -160,9 +161,10 @@ function buildPrompt(title: string, excerpt: string, categorySlug: string, hasRe
     "- NO incluyas texto, letras, números, logotipos ni marcas de agua en la imagen.",
     "- NO representes a ninguna persona real, famosa o identificable — si aparecen personas, deben ser genéricas y no reconocibles (de espaldas, a distancia, o sin protagonismo del rostro).",
     "- NO copies el estilo, logo o diseño de ningún medio de noticias existente.",
+    "- Evita piel plástica, superficies demasiado perfectas, saturación excesiva, HDR, iluminación cinematográfica, brillos irreales, desenfoque artificial, simetría perfecta, detalles derretidos y apariencia de render 3D.",
     hasReference
-      ? "- Si en la referencia aparecen personas, consérvalas en la misma posición y actividad para que la réplica sea fiel, pero hazlas no identificables (rostro borroso, de espaldas, o a distancia) — nunca un retrato nítido de una persona real reconocible."
-      : "- Es una imagen ilustrativa y genérica del tema, no una fotografía del hecho específico — no la presentes como si fuera evidencia real del suceso."
+      ? "- La imagen final debe tener una composición claramente distinta de la referencia y no debe parecer una copia de la fotografía fuente."
+      : "- Es una imagen ilustrativa del tema, no una fotografía del hecho específico — no la presentes como si fuera evidencia real del suceso."
   );
   return lines.join("\n");
 }

@@ -1,16 +1,30 @@
-/**
- * Dos cuentas reales, configuradas por variables de entorno
- * (ADMIN_USER_1/ADMIN_PASSWORD_1 y ADMIN_USER_2/ADMIN_PASSWORD_2) — no
- * hay tabla de usuarios en base de datos todavía, pero tampoco es una
- * contraseña inventada en el código: se define fuera del repo, igual
- * que las demás claves (DATABASE_URL, GEMINI_API_KEY).
- */
-export function checkCredentials(username: string, password: string): boolean {
-  const pairs: Array<[string | undefined, string | undefined]> = [
-    [process.env.ADMIN_USER_1, process.env.ADMIN_PASSWORD_1],
-    [process.env.ADMIN_USER_2, process.env.ADMIN_PASSWORD_2],
-  ];
-  return pairs.some(
-    ([user, pass]) => !!user && !!pass && user === username && pass === password
-  );
+export type AdminIdentity = { username: string; displayName: string };
+
+const DEFAULT_NAMES = ["Adrián Quintero", "Miguel Gómez", "Darío Pérez"];
+
+function configuredAccounts() {
+  return [1, 2, 3].flatMap((slot) => {
+    const username = process.env[`ADMIN_USER_${slot}`];
+    const password = process.env[`ADMIN_PASSWORD_${slot}`];
+    if (!username || !password) return [];
+    return [{
+      username,
+      password,
+      displayName: process.env[`ADMIN_NAME_${slot}`] || DEFAULT_NAMES[slot - 1],
+    }];
+  });
+}
+
+export function authenticateAdmin(username: string, password: string): AdminIdentity | null {
+  const account = configuredAccounts().find((entry) => entry.username === username && entry.password === password);
+  return account ? { username: account.username, displayName: account.displayName } : null;
+}
+
+export function getAdminIdentity(username: string): AdminIdentity | null {
+  const account = configuredAccounts().find((entry) => entry.username === username);
+  return account ? { username: account.username, displayName: account.displayName } : null;
+}
+
+export function getConfiguredAdmins(): AdminIdentity[] {
+  return configuredAccounts().map(({ username, displayName }) => ({ username, displayName }));
 }

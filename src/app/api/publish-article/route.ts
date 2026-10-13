@@ -5,14 +5,9 @@ import { generateArticleImage } from "@/lib/ingest/generateImage";
 import { CATEGORIES } from "@/lib/data";
 
 /**
- * Publica un artículo real en la portada pública. Se llama SOLO desde el
- * botón "Publicar" del panel editorial (/admin → Cola), después de que
- * un humano revisó (y pudo editar) el borrador que generó la IA —
- * "IA redacta, humano revisa", nunca automático.
- *
- * NOTA DE ALCANCE: este endpoint todavía no tiene autenticación de editor
- * (ver /docs/ARCHITECTURE.md — el panel /admin completo comparte esta
- * misma limitación pendiente). No lo expongas en un botón público.
+ * Guarda un borrador en la cola de aprobación. Requiere una sesión
+ * administrativa válida mediante la protección configurada en proxy.ts.
+ * Un administrador lo hace público desde /admin/aprobaciones.
  *
  * POST body: { title, excerpt, body, categorySlug, newsScore, aiModel, storyExternalKey }
  */
@@ -70,8 +65,9 @@ export async function POST(request: Request) {
       imageUrl: generatedImage?.url,
       imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
       imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
+      status: "pending_review",
     });
-    return NextResponse.json({ published: true, slug: result.slug }, { status: 200 });
+    return NextResponse.json({ queuedForReview: true, slug: result.slug }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Error desconocido al publicar." }, { status: 500 });
   }

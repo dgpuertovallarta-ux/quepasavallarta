@@ -6,11 +6,11 @@ import { SOURCES } from "./sources";
  * emergencia, primero Protección Civil. Este archivo decide dos cosas
  * ANTES de gastar una redacción con IA:
  *
- *  1. Prioridad — de todas las historias publicables de una corrida, cuál
- *     sale primero (solo se publica una por corrida).
+ *  1. Prioridad — de todas las historias elegibles de una corrida, cuál
+ *     se prepara primero (solo se envía un borrador por corrida).
  *  2. Fuera de tema — historias que claramente ocurren en otro lugar
  *     (Tulum, Tepic, Guadalajara…) y no mencionan a Vallarta ni la bahía:
- *     no se auto-publican.
+ *     no se envían a aprobación.
  *
  * Es deliberadamente simple (listas de palabras, sin IA) para que sea
  * predecible y fácil de ajustar.

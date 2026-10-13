@@ -143,8 +143,7 @@ export async function getPublishedArticlesByCategory(categorySlug: string, limit
 /**
  * Categorías que ya tienen al menos una nota publicada. El menú, el pie
  * y la fila de filtros solo enlazan a estas — así nadie llega a una
- * sección vacía (p. ej. Seguridad, que por regla editorial no se
- * auto-publica).
+ * sección vacía (p. ej. Seguridad, cuyas notas requieren revisión).
  */
 export async function getActiveCategorySlugs(): Promise<string[]> {
   if (!isDatabaseConfigured()) return [];
@@ -374,8 +373,10 @@ export async function hasExplainerForStory(storyExternalKey: string): Promise<bo
 export async function getLastExplainerPublishedAt(): Promise<Date | null> {
   if (!isDatabaseConfigured()) return null;
   const pool = getPool();
-  const res = await pool.query<{ published_at: string | null }>(
-    "select max(published_at) as published_at from articles where is_explainer = true"
+  const res = await pool.query<{ published_at: string | Date | null }>(
+    `select max(coalesce(published_at, drafted_at)) as published_at
+       from articles
+      where is_explainer = true and status in ('published', 'pending_review')`
   );
   const value = res.rows[0]?.published_at;
   return value ? new Date(value) : null;
@@ -493,7 +494,10 @@ export async function getRecentArticleTitles(opts: { sinceDays?: number; isExpla
   const { sinceDays = 3, isExplainer = false } = opts;
   const pool = getPool();
   const res = await pool.query<RecentTitle>(
-    "select slug, title from articles where published_at > now() - interval '1 day' * $1 and is_explainer = $2",
+    `select slug, title from articles
+      where ((status = 'published' and published_at > now() - interval '1 day' * $1)
+          or (status = 'pending_review' and drafted_at > now() - interval '1 day' * $1))
+        and is_explainer = $2`,
     [sinceDays, isExplainer]
   );
   return res.rows;
@@ -562,12 +566,13 @@ export type PublishArticleInput = {
   imageLicenseStatus?: "ai_generated" | "source_unlicensed" | "illustrative_fallback";
   /** true para "Vallarta Explica" (ver explicaPublish.ts) — false (default) para noticia breve. */
   isExplainer?: boolean;
+  /** Nuevos borradores automáticos/manualmente preparados esperan aprobación antes de hacerse públicos. */
+  status?: "published" | "pending_review";
 };
 
 /**
- * Publica un artículo real. Requiere que un humano ya haya revisado el
- * texto (llamado desde /api/publish-article, disparado por el botón
- * "Publicar" del panel editorial, nunca automáticamente desde la IA).
+ * Guarda un artículo como pendiente de revisión o publicado según la
+ * acción editorial. La publicación pública requiere aprobación explícita.
  */
 export async function publishArticle(input: PublishArticleInput): Promise<{ slug: string }> {
   const pool = getPool();
@@ -598,6 +603,7 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
 
     const imageLicenseStatus = input.imageLicenseStatus || (input.imageUrl ? "source_unlicensed" : "illustrative_fallback");
     const imageExtractedAt = input.imageUrl ? new Date().toISOString() : null;
+    const status = input.status || "published";
 
     await client.query(
       `insert into articles (
@@ -605,9 +611,9 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
          image_url, image_source_url, image_credit, image_license_status, image_extracted_at, is_explainer,
          discovered_at, drafted_at, published_at, updated_at
        )
-       values ($1,$2,$3,$4,$5,$6,$7,true,$8,'published',$9, $10,$11,$12,$13,$14,$15, now(), now(), now(), now())`,
+       values ($1,$2,$3,$4,$5,$6,$7,true,$8,$9,$10, $11,$12,$13,$14,$15,$16, now(), now(), case when $9 = 'published' then now() else null end, now())`,
       [
-        storyId, slug, input.title, input.excerpt, input.body, categoryId, authorId, input.aiModel, input.newsScore,
+        storyId, slug, input.title, input.excerpt, input.body, categoryId, authorId, input.aiModel, status, input.newsScore,
         input.imageUrl || null, input.imageSourceUrl || null, input.imageCredit || null, imageLicenseStatus, imageExtractedAt,
         !!input.isExplainer,
       ]
@@ -621,6 +627,107 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
   } finally {
     client.release();
   }
+}
+
+export type PendingArticle = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  categorySlug: string;
+  newsScore: number;
+  draftedAt: string;
+  imageUrl?: string;
+  sourceUrl?: string;
+  sourceName?: string;
+};
+
+/** Borradores que cualquier administrador puede aprobar antes de publicar. */
+export async function getPendingArticles(limit = 100): Promise<PendingArticle[]> {
+  if (!isDatabaseConfigured()) return [];
+  const pool = getPool();
+  const res = await pool.query<{
+    slug: string;
+    title: string;
+    excerpt: string | null;
+    body: string | null;
+    category_slug: string | null;
+    news_score: number;
+    drafted_at: Date | string | null;
+    image_url: string | null;
+    source_url: string | null;
+    source_name: string | null;
+  }>(
+    `select a.slug, a.title, a.excerpt, a.body, a.news_score, a.drafted_at, a.image_url,
+            c.slug as category_slug, ss.url as source_url, s.name as source_name
+       from articles a
+       left join categories c on c.id = a.category_id
+       left join story_sources ss on ss.story_id = a.story_id
+       left join sources s on s.id = ss.source_id
+      where a.status = 'pending_review'
+      order by a.drafted_at desc nulls last
+      limit $1`,
+    [limit]
+  );
+  const seen = new Set<string>();
+  return res.rows.flatMap((row) => {
+    if (seen.has(row.slug)) return [];
+    seen.add(row.slug);
+    return [{
+      slug: row.slug,
+      title: row.title,
+      excerpt: row.excerpt || "",
+      body: row.body || "",
+      categorySlug: row.category_slug || "comunidad",
+      newsScore: row.news_score,
+      draftedAt: row.drafted_at ? new Date(row.drafted_at).toISOString() : "",
+      imageUrl: row.image_url || undefined,
+      sourceUrl: row.source_url || undefined,
+      sourceName: row.source_name || undefined,
+    }];
+  });
+}
+
+export type ReviewedArticle = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  imageUrl?: string;
+};
+
+/** Cambia el estado una sola vez; evita aprobar o rechazar dos veces el mismo borrador. */
+export async function reviewPendingArticle(
+  slug: string,
+  decision: "approve" | "reject",
+  reviewer: { username: string; displayName: string }
+): Promise<ReviewedArticle | null> {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL no está configurada.");
+  const pool = getPool();
+  const status = decision === "approve" ? "published" : "discarded";
+  const res = await pool.query<{
+    slug: string;
+    title: string;
+    excerpt: string | null;
+    body: string | null;
+    image_url: string | null;
+  }>(
+    `update articles
+        set status = $2,
+            reviewed_by_username = $3,
+            reviewed_by_name = $4,
+            reviewed_at = now(),
+            approved_by_username = case when $2 = 'published' then $3 else null end,
+            approved_by_name = case when $2 = 'published' then $4 else null end,
+            published_at = case when $2 = 'published' then now() else null end,
+            updated_at = now()
+      where slug = $1 and status = 'pending_review'
+      returning slug, title, excerpt, body, image_url`,
+    [slug, status, reviewer.username, reviewer.displayName]
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return { slug: row.slug, title: row.title, excerpt: row.excerpt || "", body: row.body || "", imageUrl: row.image_url || undefined };
 }
 
 // ---------------------------------------------------------------------
