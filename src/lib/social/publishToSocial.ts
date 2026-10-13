@@ -1,7 +1,7 @@
 /**
- * Publicación automática en la página de Facebook y la cuenta de
- * Instagram del sitio después de que un administrador aprueba un artículo
- * (ver /api/admin/review-article). Requiere 3 variables de entorno — sin ellas, esta
+ * Publicación automática en Facebook/Instagram después de publicar una nota
+ * automáticamente o de que un administrador apruebe una nota en revisión.
+ * Requiere variables de entorno — sin ellas, esta
  * función no hace nada (no rompe el flujo de publicación del artículo).
  *
  *   FB_PAGE_ID              — ID numérico de la página de Facebook
