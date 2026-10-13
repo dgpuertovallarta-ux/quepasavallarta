@@ -24,9 +24,8 @@ export default function AdminShell({ active, children }: { active: string; child
       </div>
       <h1 style={{ margin: "0 0 6px" }}>Panel editorial</h1>
       <p style={{ color: "var(--text-muted)", maxWidth: 700, marginBottom: 18 }}>
-        Las noticias quedan pendientes hasta que uno de los administradores las aprueba. La cola de
-        aprobación requiere la base de datos y la migración editorial; las cuentas se configuran con
-        variables de entorno privadas.
+        Las noticias confiables se publican automáticamente cada 10 minutos. Las que requieren revisión
+        aparecen en Aprobaciones; los tres administradores pueden aprobarlas o rechazarlas.
       </p>
       <div className="admin-shell panel" style={{ padding: 0 }}>
         <div className="admin-side">
