@@ -16,7 +16,14 @@ export const SITE = {
   name: "Qué Pasa Vallarta",
   tagline: "Información clara y confiable de Puerto Vallarta.",
   city: "Puerto Vallarta, Jalisco",
+  /** WhatsApp comercial (ventas de publicidad), formato internacional sin "+". */
+  salesWhatsapp: "523223951186",
+  salesWhatsappLabel: "322 395 1186",
 };
+
+export const SALES_WHATSAPP_URL = `https://wa.me/${SITE.salesWhatsapp}?text=${encodeURIComponent(
+  "Hola, me interesa anunciar mi negocio en Qué Pasa Vallarta."
+)}`;
 
 export type Category = { slug: string; name: string };
 

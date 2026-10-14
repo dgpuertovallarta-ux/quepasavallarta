@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BUSINESS_PLANS } from "@/lib/data";
+import { BUSINESS_PLANS, SALES_WHATSAPP_URL, SITE } from "@/lib/data";
 import ConectaLeadForm from "@/components/ConectaLeadForm";
 
 export const metadata = {
@@ -20,6 +20,9 @@ export default function ConectaPage() {
           Visibilidad, audiencia y leads reales en Puerto Vallarta. No vendemos &ldquo;un banner&rdquo;:
           vendemos resultados medibles.
         </p>
+        <a className="btn btn-primary" href={SALES_WHATSAPP_URL} target="_blank" rel="noopener" style={{ marginTop: 6 }}>
+          Escríbenos por WhatsApp · {SITE.salesWhatsappLabel}
+        </a>
       </div>
 
       <div className="grid grid-4" style={{ marginBottom: 30 }}>
@@ -46,7 +49,11 @@ export default function ConectaPage() {
       <div className="panel" style={{ maxWidth: 720, marginTop: 16 }}>
         <h3 style={{ marginTop: 0 }}>¿Te interesa? Escríbenos</h3>
         <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-          Déjanos tus datos y te contactamos con las opciones para tu negocio.
+          Déjanos tus datos y te contactamos con las opciones para tu negocio, o escríbenos directo por{" "}
+          <a href={SALES_WHATSAPP_URL} target="_blank" rel="noopener">
+            WhatsApp al {SITE.salesWhatsappLabel}
+          </a>
+          .
         </p>
         <ConectaLeadForm />
       </div>
