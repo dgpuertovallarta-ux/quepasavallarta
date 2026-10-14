@@ -5,6 +5,8 @@ import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data"
 import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
 import { newsImageSrc, socialImageSrc, photoCreditLabel } from "@/lib/photos";
 import ArticleBody from "@/components/ArticleBody";
+import AdSlot from "@/components/AdSlot";
+import { getSponsor } from "@/lib/business/db";
 import { fmtDateTime } from "@/lib/format";
 import { getPublishedArticleBySlug, getPublishedArticlesByCategory } from "@/lib/db/articles";
 
@@ -55,6 +57,9 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   if (!n) notFound();
 
   const relatedReal = n.isDemo ? [] : await getPublishedArticlesByCategory(n.category, 5);
+  const sponsor = n.isDemo ? null : await getSponsor(n.slug);
+  // Sin anuncios junto a emergencias (avisos de Protección Civil, huracanes, alertas).
+  const isEmergency = /protecci[oó]n civil|hurac[aá]n|tormenta|alerta|evacua|refugio|inundaci|sismo/i.test(`${n.title} ${n.dek}`);
   const related = n.isDemo
     ? NEWS.filter((x) => x.category === n.category && x.slug !== n.slug).slice(0, 4)
     : relatedReal.filter((x) => x.slug !== n.slug).slice(0, 4);
@@ -112,7 +117,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             <DemoTag />
           </span>
         )}
+        {sponsor && (
+          <span className="chip chip-sponsor" style={{ marginLeft: 6 }}>
+            Patrocinado
+          </span>
+        )}
         <h1>{n.title}</h1>
+        {sponsor && <p className="sponsor-note">Contenido patrocinado por {sponsor}.</p>}
         <p className="article-dek">{n.dek}</p>
         <Byline n={n} />
       </div>
@@ -125,6 +136,8 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
       </figure>
 
       <ArticleBody paragraphs={n.body} />
+
+      {!isEmergency && !sponsor && <AdSlot slot="article" />}
 
       <div className="panel" style={{ maxWidth: 780, marginTop: 24 }}>
         <strong style={{ fontSize: 13 }}>Fuentes</strong>

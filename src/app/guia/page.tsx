@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { BUSINESSES } from "@/lib/data";
+import { REAL_BUSINESSES as BUSINESSES } from "@/lib/data";
 import { BusinessCard } from "@/components/cards";
 
-// La Guía todavía muestra negocios de ejemplo: no se ofrece a los buscadores.
-export const metadata = { title: "Vallarta Guía — Qué Pasa Vallarta", robots: { index: false, follow: false } };
+export const metadata = {
+  title: "Vallarta Guía — Qué Pasa Vallarta",
+  // Mientras no haya negocios dados de alta, no se ofrece a los buscadores.
+  ...(BUSINESSES.length === 0 ? { robots: { index: false, follow: true } } : {}),
+};
 
 const CATS = ["Todas", ...Array.from(new Set(BUSINESSES.map((b) => b.category)))];
 
@@ -28,7 +31,7 @@ export default async function GuiaPage({
         Directorio de restaurantes, hoteles, tours, salud, inmobiliarias y más. Los negocios marcados
         como &ldquo;Destacado&rdquo; tienen un plan Vallarta Conecta. <Link href="/conecta">Anuncia tu negocio aquí</Link>.
       </p>
-      <div className="filter-row">
+      {BUSINESSES.length > 0 && <div className="filter-row">
         {CATS.map((c) => (
           <Link
             key={c}
@@ -39,12 +42,22 @@ export default async function GuiaPage({
             {c}
           </Link>
         ))}
-      </div>
-      <div className="grid grid-3">
-        {items.map((b) => (
-          <BusinessCard b={b} key={b.slug} />
-        ))}
-      </div>
+      </div>}
+      {items.length > 0 ? (
+        <div className="grid grid-3">
+          {items.map((b) => (
+            <BusinessCard b={b} key={b.slug} />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <h3>Muy pronto: los negocios de Vallarta</h3>
+          <p>
+            Estamos dando de alta los primeros negocios de la guía. ¿Quieres que el tuyo aparezca aquí, con fotos,
+            WhatsApp y mapa? <Link href="/conecta">Anúnciate con nosotros</Link>.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,10 @@ import Link from "next/link";
 import { BUSINESS_PLANS } from "@/lib/data";
 import ConectaLeadForm from "@/components/ConectaLeadForm";
 
-export const metadata = { title: "Vallarta Conecta — para negocios" };
+export const metadata = {
+  title: "Anúnciate en Qué Pasa Vallarta — Vallarta Conecta",
+  description: "Publicidad para negocios de Puerto Vallarta y Bahía de Banderas: banners en el sitio, notas y reels patrocinados en Facebook, y ficha en la Guía de negocios.",
+};
 
 export default function ConectaPage() {
   return (
@@ -24,7 +27,7 @@ export default function ConectaPage() {
           <div className="panel" key={p.id}>
             <h3 style={{ margin: "0 0 8px", fontSize: 16 }}>{p.name}</h3>
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", margin: "0 0 12px" }}>{p.desc}</p>
-            <span className="chip chip-demo">Precio: configurable</span>
+            <span className="chip chip-sponsor">Cotiza sin compromiso</span>
           </div>
         ))}
       </div>

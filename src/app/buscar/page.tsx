@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BUSINESSES } from "@/lib/data";
+import { REAL_BUSINESSES as BUSINESSES } from "@/lib/data";
 import { upcomingEvents, eventDateLabel } from "@/lib/events";
 import { searchPublishedArticles, dropNearDuplicates } from "@/lib/db/articles";
 import { timeAgo } from "@/lib/format";

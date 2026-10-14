@@ -1,11 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
-import { NEWS, EXPLICA, getCategoryName, type NewsItem } from "@/lib/data";
+import { NEWS, EXPLICA, getCategoryName, type NewsItem, REAL_BUSINESSES } from "@/lib/data";
 import { getPublishedArticles, getPublishedExplainers, dropNearDuplicates, getEmergencyArticles } from "@/lib/db/articles";
 import { upcomingEvents, eventDateLabel } from "@/lib/events";
 import { NewsCard, SectionHead, StoryMeta, DemoTag } from "@/components/cards";
 import CarouselRow from "@/components/CarouselRow";
 import ReelsCarousel from "@/components/ReelsCarousel";
+import AdSlot from "@/components/AdSlot";
 import { getPageReels } from "@/lib/social/reels";
 import WeatherBar from "@/components/WeatherBar";
 import NewsletterForm from "@/components/NewsletterForm";
@@ -121,14 +122,19 @@ export default async function HomePage() {
         )}
       </div>
 
-      <aside className="ad-band" aria-label="Publicidad">
-        <div className="container">
-          <div className="ad-label">Publicidad</div>
-          <Link href="/conecta">
-            <img src="/media/byd-banner.gif" alt="BYD Puerto Vallarta — Vive Vallarta en modo 100% eléctrico" />
-          </Link>
-        </div>
-      </aside>
+      <AdSlot
+        slot="home"
+        fallback={
+          <aside className="ad-band" aria-label="Publicidad">
+            <div className="container">
+              <div className="ad-label">Publicidad</div>
+              <Link href="/conecta">
+                <img src="/media/byd-banner.gif" alt="BYD Puerto Vallarta — Vive Vallarta en modo 100% eléctrico" />
+              </Link>
+            </div>
+          </aside>
+        }
+      />
 
       {feature && (
         <div className="container section">
@@ -266,15 +272,15 @@ export default async function HomePage() {
       )}
 
       <div className="container section">
-        <SectionHead title="Guía de negocios" linkHref="/guia" linkLabel="Ver guía completa" />
-        <nav className="link-grid" aria-label="Categorías de la guía">
+        <SectionHead title="Guía de negocios" linkHref={REAL_BUSINESSES.length > 0 ? "/guia" : "/conecta"} linkLabel={REAL_BUSINESSES.length > 0 ? "Ver guía completa" : "Anúnciate"} />
+        {REAL_BUSINESSES.length > 0 && <nav className="link-grid" aria-label="Categorías de la guía">
           {GUIDE_CATEGORIES.map((name) => (
             <Link key={name} href={`/guia?cat=${encodeURIComponent(name)}`}>
               {name}
             </Link>
           ))}
-        </nav>
-        <div className="cta-strip" style={{ marginTop: 34 }}>
+        </nav>}
+        <div className="cta-strip" style={{ marginTop: REAL_BUSINESSES.length > 0 ? 34 : 0 }}>
           <div>
             <span className="card-kicker">Vallarta Conecta</span>
             <h3>Impulsa tu negocio con visibilidad real y conectada con tu audiencia</h3>

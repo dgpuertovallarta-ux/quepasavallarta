@@ -441,10 +441,10 @@ export const BUSINESSES: Business[] = [
 ];
 
 export const BUSINESS_PLANS = [
-  { id: "conecta", name: "Vallarta Conecta", desc: "Perfil comercial completo en el directorio con ficha, fotos, WhatsApp y estadísticas básicas." },
-  { id: "conecta-pro", name: "Vallarta Conecta Pro", desc: "Todo lo de Conecta + posición destacada en su categoría y en Agenda/Guía." },
-  { id: "partner", name: "Partner", desc: "Presencia destacada en Home y patrocinio de sección (ej. 'Vallarta Ahora presentado por…')." },
-  { id: "campaign", name: "Campaña Especial", desc: "Contenido patrocinado, cobertura de lanzamiento o campaña por tiempo limitado." },
+  { id: "basico", name: "Básico", desc: "Ficha de tu negocio en la Guía (fotos, WhatsApp, mapa y horarios) + 2 publicaciones al mes en nuestra página de Facebook." },
+  { id: "negocio", name: "Negocio", desc: "Banner en una sección del sitio + 4 publicaciones al mes en Facebook + una historia cada semana." },
+  { id: "destacado", name: "Destacado", desc: "Banner en la portada + una nota patrocinada + un reel + 4 publicaciones al mes en Facebook." },
+  { id: "campana", name: "Nota o reel patrocinado", desc: "Una pieza suelta para un lanzamiento, evento o promoción, marcada como \"Patrocinado\"." },
 ];
 
 // ------------------------------------------------------------------
@@ -468,6 +468,9 @@ export const LIVE_FEED: LiveFeedItem[] = [
 
 export function getNewsBySlug(slug: string) { return NEWS.find((n) => n.slug === slug); }
 export function getExplicaBySlug(slug: string) { return EXPLICA.find((n) => n.slug === slug); }
-export function getBusinessBySlug(slug: string) { return BUSINESSES.find((n) => n.slug === slug); }
+/** Negocios reales de la guía (los de ejemplo terminan en "-demo" y ya no se muestran). */
+export const REAL_BUSINESSES = BUSINESSES.filter((b) => !b.slug.endsWith("-demo"));
+
+export function getBusinessBySlug(slug: string) { return REAL_BUSINESSES.find((n) => n.slug === slug); }
 export function getCategoryName(slug: string) { return CATEGORIES.find((c) => c.slug === slug)?.name || slug; }
 export function getZoneName(slug: string) { return ZONES.find((z) => z.slug === slug)?.name || slug; }

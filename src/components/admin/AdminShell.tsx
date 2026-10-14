@@ -7,7 +7,8 @@ const SECTIONS = [
   { id: "aprobaciones", label: "Aprobaciones" },
   { id: "fuentes", label: "Fuentes y automatización" },
   { id: "roles", label: "Usuarios y roles" },
-  { id: "comercial", label: "Comercial / Leads" },
+  { id: "estadisticas", label: "Estadísticas" },
+  { id: "comercial", label: "Comercial / Anuncios" },
 ];
 
 export default function AdminShell({ active, children }: { active: string; children: React.ReactNode }) {

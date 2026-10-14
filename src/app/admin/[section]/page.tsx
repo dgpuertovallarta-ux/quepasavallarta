@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
-import { Resumen, Cola, Aprobaciones, Fuentes, Roles, Comercial } from "@/components/admin/sections";
+import { Resumen, Cola, Aprobaciones, Fuentes, Roles, Comercial, Estadisticas } from "@/components/admin/sections";
 
 type SectionComponent = () => React.ReactNode | Promise<React.ReactNode>;
 
@@ -10,6 +10,7 @@ const SECTIONS: Record<string, SectionComponent> = {
   aprobaciones: Aprobaciones,
   fuentes: Fuentes,
   roles: Roles,
+  estadisticas: Estadisticas,
   comercial: Comercial,
 };
 
@@ -19,7 +20,8 @@ const SECTION_LABELS: Record<string, string> = {
   aprobaciones: "Aprobaciones",
   fuentes: "Fuentes y automatización",
   roles: "Usuarios y roles",
-  comercial: "Comercial / Leads",
+  estadisticas: "Estadísticas",
+  comercial: "Comercial / Anuncios",
 };
 
 // Estas páginas consultan fuentes reales en cada visita — no se pueden

@@ -8,6 +8,7 @@ import {
   dropNearDuplicates,
 } from "@/lib/db/articles";
 import { uniqueIllustrations } from "@/lib/photos";
+import AdSlot from "@/components/AdSlot";
 
 export const revalidate = 60;
 
@@ -60,6 +61,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
           </Link>
         ))}
       </div>
+      {slug !== "clima" && slug !== "seguridad" && <AdSlot slot="section" />}
       {items.length ? (
         <div className="grid grid-3">
           {items.map((n) => (

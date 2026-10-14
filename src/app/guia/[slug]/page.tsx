@@ -1,18 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { BUSINESSES, getBusinessBySlug } from "@/lib/data";
+import { REAL_BUSINESSES, getBusinessBySlug } from "@/lib/data";
 import { PHOTOS } from "@/lib/photos";
 
 export function generateStaticParams() {
-  return BUSINESSES.map((b) => ({ slug: b.slug }));
+  return REAL_BUSINESSES.map((b) => ({ slug: b.slug }));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const b = getBusinessBySlug(slug);
-  // Negocios de ejemplo: no se ofrecen a los buscadores.
-  return { title: b ? `${b.name} — Vallarta Guía` : "Negocio no encontrado", robots: { index: false, follow: false } };
+  return { title: b ? `${b.name} — Vallarta Guía` : "Negocio no encontrado" };
 }
 
 export default async function NegocioPage({ params }: { params: Promise<{ slug: string }> }) {

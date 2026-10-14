@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ThemeInitScript from "@/components/ThemeInitScript";
 import Toast from "@/components/Toast";
+import PageTracker from "@/components/PageTracker";
 import { SITE } from "@/lib/data";
 import { getPublishedArticles, getActiveCategorySlugs } from "@/lib/db/articles";
 
@@ -12,6 +13,10 @@ import { getPublishedArticles, getActiveCategorySlugs } from "@/lib/db/articles"
 // de mostrar el aviso de demo) — no hace falta en cada request exacto,
 // con refrescar cada minuto basta.
 export const revalidate = 60;
+
+const ADSENSE_CLIENT = /^ca-pub-\d+$/.test(process.env.NEXT_PUBLIC_ADSENSE_CLIENT || "")
+  ? process.env.NEXT_PUBLIC_ADSENSE_CLIENT
+  : null;
 
 // Tipografía editorial limpia:
 // - Work Sans: interfaz, navegación y metadatos.
@@ -47,12 +52,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <head>
         <ThemeInitScript />
+        {/* Google AdSense: solo se activa cuando se configura NEXT_PUBLIC_ADSENSE_CLIENT (ca-pub-…) en Netlify. */}
+        {ADSENSE_CLIENT && (
+          <script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+            crossOrigin="anonymous"
+          />
+        )}
       </head>
       <body>
         <Header hasRealContent={hasRealContent} activeCategories={activeCategories} />
         <main id="main">{children}</main>
         <Footer hasRealContent={hasRealContent} activeCategories={activeCategories} />
         <Toast />
+        <PageTracker />
       </body>
     </html>
   );

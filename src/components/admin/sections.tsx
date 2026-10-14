@@ -1,4 +1,7 @@
-import { BUSINESSES } from "@/lib/data";
+import { REAL_BUSINESSES } from "@/lib/data";
+import { getSiteStats, getLeads, getAllAds, getSponsoredList } from "@/lib/business/db";
+import AdManager from "./AdManager";
+import SponsoredManager from "./SponsoredManager";
 import { scoreClass } from "@/lib/format";
 import { SOURCES } from "@/lib/ingest/sources";
 import { fetchSource } from "@/lib/ingest/fetchSource";
@@ -115,7 +118,7 @@ export async function Resumen() {
         <StatTile n={pendientes} l="Pendientes de revisión humana" />
         <StatTile n={pendingApprovals.length} l="Publicaciones por aprobar" />
         <StatTile n={urgentes} l="Marcadas urgentes" />
-        <StatTile n={BUSINESSES.length} l="Negocios en directorio (demo)" />
+        <StatTile n={REAL_BUSINESSES.length} l="Negocios en la Guía" />
       </div>
       <div className="panel">
         <strong style={{ fontSize: 13 }}>¿Está funcionando el sistema?</strong>
@@ -305,37 +308,117 @@ export function Roles() {
   );
 }
 
-export function Comercial() {
+const fmtDay = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+
+export async function Estadisticas() {
+  const stats = await getSiteStats(30);
+  const max = Math.max(1, ...stats.daily.map((d) => d.views));
   return (
     <>
       <div className="stat-row">
-        <StatTile n={BUSINESSES.length} l="Negocios activos" />
-        <StatTile n={BUSINESSES.filter((b) => b.featured).length} l="Destacados" />
-        <StatTile n="—" l="Leads este mes (conectar CRM)" />
-        <StatTile n="—" l="Ingresos (conectar pagos)" />
+        <StatTile n={stats.totals.today.toLocaleString("es-MX")} l="Visitas hoy" />
+        <StatTile n={stats.totals.todayVisitors.toLocaleString("es-MX")} l="Personas hoy" />
+        <StatTile n={stats.totals.views.toLocaleString("es-MX")} l="Visitas (30 días)" />
+        <StatTile n={stats.totals.visitors.toLocaleString("es-MX")} l="Personas distintas (30 días)" />
       </div>
       <div className="panel">
-        <strong style={{ fontSize: 13 }}>Negocios en Vallarta Guía / Conecta</strong>
+        <strong style={{ fontSize: 13 }}>Visitas por día — últimos 30 días</strong>
+        {stats.daily.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
+            Todavía no hay datos. El contador empieza a sumar desde hoy (solo tú lo ves aquí).
+          </p>
+        ) : (
+          <>
+            <div className="stats-bars">
+              {stats.daily.map((d) => (
+                <div key={d.day} style={{ height: `${(d.views / max) * 100}%` }} title={`${fmtDay(d.day)}: ${d.views} visitas, ${d.visitors} personas`} />
+              ))}
+            </div>
+            <div className="stats-axis">
+              <span>{fmtDay(stats.daily[0].day)}</span>
+              <span>{fmtDay(stats.daily[stats.daily.length - 1].day)}</span>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="panel">
+        <strong style={{ fontSize: 13 }}>Páginas más vistas (30 días)</strong>
         <table className="data-table">
           <thead>
             <tr>
-              <th>Negocio</th>
-              <th>Categoría</th>
-              <th>Plan</th>
-              <th>Destacado</th>
+              <th>Página</th>
+              <th>Visitas</th>
             </tr>
           </thead>
           <tbody>
-            {BUSINESSES.map((b) => (
-              <tr key={b.slug}>
-                <td>{b.name}</td>
-                <td>{b.category}</td>
-                <td>{b.plan}</td>
-                <td>{b.featured ? "Sí" : "No"}</td>
+            {stats.topPages.map((p) => (
+              <tr key={p.path}>
+                <td>
+                  <a href={p.path} target="_blank" rel="noopener">{p.path}</a>
+                </td>
+                <td>{p.views.toLocaleString("es-MX")}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10 }}>
+          Estos números son privados. Úsalos para tu media kit y para los reportes a anunciantes.
+        </p>
+      </div>
+    </>
+  );
+}
+
+export async function Comercial() {
+  const [leads, ads, sponsored] = await Promise.all([getLeads(100), getAllAds(), getSponsoredList()]);
+  const now = new Date();
+  const monthLeads = leads.filter((l) => {
+    const d = new Date(l.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  const activeAds = ads.filter((a) => a.active && (!a.endsAt || a.endsAt >= now.toISOString().slice(0, 10))).length;
+  return (
+    <>
+      <div className="stat-row">
+        <StatTile n={monthLeads} l="Interesados este mes" />
+        <StatTile n={activeAds} l="Banners activos" />
+        <StatTile n={ads.reduce((s, a) => s + a.clicks, 0)} l="Clics en banners" />
+        <StatTile n={sponsored.length} l="Notas patrocinadas" />
+      </div>
+      <div className="panel">
+        <strong style={{ fontSize: 13 }}>Interesados en anunciarse (formulario Anúnciate)</strong>
+        {leads.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>Aún no llegan solicitudes.</p>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Negocio</th>
+                <th>Contacto</th>
+                <th>Mensaje</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((l) => (
+                <tr key={l.id}>
+                  <td>{new Date(l.createdAt).toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" })}</td>
+                  <td>{l.business}</td>
+                  <td>{l.contact}</td>
+                  <td>{l.message || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div className="panel">
+        <strong style={{ fontSize: 13 }}>Banners</strong>
+        <AdManager ads={ads} />
+      </div>
+      <div className="panel">
+        <strong style={{ fontSize: 13 }}>Notas patrocinadas</strong>
+        <SponsoredManager items={sponsored} />
       </div>
     </>
   );
