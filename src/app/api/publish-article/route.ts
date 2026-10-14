@@ -47,10 +47,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Imagen 100% generada por IA (nunca la foto real del hecho) — ver
-    // generateImage.ts. Se usa la foto de la fuente solo como referencia
-    // visual para que la escena corresponda al lugar/hecho real. Si todo
-    // falla, publishArticle cae de vuelta a la imagen ilustrativa por categoría.
+    // Foto real de la fuente con su crédito (ver lib/qpv/fotoFuente.ts); sin foto, el sitio muestra la pleca de color.
     const primarySource = storyExternalKey ? await getPrimarySourceForStory(storyExternalKey) : null;
     const generatedImage = await generateArticleImage({ title, excerpt, categorySlug, sourceUrl: primarySource?.url });
 

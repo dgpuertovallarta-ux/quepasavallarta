@@ -5,17 +5,15 @@
  *
  * Imagen de la tarjeta, en este orden:
  *   1. La foto de la fuente si es una institución oficial (con su crédito).
- *   2. Una foto REAL ilustrativa de Vallarta del banco de Wikimedia por
- *      categoría (photos.ts), con su autor y licencia.
- *   3. Si no se pudo descargar ninguna: tarjeta tipográfica sin foto.
+ *   2. Si no: postal de color QPV (tarjeta tipográfica), sin foto de relleno.
  */
 import { ImageResponse } from "next/og";
 import { readFile } from "fs/promises";
 import path from "path";
 import { Tarjeta, ANCHO, ALTO, type DatosTarjeta, type Plantilla } from "@/components/social/Tarjeta";
+import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial } from "@/components/social/TarjetaVial";
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
-import { PHOTOS, PHOTO_CREDITS, illustrationFor } from "../photos";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
 
 const UA = "Mozilla/5.0 (compatible; QuePasaVallartaBot/1.0; +https://quepasavta.com)";
@@ -91,11 +89,8 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     foto = await imagenComoDataUri(n.fotoFuente);
     if (foto) credito = `Foto: ${credOficial}`;
   }
-  if (!foto) {
-    const key = illustrationFor(n.categoria, n.clave);
-    foto = await imagenComoDataUri(PHOTOS[key]);
-    if (foto) credito = `Foto ilustrativa${PHOTO_CREDITS[key] ? `: ${PHOTO_CREDITS[key]}` : ""}`;
-  }
+  // Sin foto oficial no se rellena con una foto que no tiene que ver:
+  // sale la postal de color QPV (decisión 2026-10).
 
   let plantilla: Plantilla = n.plantilla ?? (c.tipo === "alerta" ? "alerta" : "estandar");
   if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
@@ -114,14 +109,60 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   };
 }
 
-export async function renderTarjeta(d: DatosTarjeta): Promise<Buffer> {
+async function renderElemento(el: React.ReactElement): Promise<Buffer> {
   fuentesCache ??= await cargarFuentes();
-  const res = new ImageResponse(<Tarjeta {...d} />, { width: ANCHO, height: ALTO, fonts: fuentesCache });
+  const res = new ImageResponse(el, { width: ANCHO, height: ALTO, fonts: fuentesCache });
   return Buffer.from(await res.arrayBuffer());
+}
+
+export async function renderTarjeta(d: DatosTarjeta): Promise<Buffer> {
+  return renderElemento(<Tarjeta {...d} />);
+}
+
+export function horaLocal(fecha = new Date()): string {
+  return fecha.toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** Postal amarilla de QPV al Volante (un incidente o una vialidad cargada). Nunca lanza. */
+export async function crearReporteVial(d: Omit<DatosReporteVial, "logoAzul">): Promise<string | null> {
+  try {
+    const png = await renderElemento(<ReporteVial {...d} logoAzul={await dataUriDeAsset("qpv-logo-azul.png", "image/png")} />);
+    return (await saveImageBlob(png, "image/png")).url;
+  } catch (err) {
+    console.error("[crearReporteVial] Falló:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/** Postal azul con el semáforo de las vialidades. Nunca lanza. */
+export async function crearResumenVial(d: Omit<DatosResumenVial, "logo">): Promise<string | null> {
+  try {
+    const png = await renderElemento(<ResumenVial {...d} logo={await dataUriDeAsset("qpv-logo-blanco.png", "image/png")} />);
+    return (await saveImageBlob(png, "image/png")).url;
+  } catch (err) {
+    console.error("[crearResumenVial] Falló:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /** Genera la tarjeta de una nota, la guarda en Netlify Blobs y devuelve su URL pública (/api/image/…). Nunca lanza. */
 export async function crearTarjeta(n: NotaTarjeta): Promise<string | null> {
+  // Notas de tránsito (avisos oficiales de Tránsito, Protección Civil, obras…): postal de QPV al Volante.
+  if (n.categoria === "transito") {
+    const c = clasificar(n.titulo);
+    const oficial = creditoOficial(n.urlFuente);
+    const choque = c.tipo === "accidente";
+    const v = await crearReporteVial({
+      hora: horaLocal(),
+      tipo: choque ? "ACCIDENTE" : /cierre|cerrad/i.test(n.titulo) ? "CIERRE" : "AVISO VIAL",
+      tipoColor: choque || /cierre|cerrad/i.test(n.titulo) ? "rojo" : "ambar",
+      titulo: n.titulo,
+      lugar: n.detalle,
+      datos: [],
+      fuente: oficial ? `Aviso oficial: ${oficial}` : "Redacción QPV",
+    });
+    if (v) return v;
+  }
   try {
     const png = await renderTarjeta(await datosTarjeta(n));
     const { url } = await saveImageBlob(png, "image/png");

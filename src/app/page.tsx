@@ -9,8 +9,9 @@ import ReelsCarousel from "@/components/ReelsCarousel";
 import AdSlot from "@/components/AdSlot";
 import { getPageReels } from "@/lib/social/reels";
 import WeatherBar from "@/components/WeatherBar";
+import NewsVisual from "@/components/NewsVisual";
 import NewsletterForm from "@/components/NewsletterForm";
-import { PHOTOS, newsImageSrc, photoCreditLabel, uniqueIllustrations, type PhotoKey } from "@/lib/photos";
+import { PHOTOS, uniqueIllustrations, type PhotoKey } from "@/lib/photos";
 
 const GUIDE_CATEGORIES = ["Restaurantes", "Hoteles", "Tours y actividades", "Salud", "Inmobiliarias", "Automotriz"];
 
@@ -27,8 +28,7 @@ function shortDate(iso: string) {
 function StoryPhoto({ n, sizes, priority }: { n: NewsItem; sizes: string; priority?: boolean }) {
   return (
     <Link href={`/noticia/${n.slug}`} className="lead-media" aria-hidden="true" tabIndex={-1}>
-      <Image src={newsImageSrc(n)} alt="" fill sizes={sizes} priority={priority} unoptimized={!!n.imageUrl} />
-      <span className="photo-tag">{photoCreditLabel(n)}</span>
+      <NewsVisual n={n} sizes={sizes} priority={priority} />
     </Link>
   );
 }
@@ -202,14 +202,7 @@ export default async function HomePage() {
             <div className="split split-even">
               <article className="feature">
                 <Link href={`/explica/${explicaLead.slug}`} className="lead-media" aria-hidden="true" tabIndex={-1}>
-                  <Image
-                    src={explicaLead.imageUrl || PHOTOS[explicaLead.image]}
-                    alt=""
-                    fill
-                    sizes="(max-width: 900px) 100vw, 50vw"
-                    unoptimized={!!explicaLead.imageUrl}
-                  />
-                  <span className="photo-tag">{photoCreditLabel(explicaLead)}</span>
+                  <NewsVisual n={explicaLead} sizes="(max-width: 900px) 100vw, 50vw" seccion="Vallarta Explica" />
                 </Link>
                 <h3 className="feature-title-serif">
                   <Link href={`/explica/${explicaLead.slug}`}>{explicaLead.title}</Link>
@@ -221,7 +214,7 @@ export default async function HomePage() {
                   <Link key={e.slug} href={`/explica/${e.slug}`} className="thumb-list-item">
                     <h3 className="headline">{e.title}</h3>
                     <div className="thumb-list-media">
-                      <Image src={e.imageUrl || PHOTOS[e.image]} alt="" fill sizes="244px" unoptimized={!!e.imageUrl} />
+                      <NewsVisual n={e} sizes="244px" credito={false} seccion="Vallarta Explica" />
                     </div>
                   </Link>
                 ))}

@@ -1,15 +1,16 @@
 import Link from "next/link";
-import Image from "next/image";
 import { getCategoryName, type NewsItem } from "@/lib/data";
-import { CardMedia, DemoTag } from "./cards";
-import { PHOTOS } from "@/lib/photos";
+import { DemoTag } from "./cards";
+import NewsVisual from "./NewsVisual";
 import { timeAgo } from "@/lib/format";
 
 export default function EditorialLead({ lead, secondary }: { lead: NewsItem; secondary: NewsItem[] }) {
   return (
     <div className="lead-grid">
       <article className="card">
-        <CardMedia media={lead.media} image={lead.image} imageUrl={lead.imageUrl} imageCredit={lead.imageCredit} alt={lead.title} sizes="(max-width: 960px) 100vw, 60vw" priority />
+        <div className="card-media">
+          <NewsVisual n={lead} alt={lead.title} sizes="(max-width: 960px) 100vw, 60vw" priority />
+        </div>
         <div className="card-body" style={{ padding: 20 }}>
           {lead.breaking ? (
             <span className="chip chip-breaking">Última hora</span>
@@ -31,7 +32,7 @@ export default function EditorialLead({ lead, secondary }: { lead: NewsItem; sec
         {secondary.map((n) => (
           <div className="lead-secondary-item" key={n.slug}>
             <div className="lead-secondary-thumb">
-              <Image src={PHOTOS[n.image]} alt="" fill sizes="100px" />
+              <NewsVisual n={n} sizes="100px" credito={false} pequena />
             </div>
             <div className="lead-secondary-body">
               <span className="card-kicker">{getCategoryName(n.category)}</span>

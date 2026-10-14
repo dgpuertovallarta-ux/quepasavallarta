@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ultimaInstantanea } from "@/lib/trafico/monitor";
+import { ultimaInstantanea, avisosTransito } from "@/lib/trafico/monitor";
 import { CENTRO_MAPA } from "@/lib/trafico/corredores";
 
 export const metadata = {
@@ -18,7 +18,7 @@ const TIPO: Record<string, string> = {
 };
 
 export default async function TraficoPage() {
-  const s = await ultimaInstantanea();
+  const [s, avisos] = await Promise.all([ultimaInstantanea(), avisosTransito(8)]);
   const wa = process.env.QPV_WHATSAPP_REPORTES;
   const hora = s?.actualizado
     ? new Date(s.actualizado).toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit" })
@@ -63,7 +63,16 @@ export default async function TraficoPage() {
             </div>
           ))}
 
-          <h2 style={{ fontSize: 20, margin: "24px 0 8px" }}>Incidentes</h2>
+          <h2 style={{ fontSize: 20, margin: "24px 0 8px" }}>Avisos de tránsito</h2>
+          {!avisos.length && <p style={{ color: "var(--text-muted)" }}>Sin avisos en los últimos días.</p>}
+          {avisos.map((a) => (
+            <div key={a.slug} style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--border, rgba(127,127,127,.25))" }}>
+              <span style={{ color: "var(--text-muted)", minWidth: 92, fontSize: 14 }}>{a.fecha} · {a.hora}</span>
+              <Link href={`/noticia/${a.slug}`}>{a.titulo}</Link>
+            </div>
+          ))}
+
+          <h2 style={{ fontSize: 20, margin: "24px 0 8px" }}>Incidentes detectados</h2>
           {!s?.incidentes.length && <p style={{ color: "var(--text-muted)" }}>No hay incidentes reportados.</p>}
           {s?.incidentes.slice(0, 12).map((i) => (
             <div key={i.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border, rgba(127,127,127,.25))" }}>
@@ -85,7 +94,7 @@ export default async function TraficoPage() {
             </a>
           )}
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
-            Tiempos e incidentes: TomTom Traffic. Pueden tener unos minutos de retraso. Emergencias: 911.
+            Tiempos e incidentes detectados: TomTom Traffic, pueden tener unos minutos de retraso. Avisos: Tránsito, Protección Civil y redacción QPV. Emergencias: 911.
           </p>
         </section>
       </div>

@@ -3,7 +3,7 @@ import { isAutoPublishEligible, isHumanReviewEligible } from "./storyGraph";
 import { generateArticleDraft, isAiConfigured } from "./generateArticle";
 import { parseArticleDraft, looksLikeInsufficientMaterial, isBadTitle } from "./articleFormat";
 import { generateArticleImage } from "./generateImage";
-import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles, publishArticle, type RecentTitle } from "../db/articles";
+import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles, publishArticle, DuplicateArticleError, type RecentTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { sortByEditorialFocus, isOffTopicStory, isOfficialBulletinStory } from "./localFocus";
 import { loadSkips, saveSkips } from "./skipMemory";
@@ -155,13 +155,14 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         throw new StorySkipped(`Ya existe un artículo muy similar recientemente (${similarSlug}) — se omite para no duplicar.`, 6 * HOUR);
       }
 
-      // Foto oficial (si la fuente es institución) + tarjeta para redes. Ya no se generan imágenes con IA.
+      // Foto real de la fuente (con crédito) + postal de color para redes. Ya no se generan imágenes con IA.
       const primarySource = story.items[0];
       const generatedImage = await generateArticleImage({
         title,
         excerpt,
         categorySlug: primarySource.categoryGuess,
         sourceUrl: primarySource.link,
+        sourceName: primarySource.sourceName,
       });
 
       const automatic = isAutoPublishEligible(story);
@@ -177,6 +178,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         imageCredit: generatedImage?.credit,
         imageLicenseStatus: generatedImage?.licenseStatus,
         status: automatic ? "published" : "pending_review",
+        permitirParecida: isBulletin,
       });
       if (automatic) {
         result.autoPublished++;
@@ -194,6 +196,13 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
       createdThisRun++;
       recentTitles.push({ slug, title });
     } catch (err) {
+      if (err instanceof DuplicateArticleError) {
+        // Otra corrida (o una nota parecida) ya la publicó: no es error, se descarta la historia.
+        result.sameAsPublished++;
+        skips[story.storyId] = { until: Date.now() + 24 * HOUR, reason: err.message.slice(0, 200) };
+        skipsChanged = true;
+        continue;
+      }
       const message = err instanceof Error ? err.message : "Error desconocido";
       result.errors.push({ storyId: story.storyId, error: message });
       // Solo se anotan los descartes de la historia en sí. Una falla

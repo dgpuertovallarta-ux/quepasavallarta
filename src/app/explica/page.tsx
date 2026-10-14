@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { EXPLICA } from "@/lib/data";
 import { DemoTag } from "@/components/cards";
-import { newsImageSrc, uniqueIllustrations } from "@/lib/photos";
+import { uniqueIllustrations } from "@/lib/photos";
+import NewsVisual from "@/components/NewsVisual";
 import { fmtDate } from "@/lib/format";
 import { getPublishedExplainers } from "@/lib/db/articles";
 
@@ -27,7 +27,7 @@ export default async function ExplicaIndexPage() {
         {items.map((e) => (
           <Link key={e.slug} href={`/explica/${e.slug}`} className="card" style={{ textDecoration: "none", color: "inherit" }}>
             <div className="card-media">
-              <Image src={newsImageSrc(e)} alt={e.title} fill sizes="(max-width: 720px) 100vw, 50vw" unoptimized={!!e.imageUrl} />
+              <NewsVisual n={e} alt={e.title} sizes="(max-width: 720px) 100vw, 50vw" credito={false} seccion="Vallarta Explica" />
               <span className="chip" style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}>
                 {e.isDemo ? <DemoTag /> : "Explica"}
               </span>

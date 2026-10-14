@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCategoryName, AUTHORS, type NewsItem, type EventItem, type Business, type Media } from "@/lib/data";
-import { PHOTOS, PHOTO_CREDITS, newsImageSrc } from "@/lib/photos";
+import { PHOTOS, PHOTO_CREDITS } from "@/lib/photos";
+import NewsVisual from "./NewsVisual";
 import { eventDateLabel } from "@/lib/events";
 import { timeAgo, fmtDate } from "@/lib/format";
 
@@ -73,15 +74,9 @@ export function NewsCard({
 }) {
   return (
     <article className="card">
-      <CardMedia
-        media={n.media}
-        image={n.image}
-        imageUrl={n.imageUrl}
-        imageCredit={n.imageCredit}
-        alt={n.title}
-        square={square}
-        priority={priority}
-      />
+      <div className={`card-media${square ? " square" : ""}`}>
+        <NewsVisual n={n} alt={n.title} priority={priority} />
+      </div>
       <div className="card-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
         <h3 className="card-title">
@@ -109,7 +104,7 @@ export function NewsListItem({ n }: { n: NewsItem }) {
   return (
     <div className="card-list-item">
       <div className="card-list-thumb" style={{ position: "relative", overflow: "hidden" }}>
-        <Image src={newsImageSrc(n)} alt="" fill sizes="84px" style={{ objectFit: "cover" }} unoptimized={!!n.imageUrl} />
+        <NewsVisual n={n} sizes="104px" credito={false} pequena />
       </div>
       <div className="card-list-body">
         <span className="card-kicker">{getCategoryName(n.category)}</span>
@@ -125,7 +120,7 @@ export function NewsListItem({ n }: { n: NewsItem }) {
 export function HeroCard({ n }: { n: NewsItem }) {
   return (
     <article className="hero-photo">
-      <Image src={newsImageSrc(n)} alt={n.title} fill sizes="(max-width: 900px) 100vw, 66vw" priority unoptimized={!!n.imageUrl} />
+      <NewsVisual n={n} alt={n.title} sizes="(max-width: 900px) 100vw, 66vw" priority credito={false} fondo />
       <div className="hero-photo-body">
         {n.breaking ? (
           <span className="chip chip-breaking">Última hora</span>

@@ -3,7 +3,9 @@
  *  - Mide 7 corredores (tiempo con tráfico vs. normal) e incidentes de TomTom.
  *  - Accidentes, cierres e inundaciones: borrador en la cola de aprobación del
  *    panel (no se publican solos: el dato automático puede estar desfasado).
- *  - Tráfico pesado en un corredor: aviso a la cola de redes con tarjeta de mapa.
+ *  - Tráfico pesado en un corredor: postal amarilla "Reporte vial" a la cola de redes.
+ *  - 8:00, 14:00 y 18:00: postal azul "Así va el tráfico" con el semáforo de
+ *    las vialidades y los avisos oficiales de Tránsito de las últimas horas.
  *  - Guarda la última medición para la página pública /trafico.
  * Sin TOMTOM_API_KEY no hace nada.
  */
@@ -11,7 +13,9 @@ import { getStore } from "@netlify/blobs";
 import { CORREDORES } from "./corredores";
 import { incidentes, medirCorredor, type EstadoCorredor, type Incidente } from "./tomtom";
 import { encolarRedes } from "../qpv/colaRedes";
-import { crearTarjetaMapa } from "../qpv/tarjetas";
+import { crearReporteVial, crearResumenVial, horaLocal as horaTexto } from "../qpv/tarjetas";
+import { getPool } from "../db/client";
+import type { Semaforo } from "@/components/social/TarjetaVial";
 import { publishArticle, getRecentArticleTitles, findDuplicateTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { siteUrl } from "../storage/imageBlobs";
@@ -88,20 +92,125 @@ export async function correrMonitor(): Promise<string> {
     }
   }
 
-  // 2) Corredores con retraso fuerte → aviso a redes con mapa ("Si vas para…")
+  // 2) Corredores con retraso fuerte → postal amarilla de QPV al Volante a la cola de redes
   for (const c of corredores.filter((x) => x.nivel === "pesado")) {
     if (reciente("corr:" + c.id)) continue;
     const def = CORREDORES.find((x) => x.id === c.id)!;
-    const lat = (def.origen[0] + def.destino[0]) / 2;
-    const lon = (def.origen[1] + def.destino[1]) / 2;
-    const titulo = def.gancho;
-    const detalle = `${c.minutos} min (normal: ${c.minutosLibre}) · +${c.retrasoMin} min de retraso`;
-    const imageUrl = await crearTarjetaMapa({ titulo, lugar: c.nombre.split("(")[0].trim(), detalle, lat, lon });
-    await encolarRedes({ title: titulo, excerpt: detalle, articleUrl: `${siteUrl()}/trafico`, imageUrl });
+    const imageUrl = await crearReporteVial({
+      hora: horaTexto(),
+      tipo: "TRÁFICO PESADO",
+      tipoColor: "rojo",
+      titulo: def.gancho,
+      lugar: c.nombre,
+      datos: [
+        { k: "Tiempo ahora", v: `${c.minutos} min` },
+        { k: "Sin tráfico", v: `${c.minutosLibre} min` },
+        { k: "Retraso", v: `+${c.retrasoMin} min` },
+        { k: "Estatus", v: "Medición automática" },
+      ],
+      fuente: "Monitor QPV al Volante · datos TomTom",
+    });
+    await encolarRedes({
+      title: `🚗 ${def.gancho}: ${c.minutos} min (normalmente ${c.minutosLibre}), +${c.retrasoMin} min de retraso`,
+      excerpt: "Tráfico en vivo",
+      articleUrl: `${siteUrl()}/trafico`,
+      imageUrl: imageUrl ?? undefined,
+    });
     avisados["corr:" + c.id] = new Date().toISOString();
     avisos++;
   }
 
+  // 3) Resumen vial a las 8:00, 14:00 y 18:00 (postal azul con el semáforo)
+  let resumen = "";
+  const slot = [8, 14, 18].find((x) => x === h);
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  if (slot !== undefined && corredores.length && !avisados[`resumen:${hoy}:${slot}`]) {
+    resumen = await publicarResumen(corredores, incs, slot);
+    avisados[`resumen:${hoy}:${slot}`] = new Date().toISOString();
+  }
+
   await s.setJSON("avisados", avisados);
-  return `Incidentes: ${incs.length} · corredores: ${corredores.length} · borradores para aprobar: ${borradores} · avisos a redes: ${avisos}`;
+  return `Incidentes: ${incs.length} · corredores: ${corredores.length} · borradores para aprobar: ${borradores} · avisos a redes: ${avisos}${resumen ? ` · ${resumen}` : ""}`;
+}
+
+const SEM: Record<EstadoCorredor["nivel"], Semaforo> = { pesado: "rojo", lento: "ambar", fluido: "verde" };
+const NOMBRE_CORTO: Record<string, string> = {
+  "ameca-sur": "Puente del Ameca → Vallarta",
+  "ameca-norte": "Vallarta → Puente del Ameca",
+  "medina-ascencio": "Medina Ascencio → Centro",
+  "medina-norte": "Medina Ascencio → Aeropuerto",
+  bucerias: "Bucerías → Aeropuerto",
+  pitillal: "El Pitillal → Zona Hotelera",
+  sur: "Centro → Mismaloya",
+};
+
+/** Avisos viales oficiales publicados en el sitio en las últimas horas (categoría Tránsito). */
+async function avisosOficialesRecientes(horas: number): Promise<{ hora: string; titulo: string }[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const { rows } = await getPool().query<{ title: string; published_at: string }>(
+      `select a.title, a.published_at from articles a join categories c on c.id = a.category_id
+        where a.status = 'published' and c.slug = 'transito' and a.published_at > now() - interval '1 hour' * $1
+        order by a.published_at desc limit 3`,
+      [horas]
+    );
+    return rows.map((r) => ({ hora: horaTexto(new Date(r.published_at)), titulo: r.title }));
+  } catch {
+    return [];
+  }
+}
+
+async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], slot: number): Promise<string> {
+  const items: { hora?: string; sem: Semaforo; t: string; d?: string }[] = [];
+  // Primero lo que está cargado, luego lo que fluye
+  const orden = [...corredores].sort((a, b) => b.retrasoMin - a.retrasoMin);
+  const oficiales = await avisosOficialesRecientes(6);
+  // 4 renglones: hasta 3 vialidades (las más cargadas) y el aviso oficial más reciente
+  for (const c of orden.slice(0, oficiales.length ? 3 : 4)) {
+    items.push({
+      sem: SEM[c.nivel],
+      t: NOMBRE_CORTO[c.id] ?? c.nombre,
+      d: c.retrasoMin > 0 ? `${c.minutos} min · +${c.retrasoMin} min de retraso` : `${c.minutos} min · fluye normal`,
+    });
+  }
+  for (const a of oficiales.slice(0, 1)) {
+    items.push({ sem: "ambar", t: a.titulo.length > 60 ? a.titulo.slice(0, 57) + "…" : a.titulo, d: `Aviso oficial · ${a.hora}` });
+  }
+  const graves = incs.filter((i) => i.tipo === "cierre" || i.tipo === "accidente" || i.tipo === "inundacion").length;
+  const momento = slot === 8 ? "de la mañana" : slot === 14 ? "del mediodía" : "de la tarde";
+  const fecha = new Date().toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", weekday: "long", day: "numeric", month: "long" });
+  const imageUrl = await crearResumenVial({
+    hora: horaTexto(),
+    titulo: "Así va el tráfico en Vallarta",
+    sub: `Resumen ${momento} · ${fecha}`,
+    items: items.slice(0, 4),
+    fuente: oficiales.length ? "Monitor QPV al Volante (TomTom) y avisos oficiales" : "Monitor QPV al Volante · datos TomTom",
+  });
+  const cargadas = orden.filter((c) => c.nivel === "pesado").map((c) => NOMBRE_CORTO[c.id] ?? c.nombre);
+  const titulo = cargadas.length
+    ? `🚦 Así va el tráfico en Vallarta. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
+    : `🚦 Así va el tráfico en Vallarta: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
+  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl: imageUrl ?? undefined });
+  return `resumen vial ${slot}:00 enviado a la cola`;
+}
+
+/** Para la página /trafico: últimos avisos de tránsito publicados en el sitio (oficiales y redacción). */
+export async function avisosTransito(limite = 8): Promise<{ slug: string; titulo: string; hora: string; fecha: string }[]> {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    const { rows } = await getPool().query<{ slug: string; title: string; published_at: string }>(
+      `select a.slug, a.title, a.published_at from articles a join categories c on c.id = a.category_id
+        where a.status = 'published' and c.slug = 'transito' and a.published_at > now() - interval '3 days'
+        order by a.published_at desc limit $1`,
+      [limite]
+    );
+    return rows.map((r) => ({
+      slug: r.slug,
+      titulo: r.title,
+      hora: horaTexto(new Date(r.published_at)),
+      fecha: new Date(r.published_at).toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", day: "numeric", month: "short" }),
+    }));
+  } catch {
+    return [];
+  }
 }

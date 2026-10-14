@@ -1,9 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import { redireccionDuplicada } from "@/lib/qpv/duplicados";
 import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data";
 import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
-import { newsImageSrc, socialImageSrc, photoCreditLabel } from "@/lib/photos";
+import { socialImageSrc, photoCreditLabel } from "@/lib/photos";
 import ArticleBody from "@/components/ArticleBody";
 import AdSlot from "@/components/AdSlot";
 import { getSponsor } from "@/lib/business/db";
@@ -54,7 +55,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const n = await findArticle(slug);
-  if (!n) notFound();
+  if (!n) {
+    // Nota quitada por repetida: su enlace lleva a la que se quedó (ver lib/qpv/duplicados.ts).
+    const destino = await redireccionDuplicada(slug);
+    if (destino) permanentRedirect(`/noticia/${destino}`);
+    notFound();
+  }
 
   const relatedReal = n.isDemo ? [] : await getPublishedArticlesByCategory(n.category, 5);
   const sponsor = n.isDemo ? null : await getSponsor(n.slug);
@@ -128,12 +134,15 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         <Byline n={n} />
       </div>
 
-      <figure className="article-figure">
-        <div className="card-media">
-          <Image src={newsImageSrc(n)} alt={n.title} fill sizes="(max-width: 1040px) 100vw, 980px" priority unoptimized={!!n.imageUrl} />
-          <span className="photo-tag">{photoCreditLabel(n)}</span>
-        </div>
-      </figure>
+      {/* Solo foto si es de la nota; sin foto propia la nota va directo al texto. */}
+      {n.imageUrl && (
+        <figure className="article-figure">
+          <div className="card-media">
+            <Image src={n.imageUrl} alt={n.title} fill sizes="(max-width: 1040px) 100vw, 980px" priority unoptimized />
+            <span className="photo-tag">{photoCreditLabel(n)}</span>
+          </div>
+        </figure>
+      )}
 
       <ArticleBody paragraphs={n.body} />
 

@@ -134,3 +134,10 @@ function normalizarUrl(u: string): string {
     return u.toLowerCase();
   }
 }
+
+/** Parecido 0–1 entre dos textos (palabras clave en común), sin reglas de anclas. */
+export function parecido(a: string, b: string): number {
+  const ta = new Set(tokens(a));
+  const tb = new Set(tokens(b));
+  return Math.max(jaccard(ta, tb), contencion(ta, tb) * 0.6);
+}

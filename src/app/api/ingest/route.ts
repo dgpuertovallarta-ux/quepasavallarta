@@ -8,6 +8,8 @@ import { runAutoPublish, type AutoPublishResult } from "@/lib/ingest/autoPublish
 import { runExplicaPublish, type ExplicaPublishResult } from "@/lib/ingest/explicaPublish";
 import type { IngestedItem } from "@/lib/ingest/types";
 import { procesarColaRedes } from "@/lib/qpv/colaRedes";
+import { runImageBackfill } from "@/lib/ingest/backfillImages";
+import { limpiarDuplicados } from "@/lib/qpv/duplicados";
 
 export const maxDuration = 60;
 
@@ -103,9 +105,18 @@ async function runIngest() {
 
   // Cola de Facebook/Instagram: sale como máximo una nota por corrida, respetando límites (ver lib/qpv/colaRedes.ts).
   const socialQueue = await procesarColaRedes();
+  // Notas repetidas que ya hayan salido: se quitan y su enlace redirige a la buena (ver lib/qpv/duplicados.ts).
+  const duplicates = isDatabaseConfigured() ? await limpiarDuplicados() : "Sin base de datos.";
+  // Fotos reales para notas viejas (las que tenían IA o ninguna): unas pocas por corrida.
+  const realPhotos =
+    Date.now() - startedAt < 35_000
+      ? await runImageBackfill(4).catch((err) => ({ error: err instanceof Error ? err.message : String(err) }))
+      : "Sin tiempo en esta corrida.";
 
   const summary = {
     socialQueue,
+    duplicates,
+    realPhotos,
     fetchedAt: new Date().toISOString(),
     sourcesQueried: SOURCES.length,
     sourcesOk: results.filter((r) => r.ok).length,
@@ -129,6 +140,8 @@ async function runIngest() {
       storiesFound: summary.storiesFound,
       autoPublish,
       socialQueue,
+      realPhotos,
+      duplicates,
       sourceErrors: results.filter((r) => !r.ok && r.error && !r.error.startsWith("Fuente no verificada")).map((r) => `${r.sourceId}: ${r.error}`),
     })
   );

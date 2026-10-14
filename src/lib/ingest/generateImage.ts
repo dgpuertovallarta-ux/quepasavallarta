@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { saveImageBlob } from "../storage/imageBlobs";
 import { extractOgImage } from "./extractImage";
-import { creditoOficial } from "../qpv/oficiales";
-import { crearTarjeta, imagenComoDataUri } from "../qpv/tarjetas";
+import { fotoDeFuente } from "../qpv/fotoFuente";
+import { crearTarjeta } from "../qpv/tarjetas";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 
@@ -271,10 +271,10 @@ async function generateAiImage(input: {
 
 /**
  * Imagen de una nota (reemplaza la generación con IA):
- *  - Si la fuente es una institución oficial (Ayuntamiento, SEAPAL, Fiscalía,
- *    Protección Civil…), se usa su foto con crédito, re-alojada en /api/image.
- *  - Si no, el artículo queda sin imagen propia y el sitio muestra la foto
- *    REAL ilustrativa de su categoría (banco de Wikimedia, photos.ts).
+ *  - La foto REAL de la nota original (institución oficial o medio), con su
+ *    crédito, re-alojada en /api/image — ver lib/qpv/fotoFuente.ts.
+ *  - Si la fuente no tiene foto, el sitio muestra la pleca de color de la
+ *    sección (NewsVisual.tsx), nunca una foto que no tiene que ver.
  *  - En ambos casos se arma la tarjeta para redes (ver lib/qpv/tarjetas.tsx).
  * Nunca lanza.
  */
@@ -283,30 +283,16 @@ export async function generateArticleImage(input: {
   excerpt: string;
   categorySlug: string;
   sourceUrl?: string;
+  sourceName?: string;
 }): Promise<GeneratedImage | null> {
   if (isImageAiConfigured()) return generateAiImage(input);
 
-  let url: string | undefined;
-  let credit: string | undefined;
-  let fotoFuente: string | undefined;
-  const oficial = creditoOficial(input.sourceUrl);
-  if (input.sourceUrl && oficial) {
-    try {
-      const og = await extractOgImage(input.sourceUrl);
-      if (og) {
-        fotoFuente = og.url;
-        const dataUri = await imagenComoDataUri(og.url);
-        if (dataUri) {
-          const [meta, b64] = dataUri.split(",");
-          const tipo = meta.slice(5, meta.indexOf(";"));
-          url = (await saveImageBlob(Buffer.from(b64, "base64"), tipo)).url;
-          credit = oficial;
-        }
-      }
-    } catch (err) {
-      console.error("[generateArticleImage] Foto oficial:", err instanceof Error ? err.message : err);
-    }
-  }
+  // Foto real de la fuente (oficial o medio, con crédito) — ver lib/qpv/fotoFuente.ts
+  const foto = await fotoDeFuente(input.sourceUrl, input.sourceName);
+  const url = foto?.url;
+  const credit = foto?.credito;
+  // La tarjeta de redes solo usa la foto si es oficial (tarjetas.tsx lo verifica).
+  const fotoFuente = foto?.oficial ? foto.urlOriginal : undefined;
 
   const cardUrl = await crearTarjeta({
     titulo: input.title,

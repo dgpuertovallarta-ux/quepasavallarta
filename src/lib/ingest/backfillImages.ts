@@ -1,60 +1,46 @@
-import { generateArticleImage, isImageAiConfigured } from "./generateImage";
-import { getArticlesNeedingImageBackfill, updateArticleImage } from "../db/articles";
+import { getArticlesNeedingRealPhoto, setArticleRealPhoto } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
+import { fotoDeFuente } from "../qpv/fotoFuente";
 
-// Cada artículo tarda unos segundos (llamada a Gemini + guardar en Netlify
-// Blobs). Subido de 2 a 5 (2026-09) — con 151 artículos pendientes del
-// backfill, 2 por corrida era demasiado lento para procesarlos a mano.
-// Este endpoint (a diferencia de /api/ingest) no descarga fuentes RSS
-// primero, así que tiene más margen de tiempo por corrida. Se corre
-// llamando al endpoint varias veces seguidas hasta que "remaining" salga
-// en false; si empieza a fallar por timeout, bajar este número de nuevo.
-const MAX_BACKFILL_PER_RUN = 5;
+/**
+ * Cambia la imagen de las notas YA publicadas por la foto REAL de su fuente
+ * (2026-10): las que tenían imagen de IA y las que no tenían ninguna.
+ * Si la fuente no tiene foto utilizable, la nota queda con la pleca de color
+ * de su sección y no se vuelve a intentar.
+ *
+ * Corre solo en cada /api/ingest (pocas por corrida) y también a mano en
+ * GET /api/backfill-images (repetir hasta que "remaining" salga en false).
+ */
+const MAX_POR_CORRIDA = 6;
 
 export type BackfillResult = {
   attempted: number;
   updated: number;
+  sinFoto: number;
   errors: { slug: string; error: string }[];
-  /** true si probablemente queden más artículos por procesar — hay que volver a llamar este endpoint. */
   remaining: boolean;
 };
 
-/**
- * Repasa artículos YA publicados (noticias y Vallarta Explica) que se
- * publicaron antes de que existiera generateImage.ts, y por eso siguen
- * mostrando la foto ilustrativa repetida por categoría — les genera una
- * imagen propia con IA y reemplaza `image_url`. Decisión del propietario
- * (2026-09): "ya no quiero fotos repetidas en las noticias viejas".
- */
-export async function runImageBackfill(): Promise<BackfillResult> {
-  const result: BackfillResult = { attempted: 0, updated: 0, errors: [], remaining: false };
-  if (!isImageAiConfigured() || !isDatabaseConfigured()) return result;
+export async function runImageBackfill(max = MAX_POR_CORRIDA): Promise<BackfillResult> {
+  const result: BackfillResult = { attempted: 0, updated: 0, sinFoto: 0, errors: [], remaining: false };
+  if (!isDatabaseConfigured()) return result;
 
-  // Pedimos uno más del límite del lote solo para saber si queda trabajo
-  // pendiente, sin tener que hacer una segunda consulta de conteo.
-  const candidates = await getArticlesNeedingImageBackfill(MAX_BACKFILL_PER_RUN + 1);
-  result.remaining = candidates.length > MAX_BACKFILL_PER_RUN;
-  const batch = candidates.slice(0, MAX_BACKFILL_PER_RUN);
+  const candidates = await getArticlesNeedingRealPhoto(max + 1);
+  result.remaining = candidates.length > max;
 
-  for (const article of batch) {
-    result.attempted++;
-    try {
-      const generated = await generateArticleImage({
-        title: article.title,
-        excerpt: article.excerpt,
-        categorySlug: article.categorySlug,
-        sourceUrl: article.sourceUrl,
-      });
-      if (!generated?.url) {
-        result.errors.push({ slug: article.slug, error: "La IA no devolvió una imagen." });
-        continue;
+  // En paralelo: cada búsqueda tarda hasta ~16 s (página + foto), así el lote cabe en la corrida.
+  await Promise.all(
+    candidates.slice(0, max).map(async (a) => {
+      result.attempted++;
+      try {
+        const foto = await fotoDeFuente(a.sourceUrl, a.sourceName);
+        await setArticleRealPhoto(a.slug, foto ? { imageUrl: foto.url, imageCredit: foto.credito, imageSourceUrl: foto.urlOriginal } : null);
+        if (foto) result.updated++;
+        else result.sinFoto++;
+      } catch (err) {
+        result.errors.push({ slug: a.slug, error: err instanceof Error ? err.message : "Error desconocido" });
       }
-      await updateArticleImage(article.slug, { imageUrl: generated.url, imageCredit: "Imagen generada con IA" });
-      result.updated++;
-    } catch (err) {
-      result.errors.push({ slug: article.slug, error: err instanceof Error ? err.message : "Error desconocido" });
-    }
-  }
-
+    })
+  );
   return result;
 }

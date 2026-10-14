@@ -4,8 +4,9 @@ import { runImageBackfill } from "@/lib/ingest/backfillImages";
 export const maxDuration = 60;
 
 /**
- * Regenera con IA la imagen de artículos ya publicados que todavía tienen
- * la foto ilustrativa repetida por categoría (ver backfillImages.ts).
+ * Pone la foto REAL de su fuente a las notas ya publicadas que tenían
+ * imagen de IA o ninguna (ver backfillImages.ts). También corre solo en
+ * cada /api/ingest.
  *
  * Uso: entra a esta URL en el navegador (GET /api/backfill-images) y
  * vuelve a recargar la página varias veces seguidas — cada visita procesa

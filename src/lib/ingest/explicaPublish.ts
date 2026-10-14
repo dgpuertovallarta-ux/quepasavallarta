@@ -71,6 +71,7 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
         excerpt,
         categorySlug: primarySource.categoryGuess,
         sourceUrl: primarySource.link,
+        sourceName: primarySource.sourceName,
       });
 
       await publishArticle({

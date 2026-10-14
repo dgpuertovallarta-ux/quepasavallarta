@@ -26,6 +26,13 @@ export function getPool(): Pool {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.DATABASE_URL.includes("localhost") ? undefined : { rejectUnauthorized: false },
+      // Cada función de Netlify abre su propio pool; con el default (10) unas
+      // cuantas visitas a la vez llenaban el límite de 200 conexiones de la
+      // base y las notas daban error 500 (2026-10). Pocas por instancia y se
+      // sueltan rápido.
+      max: 3,
+      idleTimeoutMillis: 5_000,
+      connectionTimeoutMillis: 10_000,
     });
   }
   return pool;

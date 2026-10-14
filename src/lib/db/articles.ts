@@ -1,4 +1,4 @@
-import { esDuplicada } from "../qpv/dedupe";
+import { esDuplicada, parecido } from "../qpv/dedupe";
 import { getPool, isDatabaseConfigured } from "./client";
 import type { NewsItem, Media, ExplicaItem } from "../data";
 import { illustrationFor } from "../photos";
@@ -464,7 +464,7 @@ export function dropNearDuplicates<T extends { title: string; publishedAt: strin
   return kept.map((k) => items[k]);
 }
 
-export type RecentTitle = { slug: string; title: string };
+export type RecentTitle = { slug: string; title: string; excerpt?: string | null };
 
 /**
  * ¿Este título cuenta el mismo hecho que alguna nota ya publicada?
@@ -485,7 +485,16 @@ export type RecentTitle = { slug: string; title: string };
  * los duplicados reales (Volaris, Profepa, IMSS-VPH, Capitán Sol) y deja
  * pasar notas distintas del mismo huracán.
  */
-export function findDuplicateTitle(title: string, recent: RecentTitle[]): string | null {
+export function findDuplicateTitle(title: string, recent: RecentTitle[], excerpt?: string): string | null {
+  // Con resumen: el mismo hecho contado con otras palabras ("Reconocen… VIH" /
+  // "Distinguen… COMUSIDA") se parece más en el resumen que en el título.
+  if (excerpt) {
+    const conResumen = esDuplicada(
+      { titulo: title, resumen: excerpt },
+      recent.filter((r) => r.excerpt).map((r) => ({ id: r.slug, titulo: r.title, resumen: r.excerpt ?? undefined }))
+    );
+    if (conResumen.duplicada && conResumen.de.id && conResumen.parecido >= 0.3) return conResumen.de.id;
+  }
   // Filtro reforzado (2026-10): además de las palabras del título, compara
   // lugares, instituciones, cifras y nombres propios — así "Aseguran a un
   // sujeto en San Vicente…" y "Capturan en San Vicente a sujeto…" ya se
@@ -515,7 +524,7 @@ export async function getRecentArticleTitles(opts: { sinceDays?: number; isExpla
   const { sinceDays = 3, isExplainer = false } = opts;
   const pool = getPool();
   const res = await pool.query<RecentTitle>(
-    `select slug, title from articles
+    `select slug, title, excerpt from articles
       where ((status = 'published' and published_at > now() - interval '1 day' * $1)
           or (status = 'pending_review' and drafted_at > now() - interval '1 day' * $1))
         and is_explainer = $2`,
@@ -589,7 +598,22 @@ export type PublishArticleInput = {
   isExplainer?: boolean;
   /** Nuevos borradores automáticos/manualmente preparados esperan aprobación antes de hacerse públicos. */
   status?: "published" | "pending_review";
+  /** Boletines oficiales periódicos (aviso de huracán cada 3 h): se parecen al anterior a propósito; no se frenan por parecido. */
+  permitirParecida?: boolean;
 };
+
+/** La nota ya existe (misma historia o casi el mismo título): no se inserta. */
+export class DuplicateArticleError extends Error {
+  constructor(public readonly existingSlug: string, motivo: string) {
+    super(`Nota repetida (${motivo}): ya existe "${existingSlug}".`);
+    this.name = "DuplicateArticleError";
+  }
+}
+
+// Candado de Postgres para publicar de a una nota a la vez: si dos corridas
+// de /api/ingest coinciden (pasaba: notas repetidas publicadas en el mismo
+// minuto), la segunda espera y ve la nota de la primera antes de insertar.
+const LOCK_PUBLICAR = 7_204_2026;
 
 /**
  * Guarda un artículo como pendiente de revisión o publicado según la
@@ -611,6 +635,33 @@ export async function publishArticle(input: PublishArticleInput): Promise<{ slug
     if (input.storyExternalKey) {
       const storyRes = await client.query<{ id: string }>("select id from stories where external_key = $1", [input.storyExternalKey]);
       storyId = storyRes.rows[0]?.id || null;
+    }
+
+    // Revisión de duplicados DENTRO de la transacción y con candado (ver LOCK_PUBLICAR).
+    await client.query("select pg_advisory_xact_lock($1)", [LOCK_PUBLICAR]);
+    if (storyId) {
+      const same = await client.query<{ slug: string }>(
+        "select slug from articles where story_id = $1 and status in ('published', 'pending_review') limit 1",
+        [storyId]
+      );
+      if (same.rows[0]) throw new DuplicateArticleError(same.rows[0].slug, "misma historia");
+    }
+    if (!input.permitirParecida) {
+      const recientes = await client.query<RecentTitle & { reciente: boolean }>(
+        `select slug, title, excerpt,
+                coalesce(published_at, drafted_at) > now() - interval '30 minutes' as reciente
+           from articles
+          where ((status = 'published' and published_at > now() - interval '3 days')
+              or (status = 'pending_review' and drafted_at > now() - interval '3 days'))
+            and is_explainer = $1`,
+        [!!input.isExplainer]
+      );
+      const parecida = findDuplicateTitle(input.title, recientes.rows, input.excerpt);
+      if (parecida) throw new DuplicateArticleError(parecida, "título casi igual");
+      // Mismo tema en la última media hora (dos redacciones del mismo hecho)
+      const txt = `${input.title} ${input.excerpt}`;
+      const mismoTema = recientes.rows.find((r) => r.reciente && parecido(txt, `${r.title} ${r.excerpt ?? ""}`) >= 0.25);
+      if (mismoTema) throw new DuplicateArticleError(mismoTema.slug, "mismo tema en la última media hora");
     }
 
     let slug = slugify(input.title);
@@ -821,3 +872,53 @@ export async function updateArticleImage(
     [input.imageUrl, input.imageCredit, slug]
   );
 }
+
+/**
+ * Notas publicadas que todavía no tienen foto REAL (tenían imagen de IA o
+ * ninguna) y a las que no se les ha buscado la foto de su fuente.
+ * Ver lib/ingest/backfillImages.ts.
+ */
+export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: string; sourceUrl: string; sourceName: string | null }[]> {
+  if (!isDatabaseConfigured()) return [];
+  const res = await getPool().query<{ slug: string; source_url: string; source_name: string | null }>(
+    `select a.slug, ss.url as source_url, s.name as source_name
+     from articles a
+     join story_sources ss on ss.story_id = a.story_id
+     left join sources s on s.id = ss.source_id
+     where a.status = 'published' and ss.url is not null
+       and (
+         a.image_license_status = 'ai_generated'
+         or a.image_credit ilike '%generada con ia%'
+         or (a.image_url is null and a.image_extracted_at is null)
+       )
+     order by a.published_at desc nulls last
+     limit $1`,
+    [limit * 3]
+  );
+  const seen = new Set<string>();
+  const out: { slug: string; sourceUrl: string; sourceName: string | null }[] = [];
+  for (const r of res.rows) {
+    if (seen.has(r.slug)) continue;
+    seen.add(r.slug);
+    out.push({ slug: r.slug, sourceUrl: r.source_url, sourceName: r.source_name });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/** Guarda la foto real de la fuente; con `foto` null marca la nota como "ya se buscó, no tiene" (queda con la pleca de color). */
+export async function setArticleRealPhoto(
+  slug: string,
+  foto: { imageUrl: string; imageCredit: string; imageSourceUrl: string } | null
+): Promise<void> {
+  await getPool().query(
+    `update articles
+     set image_url = $1, image_credit = $2, image_source_url = $3,
+         image_license_status = $4, image_extracted_at = now(), updated_at = now()
+     where slug = $5`,
+    foto
+      ? [foto.imageUrl, foto.imageCredit, foto.imageSourceUrl, "source_unlicensed", slug]
+      : [null, null, null, "illustrative_fallback", slug]
+  );
+}
+
