@@ -15,6 +15,7 @@ const PRIMARY_FALLBACK = ["gobierno", "comunidad", "turismo"];
 const SECTIONS = [
   { href: "/", label: "Inicio" },
   { href: "/proteccion-civil", label: "Protección Civil" },
+  { href: "/trafico", label: "QPV al Volante" },
   { href: "/ahora", label: "Vallarta Ahora" },
   { href: "/explica", label: "Vallarta Explica" },
   { href: "/agenda", label: "Vive Vallarta" },
@@ -83,6 +84,7 @@ export default function Header({
     : PRIMARY_FALLBACK.slice(0, 2);
   const primary: { href: string; label: string; alert?: boolean }[] = [
     { href: "/proteccion-civil", label: "Protección Civil", alert: true },
+    { href: "/trafico", label: "Tráfico" },
     ...primarySlugs.map((slug) => ({
       href: `/categoria/${slug}`,
       label: CATEGORIES.find((c) => c.slug === slug)?.name || slug,

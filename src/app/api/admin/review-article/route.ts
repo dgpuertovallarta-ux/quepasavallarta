@@ -6,6 +6,8 @@ import { reviewPendingArticle } from "@/lib/db/articles";
 import { publishToSocial } from "@/lib/social/publishToSocial";
 import { isHurricaneSimonContent } from "@/lib/social/editorialPolicy";
 import { siteUrl } from "@/lib/storage/imageBlobs";
+import { getPublishedArticleBySlug } from "@/lib/db/articles";
+import { crearTarjeta } from "@/lib/qpv/tarjetas";
 
 async function currentAdmin() {
   const cookieStore = await cookies();
@@ -49,11 +51,19 @@ export async function POST(request: Request) {
       });
     }
 
+    // Aprobada por una persona: sale a redes en ese momento, con su tarjeta QPV (no con imagen de IA).
+    const publicada = await getPublishedArticleBySlug(article.slug).catch(() => null);
+    const cardUrl = await crearTarjeta({
+      titulo: article.title,
+      categoria: publicada?.category ?? "comunidad",
+      clave: article.slug,
+      urlFuente: publicada?.sources[0]?.url,
+    });
     const social = await publishToSocial({
       title: article.title,
       excerpt: article.excerpt,
       articleUrl: `${siteUrl()}/noticia/${article.slug}`,
-      imageUrl: article.imageUrl,
+      imageUrl: cardUrl ?? article.imageUrl,
     });
     return NextResponse.json({ reviewed: true, decision, reviewedBy: admin.displayName, published: true, social });
   } catch (err) {

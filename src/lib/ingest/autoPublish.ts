@@ -7,7 +7,7 @@ import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles
 import { isDatabaseConfigured } from "../db/client";
 import { sortByEditorialFocus, isOffTopicStory, isOfficialBulletinStory } from "./localFocus";
 import { loadSkips, saveSkips } from "./skipMemory";
-import { publishToSocial } from "../social/publishToSocial";
+import { encolarRedes } from "../qpv/colaRedes";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
 import { siteUrl } from "../storage/imageBlobs";
 
@@ -155,7 +155,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         throw new StorySkipped(`Ya existe un artículo muy similar recientemente (${similarSlug}) — se omite para no duplicar.`, 6 * HOUR);
       }
 
-      // La IA crea una imagen nueva; la foto original solo aporta contexto.
+      // Foto oficial (si la fuente es institución) + tarjeta para redes. Ya no se generan imágenes con IA.
       const primarySource = story.items[0];
       const generatedImage = await generateArticleImage({
         title,
@@ -174,8 +174,8 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         aiModel: draft.model,
         storyExternalKey: story.storyId,
         imageUrl: generatedImage?.url,
-        imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
-        imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
+        imageCredit: generatedImage?.credit,
+        imageLicenseStatus: generatedImage?.licenseStatus,
         status: automatic ? "published" : "pending_review",
       });
       if (automatic) {
@@ -184,12 +184,9 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         if (isHurricaneSimonContent(content)) {
           result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         } else {
-          const social = await publishToSocial({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage?.url });
-          result.socialResults.push({
-            storyId: story.storyId,
-            facebook: social.facebook.ok ? "published" : social.facebook.attempted ? "failed" : "skipped",
-            instagram: social.instagram.ok ? "published" : social.instagram.attempted ? "failed" : "skipped",
-          });
+          // Ya no se publica en redes al instante: entra a la cola (máximo diario y separación entre posts) — ver lib/qpv/colaRedes.ts.
+          await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage?.cardUrl ?? generatedImage?.url });
+          result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         }
       } else {
         result.queuedForReview++;

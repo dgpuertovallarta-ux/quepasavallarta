@@ -1,16 +1,28 @@
 import { GoogleGenAI } from "@google/genai";
 import { saveImageBlob } from "../storage/imageBlobs";
 import { extractOgImage } from "./extractImage";
+import { creditoOficial } from "../qpv/oficiales";
+import { crearTarjeta, imagenComoDataUri } from "../qpv/tarjetas";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 
+/**
+ * Decisión editorial (2026-10): ya NO se generan imágenes con IA para las
+ * notas — restaban credibilidad, Facebook marcaba cada post como "AI
+ * content" y en nota roja llegaron a inventar escenas de hechos reales.
+ * Solo se vuelve a activar a propósito con QPV_PERMITIR_IMAGEN_IA=1.
+ */
 export function isImageAiConfigured(): boolean {
-  return !!process.env.GEMINI_API_KEY;
+  return !!process.env.GEMINI_API_KEY && process.env.QPV_PERMITIR_IMAGEN_IA === "1";
 }
 
 export type GeneratedImage = {
-  /** URL pública real (Netlify Blobs, servida vía /api/image/[key]) — no un data URL. Publicable en Instagram/Facebook. */
-  url: string;
+  /** Foto del artículo en el sitio (solo si es foto oficial re-alojada en /api/image/…). Sin ella, el sitio usa la foto real ilustrativa de su categoría. */
+  url?: string;
+  /** Tarjeta 1080×1350 con titular y logo para Facebook/Instagram (/api/image/…). */
+  cardUrl?: string;
+  credit?: string;
+  licenseStatus?: "source_unlicensed" | "ai_generated";
   model: string;
 };
 
@@ -213,7 +225,7 @@ async function fetchReferenceImage(sourceUrl: string): Promise<{ data: string; m
  * vuelta al banco de fotos ilustrativas por categoría (mismo patrón que
  * extractOgImage antes).
  */
-export async function generateArticleImage(input: {
+async function generateAiImage(input: {
   title: string;
   excerpt: string;
   categorySlug: string;
@@ -250,9 +262,60 @@ export async function generateArticleImage(input: {
     const mimeType = imagePart.inlineData.mimeType || "image/png";
     const bytes = Buffer.from(imagePart.inlineData.data, "base64");
     const { url } = await saveImageBlob(bytes, mimeType);
-    return { url, model: IMAGE_MODEL };
+    return { url, model: IMAGE_MODEL, credit: "Imagen generada con IA", licenseStatus: "ai_generated" };
   } catch (err) {
     console.error("[generateArticleImage] Falló la generación de imagen:", err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+/**
+ * Imagen de una nota (reemplaza la generación con IA):
+ *  - Si la fuente es una institución oficial (Ayuntamiento, SEAPAL, Fiscalía,
+ *    Protección Civil…), se usa su foto con crédito, re-alojada en /api/image.
+ *  - Si no, el artículo queda sin imagen propia y el sitio muestra la foto
+ *    REAL ilustrativa de su categoría (banco de Wikimedia, photos.ts).
+ *  - En ambos casos se arma la tarjeta para redes (ver lib/qpv/tarjetas.tsx).
+ * Nunca lanza.
+ */
+export async function generateArticleImage(input: {
+  title: string;
+  excerpt: string;
+  categorySlug: string;
+  sourceUrl?: string;
+}): Promise<GeneratedImage | null> {
+  if (isImageAiConfigured()) return generateAiImage(input);
+
+  let url: string | undefined;
+  let credit: string | undefined;
+  let fotoFuente: string | undefined;
+  const oficial = creditoOficial(input.sourceUrl);
+  if (input.sourceUrl && oficial) {
+    try {
+      const og = await extractOgImage(input.sourceUrl);
+      if (og) {
+        fotoFuente = og.url;
+        const dataUri = await imagenComoDataUri(og.url);
+        if (dataUri) {
+          const [meta, b64] = dataUri.split(",");
+          const tipo = meta.slice(5, meta.indexOf(";"));
+          url = (await saveImageBlob(Buffer.from(b64, "base64"), tipo)).url;
+          credit = oficial;
+        }
+      }
+    } catch (err) {
+      console.error("[generateArticleImage] Foto oficial:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  const cardUrl = await crearTarjeta({
+    titulo: input.title,
+    categoria: input.categorySlug,
+    clave: input.title,
+    fotoFuente,
+    urlFuente: input.sourceUrl,
+  });
+
+  if (!url && !cardUrl) return null;
+  return { url, cardUrl: cardUrl ?? undefined, credit, licenseStatus: url ? "source_unlicensed" : undefined, model: "qpv-tarjeta" };
 }

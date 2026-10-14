@@ -82,8 +82,8 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
         aiModel: draft.model,
         storyExternalKey: story.storyId,
         imageUrl: generatedImage?.url,
-        imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
-        imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
+        imageCredit: generatedImage?.credit,
+        imageLicenseStatus: generatedImage?.licenseStatus,
         isExplainer: true,
         status: "pending_review",
       });

@@ -45,7 +45,7 @@ export async function runImageBackfill(): Promise<BackfillResult> {
         categorySlug: article.categorySlug,
         sourceUrl: article.sourceUrl,
       });
-      if (!generated) {
+      if (!generated?.url) {
         result.errors.push({ slug: article.slug, error: "La IA no devolvió una imagen." });
         continue;
       }

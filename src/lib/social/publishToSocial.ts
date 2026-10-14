@@ -67,17 +67,15 @@ function instagramImageUrl(imageUrl: string): string {
 function buildInstagramCaption(input: SocialPublishInput): string {
   const parts = [input.title.trim()];
   if (input.excerpt.trim()) parts.push(input.excerpt.trim());
-  parts.push("Lee la nota completa en quepasavta.com");
-  parts.push("Imagen ilustrativa generada con inteligencia artificial.");
-  parts.push("#PuertoVallarta #Vallarta #BahíaDeBanderas #Jalisco #QuéPasaVallarta #Noticias");
+  parts.push("Nota completa en quepasavta.com");
+  parts.push("#PuertoVallarta #BahíaDeBanderas #QuéPasaVallarta");
   return parts.join("\n\n").slice(0, 2100);
 }
 
+/** Facebook: una frase con el dato clave + el enlace (línea editorial 2026-10: sin párrafos ni hashtags). */
 function buildCaption(input: SocialPublishInput): string {
-  const parts = [input.title.trim()];
-  if (input.excerpt.trim()) parts.push(input.excerpt.trim());
-  parts.push(`Nota completa: ${input.articleUrl}`);
-  return parts.join("\n\n");
+  const titulo = input.title.trim().replace(/[.\s]+$/, "");
+  return `${titulo}.\n\n${input.articleUrl}`;
 }
 
 async function postToFacebook(input: SocialPublishInput): Promise<SocialPublishResult["facebook"]> {
@@ -127,7 +125,6 @@ async function postToInstagram(input: SocialPublishInput): Promise<SocialPublish
       access_token: token,
       image_url: instagramImageUrl(input.imageUrl),
       caption: buildInstagramCaption(input),
-      is_ai_generated: "true",
     });
     const createRes = await fetch(`${GRAPH_BASE}/${igUserId}/media`, { method: "POST", body: createBody });
     const createJson = (await createRes.json()) as { id?: string; error?: { message?: string } };

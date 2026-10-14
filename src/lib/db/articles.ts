@@ -1,3 +1,4 @@
+import { esDuplicada } from "../qpv/dedupe";
 import { getPool, isDatabaseConfigured } from "./client";
 import type { NewsItem, Media, ExplicaItem } from "../data";
 import { illustrationFor } from "../photos";
@@ -56,7 +57,21 @@ type ArticleRow = {
   source_name: string | null;
   image_url: string | null;
   image_credit: string | null;
+  image_license_status?: string | null;
 };
+
+/**
+ * Decisión editorial (2026-10): el sitio ya no muestra imágenes generadas con
+ * IA — restaban credibilidad y Facebook marcaba los posts como "AI content".
+ * Las notas que tenían una quedan con la foto real ilustrativa de su
+ * categoría (banco de Wikimedia, ver photos.ts). No se borra nada de la base.
+ */
+function realImageUrl(row: { image_url: string | null; image_credit?: string | null; image_license_status?: string | null }): string | undefined {
+  if (!row.image_url) return undefined;
+  if (row.image_license_status === "ai_generated") return undefined;
+  if (/generada con ia/i.test(row.image_credit || "")) return undefined;
+  return row.image_url;
+}
 
 function mapRowToNewsItem(row: ArticleRow): NewsItem {
   const category = row.category_slug || "comunidad";
@@ -82,8 +97,8 @@ function mapRowToNewsItem(row: ArticleRow): NewsItem {
     updatedAt: row.updated_at,
     media: mediaForCategory(category),
     image: illustrationFor(category, row.slug),
-    imageUrl: row.image_url || undefined,
-    imageCredit: row.image_credit || undefined,
+    imageUrl: realImageUrl(row),
+    imageCredit: realImageUrl(row) ? row.image_credit || undefined : undefined,
     sources: row.source_url ? [{ label: row.source_name || "Fuente original", url: row.source_url }] : [],
     body: fixed.bodyParagraphs,
   };
@@ -105,7 +120,7 @@ function rowsToNewsItems(rows: ArticleRow[]): NewsItem[] {
 const SELECT_BASE = `
   select
     a.slug, a.title, a.excerpt, a.body, a.news_score, a.published_at, a.updated_at,
-    a.image_url, a.image_credit,
+    a.image_url, a.image_credit, a.image_license_status,
     c.slug as category_slug,
     coalesce(au.display_name, 'Redacción Qué Pasa Vallarta') as author_name,
     ss.url as source_url,
@@ -319,8 +334,8 @@ function mapRowToExplicaItem(row: ArticleRow): ExplicaItem {
     title: fixed.title,
     dek: fixed.excerpt,
     image: illustrationFor(category, row.slug),
-    imageUrl: row.image_url || undefined,
-    imageCredit: row.image_credit || undefined,
+    imageUrl: realImageUrl(row),
+    imageCredit: realImageUrl(row) ? row.image_credit || undefined : undefined,
     publishedAt: row.published_at,
     quePaso: sectionFrom(paragraphs, /QU[EÉ] (EST[AÁ] )?PAS(Ó|O|ANDO)/i),
     porQueImporta: sectionFrom(paragraphs, /POR QU[EÉ] IMPORTA/i),
@@ -471,6 +486,12 @@ export type RecentTitle = { slug: string; title: string };
  * pasar notas distintas del mismo huracán.
  */
 export function findDuplicateTitle(title: string, recent: RecentTitle[]): string | null {
+  // Filtro reforzado (2026-10): además de las palabras del título, compara
+  // lugares, instituciones, cifras y nombres propios — así "Aseguran a un
+  // sujeto en San Vicente…" y "Capturan en San Vicente a sujeto…" ya se
+  // detectan como la misma nota. Ver lib/qpv/dedupe.ts.
+  const reforzado = esDuplicada({ titulo: title }, recent.map((r) => ({ id: r.slug, titulo: r.title })));
+  if (reforzado.duplicada && reforzado.de.id) return reforzado.de.id;
   const sets = recent.map((r) => titleTokens(r.title));
   const frequency = new Map<string, number>();
   for (const set of sets) for (const w of set) frequency.set(w, (frequency.get(w) || 0) + 1);
@@ -694,6 +715,7 @@ export type ReviewedArticle = {
   excerpt: string;
   body: string;
   imageUrl?: string;
+  imageCredit?: string;
 };
 
 /** Cambia el estado una sola vez; evita aprobar o rechazar dos veces el mismo borrador. */
@@ -711,6 +733,8 @@ export async function reviewPendingArticle(
     excerpt: string | null;
     body: string | null;
     image_url: string | null;
+    image_credit: string | null;
+    image_license_status: string | null;
   }>(
     `update articles
         set status = $2,
@@ -722,12 +746,12 @@ export async function reviewPendingArticle(
             published_at = case when $2 = 'published' then now() else null end,
             updated_at = now()
       where slug = $1 and status = 'pending_review'
-      returning slug, title, excerpt, body, image_url`,
+      returning slug, title, excerpt, body, image_url, image_credit, image_license_status`,
     [slug, status, reviewer.username, reviewer.displayName]
   );
   const row = res.rows[0];
   if (!row) return null;
-  return { slug: row.slug, title: row.title, excerpt: row.excerpt || "", body: row.body || "", imageUrl: row.image_url || undefined };
+  return { slug: row.slug, title: row.title, excerpt: row.excerpt || "", body: row.body || "", imageUrl: realImageUrl(row), imageCredit: realImageUrl(row) ? row.image_credit || undefined : undefined };
 }
 
 // ---------------------------------------------------------------------

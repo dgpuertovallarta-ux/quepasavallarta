@@ -63,8 +63,8 @@ export async function POST(request: Request) {
       aiModel,
       storyExternalKey,
       imageUrl: generatedImage?.url,
-      imageCredit: generatedImage ? "Imagen generada con IA" : undefined,
-      imageLicenseStatus: generatedImage ? "ai_generated" : undefined,
+      imageCredit: generatedImage?.credit,
+      imageLicenseStatus: generatedImage?.licenseStatus,
       status: "pending_review",
     });
     return NextResponse.json({ queuedForReview: true, slug: result.slug }, { status: 200 });

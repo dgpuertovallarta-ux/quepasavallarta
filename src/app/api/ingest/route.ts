@@ -7,6 +7,7 @@ import { isDatabaseConfigured } from "@/lib/db/client";
 import { runAutoPublish, type AutoPublishResult } from "@/lib/ingest/autoPublish";
 import { runExplicaPublish, type ExplicaPublishResult } from "@/lib/ingest/explicaPublish";
 import type { IngestedItem } from "@/lib/ingest/types";
+import { procesarColaRedes } from "@/lib/qpv/colaRedes";
 
 export const maxDuration = 60;
 
@@ -100,7 +101,11 @@ async function runIngest() {
     explicaPublish = await runExplicaPublish(stories, { startBefore: autoPublish.queuedForReview + autoPublish.autoPublished > 0 ? startedAt : retryUntil });
   }
 
+  // Cola de Facebook/Instagram: sale como máximo una nota por corrida, respetando límites (ver lib/qpv/colaRedes.ts).
+  const socialQueue = await procesarColaRedes();
+
   const summary = {
+    socialQueue,
     fetchedAt: new Date().toISOString(),
     sourcesQueried: SOURCES.length,
     sourcesOk: results.filter((r) => r.ok).length,
@@ -123,6 +128,7 @@ async function runIngest() {
       itemsFound: summary.itemsFound,
       storiesFound: summary.storiesFound,
       autoPublish,
+      socialQueue,
       sourceErrors: results.filter((r) => !r.ok && r.error && !r.error.startsWith("Fuente no verificada")).map((r) => `${r.sourceId}: ${r.error}`),
     })
   );
