@@ -40,6 +40,7 @@ async function leerTodos(): Promise<ItemRedes[]> {
 }
 
 export async function encolarRedes(n: { title: string; excerpt: string; articleUrl: string; imageUrl?: string | null }): Promise<void> {
+  if (!n.imageUrl) return; // nada sale a redes sin imagen (2026-10)
   const c = clasificar(n.title, n.excerpt);
   const item: ItemRedes = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

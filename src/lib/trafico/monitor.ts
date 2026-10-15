@@ -13,7 +13,7 @@ import { getStore } from "@netlify/blobs";
 import { CORREDORES } from "./corredores";
 import { incidentes, medirCorredor, type EstadoCorredor, type Incidente } from "./tomtom";
 import { encolarRedes } from "../qpv/colaRedes";
-import { crearReporteVial, crearResumenVial, horaLocal as horaTexto } from "../qpv/tarjetas";
+import { crearTarjetaMapa, horaLocal as horaTexto } from "../qpv/tarjetas";
 import { getPool } from "../db/client";
 import type { Semaforo } from "@/components/social/TarjetaVial";
 import { publishArticle, getRecentArticleTitles, findDuplicateTitle } from "../db/articles";
@@ -65,7 +65,13 @@ export async function correrMonitor(): Promise<string> {
   await s.setJSON("instantanea", { actualizado: new Date().toISOString(), corredores, incidentes: incs } satisfies Instantanea);
 
   const avisados = ((await s.get("avisados", { type: "json" })) ?? {}) as Record<string, string>;
-  const reciente = (k: string) => !!avisados[k] && Date.now() - new Date(avisados[k]).getTime() < HORAS_ENTRE_AVISOS * 3_600_000;
+  const reciente = (k: string) => {
+    if (!avisados[k]) return false;
+    const horas = k.startsWith("inc:") ? 7 * 24 : HORAS_ENTRE_AVISOS; // un cierre por obra dura semanas: un solo borrador
+    return Date.now() - new Date(avisados[k]).getTime() < horas * 3_600_000;
+  };
+  // limpieza de registros viejos
+  for (const k of Object.keys(avisados)) if (Date.now() - new Date(avisados[k]).getTime() > 8 * 24 * 3_600_000) delete avisados[k];
   let borradores = 0;
   let avisos = 0;
 
@@ -96,25 +102,21 @@ export async function correrMonitor(): Promise<string> {
   for (const c of corredores.filter((x) => x.nivel === "pesado")) {
     if (reciente("corr:" + c.id)) continue;
     const def = CORREDORES.find((x) => x.id === c.id)!;
-    const imageUrl = await crearReporteVial({
-      hora: horaTexto(),
-      tipo: "TRÁFICO PESADO",
-      tipoColor: "rojo",
-      titulo: def.gancho,
-      lugar: c.nombre,
-      datos: [
-        { k: "Tiempo ahora", v: `${c.minutos} min` },
-        { k: "Sin tráfico", v: `${c.minutosLibre} min` },
-        { k: "Retraso", v: `+${c.retrasoMin} min` },
-        { k: "Estatus", v: "Medición automática" },
-      ],
-      fuente: "Monitor QPV al Volante · datos TomTom",
+    const def2 = def;
+    const imageUrl = await crearTarjetaMapa({
+      titulo: def2.gancho,
+      lugar: c.nombre.replace(/\s*→\s*/g, " hacia "),
+      detalle: `${c.minutos} min (normal: ${c.minutosLibre}) · +${c.retrasoMin} min de retraso`,
+      lat: (def2.origen[0] + def2.destino[0]) / 2,
+      lon: (def2.origen[1] + def2.destino[1]) / 2,
+      zoom: 14,
     });
+    if (!imageUrl) continue; // sin imagen no sale
     await encolarRedes({
       title: `${c.nombre.replace(/\s*→\s*/g, " hacia ")}: el trayecto toma ${c.minutos} minutos, ${c.retrasoMin} más de lo normal. Medición de QPV al Volante a las ${horaTexto()}`,
       excerpt: "Tráfico en vivo",
       articleUrl: `${siteUrl()}/trafico`,
-      imageUrl: imageUrl ?? undefined,
+      imageUrl,
     });
     avisados["corr:" + c.id] = new Date().toISOString();
     avisos++;
@@ -179,18 +181,26 @@ async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], 
   const graves = incs.filter((i) => i.tipo === "cierre" || i.tipo === "accidente" || i.tipo === "inundacion").length;
   const momento = slot === 8 ? "de la mañana" : slot === 14 ? "del mediodía" : "de la tarde";
   const fecha = new Date().toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", weekday: "long", day: "numeric", month: "long" });
-  const imageUrl = await crearResumenVial({
-    hora: horaTexto(),
+  void items;
+  const resumenTexto = orden
+    .slice(0, 3)
+    .map((c) => `${NOMBRE_CORTO[c.id] ?? c.nombre}: ${c.retrasoMin > 0 ? `+${c.retrasoMin} min` : "fluye"}`)
+    .join(" · ");
+  const imageUrl = await crearTarjetaMapa({
     titulo: "Así va el tráfico en Vallarta",
-    sub: `Resumen ${momento} · ${fecha}`,
-    items: items.slice(0, 4),
-    fuente: oficiales.length ? "Monitor QPV al Volante (TomTom) y avisos oficiales" : "Monitor QPV al Volante · datos TomTom",
+    lugar: `Resumen ${momento} · ${horaTexto()}`,
+    detalle: resumenTexto.replace(/\s*→\s*/g, " a "),
+    lat: 20.665,
+    lon: -105.245,
+    zoom: 12,
   });
+  if (!imageUrl) return "resumen sin imagen: no se publicó";
+  void fecha;
   const cargadas = orden.filter((c) => c.nivel === "pesado").map((c) => NOMBRE_CORTO[c.id] ?? c.nombre);
   const titulo = cargadas.length
     ? `Así va el tráfico en Vallarta a las ${horaTexto()}. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
     : `Así va el tráfico en Vallarta a las ${horaTexto()}: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
-  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl: imageUrl ?? undefined });
+  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl });
   return `resumen vial ${slot}:00 enviado a la cola`;
 }
 

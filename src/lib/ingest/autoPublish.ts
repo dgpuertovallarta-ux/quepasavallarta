@@ -187,7 +187,10 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
           result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         } else {
           // Ya no se publica en redes al instante: entra a la cola (máximo diario y separación entre posts) — ver lib/qpv/colaRedes.ts.
-          await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage?.cardUrl ?? generatedImage?.url });
+          // Nada sale a Facebook sin foto real (2026-10): sin foto, la nota queda solo en el sitio.
+          if (generatedImage?.url && generatedImage.cardUrl) {
+            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.cardUrl });
+          }
           result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         }
       } else {

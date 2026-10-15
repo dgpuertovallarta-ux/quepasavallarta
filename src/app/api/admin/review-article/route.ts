@@ -61,11 +61,20 @@ export async function POST(request: Request) {
       fotoFuente: publicada?.imageUrl,
       creditoFoto: publicada?.imageCredit,
     });
+    if (!cardUrl) {
+      return NextResponse.json({
+        reviewed: true,
+        decision,
+        reviewedBy: admin.displayName,
+        published: true,
+        socialSkipped: "La nota no tiene foto real, así que no se publicó en Facebook ni Instagram (regla: nada sin foto).",
+      });
+    }
     const social = await publishToSocial({
       title: article.title,
       excerpt: article.excerpt,
       articleUrl: `${siteUrl()}/noticia/${article.slug}`,
-      imageUrl: cardUrl ?? article.imageUrl,
+      imageUrl: cardUrl,
     });
     return NextResponse.json({ reviewed: true, decision, reviewedBy: admin.displayName, published: true, social });
   } catch (err) {

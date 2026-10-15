@@ -93,7 +93,6 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   }
 
   // Con foto real: foto arriba y franja azul QPV (la que más pega en Facebook).
-  // Sin foto: postal de color, nunca una foto de relleno.
   let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "foto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
   if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
 
@@ -148,24 +147,12 @@ export async function crearResumenVial(d: Omit<DatosResumenVial, "logo">): Promi
 
 /** Genera la tarjeta de una nota, la guarda en Netlify Blobs y devuelve su URL pública (/api/image/…). Nunca lanza. */
 export async function crearTarjeta(n: NotaTarjeta): Promise<string | null> {
-  // Notas de tránsito (avisos oficiales de Tránsito, Protección Civil, obras…): postal de QPV al Volante.
-  if (n.categoria === "transito" && !n.fotoFuente) {
-    const c = clasificar(n.titulo);
-    const oficial = creditoOficial(n.urlFuente);
-    const choque = c.tipo === "accidente";
-    const v = await crearReporteVial({
-      hora: horaLocal(),
-      tipo: choque ? "ACCIDENTE" : /cierre|cerrad/i.test(n.titulo) ? "CIERRE" : "AVISO VIAL",
-      tipoColor: choque || /cierre|cerrad/i.test(n.titulo) ? "rojo" : "ambar",
-      titulo: n.titulo,
-      lugar: n.detalle,
-      datos: [],
-      fuente: oficial ? `Aviso oficial: ${oficial}` : "Redacción QPV",
-    });
-    if (v) return v;
-  }
+  // Regla (2026-10): nada sale a Facebook sin foto real. Sin foto → sin tarjeta (null).
+  if (!n.fotoFuente) return null;
   try {
-    const png = await renderTarjeta(await datosTarjeta(n));
+    const datos = await datosTarjeta(n);
+    if (!datos.foto) return null; // la foto no se pudo descargar: no sale
+    const png = await renderTarjeta(datos);
     const { url } = await saveImageBlob(png, "image/png");
     return url;
   } catch (err) {
@@ -175,10 +162,11 @@ export async function crearTarjeta(n: NotaTarjeta): Promise<string | null> {
 }
 
 /** Tarjeta de mapa (QPV al Volante): punto en el mapa + titular + dato de retraso. Nunca lanza. */
-export async function crearTarjetaMapa(n: { titulo: string; lugar: string; detalle?: string; lat: number; lon: number; etiqueta?: string }): Promise<string | null> {
+export async function crearTarjetaMapa(n: { titulo: string; lugar: string; detalle?: string; lat: number; lon: number; etiqueta?: string; zoom?: number }): Promise<string | null> {
   try {
     const { armarMapa } = await import("./mapa");
-    const mapa = await armarMapa(n.lat, n.lon, 15, { trafico: true });
+    const mapa = await armarMapa(n.lat, n.lon, n.zoom ?? 15, { trafico: true });
+    if (!mapa.tiles.length) return null; // sin mapa no hay imagen
     const png = await renderTarjeta({
       plantilla: "mapa",
       titulo: n.titulo,
