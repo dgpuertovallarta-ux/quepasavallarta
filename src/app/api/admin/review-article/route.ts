@@ -58,6 +58,8 @@ export async function POST(request: Request) {
       categoria: publicada?.category ?? "comunidad",
       clave: article.slug,
       urlFuente: publicada?.sources[0]?.url,
+      fotoFuente: publicada?.imageUrl,
+      creditoFoto: publicada?.imageCredit,
     });
     const social = await publishToSocial({
       title: article.title,

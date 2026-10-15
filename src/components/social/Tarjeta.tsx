@@ -7,7 +7,7 @@ export const COLORES = { navy: "#0A1F3A", teal: "#14B8B0", red: "#D7262E", amber
 export const ANCHO = 1080;
 export const ALTO = 1350;
 
-export type Plantilla = "estandar" | "ultimahora" | "tarjeta" | "alerta" | "mapa" | "explicador" | "marco";
+export type Plantilla = "estandar" | "ultimahora" | "tarjeta" | "alerta" | "mapa" | "explicador" | "marco" | "foto";
 
 export type MapaTiles = {
   tiles: { src: string; x: number; y: number }[]; // posiciones en px dentro del área del mapa
@@ -214,6 +214,30 @@ export function Tarjeta(d: DatosTarjeta) {
           {d.logoAzul ? <img src={d.logoAzul} width={141} height={60} style={{ width: 141, height: 60 }} /> : <div style={{ display: "flex", color: COLORES.navy, fontFamily: F.titular, fontWeight: 700, fontSize: 36 }}>QPV</div>}
           {d.credito && <div style={{ display: "flex", color: "rgba(10,31,58,0.6)", fontFamily: F.base, fontWeight: 500, fontSize: 22 }}>{d.credito}</div>}
         </div>
+      </div>
+    );
+  }
+
+  if (d.plantilla === "foto") {
+    // Foto real arriba y franja azul QPV abajo con sección y titular (2026-10).
+    const altoFoto = 860;
+    const colorSeccion = d.etiqueta === "SEGURIDAD" || d.etiqueta === "ALERTA" || d.etiqueta === "ÚLTIMA HORA" ? COLORES.red : d.etiqueta === "QPV AL VOLANTE" || d.etiqueta === "TRÁNSITO" ? COLORES.amber : COLORES.teal;
+    const texto = colorSeccion === COLORES.amber ? COLORES.navy : COLORES.white;
+    return (
+      <div style={base}>
+        {d.foto && <img src={d.foto} width={ANCHO} height={altoFoto} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: altoFoto, objectFit: "cover" }} />}
+        <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: 220, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(6,16,32,0.55), rgba(6,16,32,0))" }} />
+        <div style={{ position: "absolute", left: 56, top: 44, display: "flex" }}><Logo logo={d.logo} size={40} /></div>
+        {d.credito && (
+          <div style={{ position: "absolute", right: 24, top: altoFoto - 44, display: "flex", background: "rgba(6,16,32,0.6)", color: "rgba(255,255,255,0.85)", fontFamily: F.base, fontWeight: 500, fontSize: 20, padding: "5px 12px" }}>{d.credito}</div>
+        )}
+        <div style={{ position: "absolute", left: 0, right: 0, top: altoFoto, height: 10, display: "flex", background: colorSeccion }} />
+        <div style={{ position: "absolute", left: 0, right: 0, top: altoFoto + 10, bottom: 0, display: "flex", background: COLORES.navy, backgroundImage: "radial-gradient(circle at 92% 110%, rgba(20,184,176,0.22), rgba(10,31,58,0) 55%)" }} />
+        <div style={{ position: "absolute", left: 64, right: 64, top: altoFoto + 44, display: "flex", flexDirection: "column", gap: 22 }}>
+          <Etiqueta texto={d.etiqueta} fondo={colorSeccion} color={texto} />
+          <Titular texto={d.titulo} base={78} />
+        </div>
+        <div style={{ position: "absolute", right: 64, bottom: 40, display: "flex", color: "rgba(255,255,255,0.7)", fontFamily: F.base, fontWeight: 800, fontSize: 24, letterSpacing: 1 }}>quepasavta.com</div>
       </div>
     );
   }

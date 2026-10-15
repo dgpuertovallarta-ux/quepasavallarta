@@ -291,14 +291,15 @@ export async function generateArticleImage(input: {
   const foto = await fotoDeFuente(input.sourceUrl, input.sourceName);
   const url = foto?.url;
   const credit = foto?.credito;
-  // La tarjeta de redes solo usa la foto si es oficial (tarjetas.tsx lo verifica).
-  const fotoFuente = foto?.oficial ? foto.urlOriginal : undefined;
+  // La tarjeta de redes lleva esa misma foto real (ya guardada en el sitio) con su crédito.
+  const fotoFuente = foto?.url;
 
   const cardUrl = await crearTarjeta({
     titulo: input.title,
     categoria: input.categorySlug,
     clave: input.title,
     fotoFuente,
+    creditoFoto: credit,
     urlFuente: input.sourceUrl,
   });
 

@@ -111,7 +111,7 @@ export async function correrMonitor(): Promise<string> {
       fuente: "Monitor QPV al Volante · datos TomTom",
     });
     await encolarRedes({
-      title: `🚗 ${def.gancho}: ${c.minutos} min (normalmente ${c.minutosLibre}), +${c.retrasoMin} min de retraso`,
+      title: `${c.nombre.replace(/\s*→\s*/g, " hacia ")}: el trayecto toma ${c.minutos} minutos, ${c.retrasoMin} más de lo normal. Medición de QPV al Volante a las ${horaTexto()}`,
       excerpt: "Tráfico en vivo",
       articleUrl: `${siteUrl()}/trafico`,
       imageUrl: imageUrl ?? undefined,
@@ -188,8 +188,8 @@ async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], 
   });
   const cargadas = orden.filter((c) => c.nivel === "pesado").map((c) => NOMBRE_CORTO[c.id] ?? c.nombre);
   const titulo = cargadas.length
-    ? `🚦 Así va el tráfico en Vallarta. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
-    : `🚦 Así va el tráfico en Vallarta: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
+    ? `Así va el tráfico en Vallarta a las ${horaTexto()}. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
+    : `Así va el tráfico en Vallarta a las ${horaTexto()}: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
   await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl: imageUrl ?? undefined });
   return `resumen vial ${slot}:00 enviado a la cola`;
 }

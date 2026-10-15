@@ -72,8 +72,10 @@ export type NotaTarjeta = {
   categoria: string;
   /** Para elegir la foto ilustrativa de forma estable (slug o título). */
   clave: string;
-  /** Foto de la fuente (og:image). Solo se usa si la fuente es oficial. */
+  /** Foto real de la nota (la de su fuente, ya guardada en el sitio). */
   fotoFuente?: string;
+  /** Crédito de esa foto ("Ayuntamiento de PV", nombre del medio…). */
+  creditoFoto?: string;
   urlFuente?: string;
   detalle?: string;
   plantilla?: Plantilla;
@@ -85,16 +87,15 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
 
   let foto: string | null = null;
   let credito: string | undefined;
-  if (n.fotoFuente && credOficial) {
+  if (n.fotoFuente) {
     foto = await imagenComoDataUri(n.fotoFuente);
-    if (foto) credito = `Foto: ${credOficial}`;
+    if (foto) credito = `Foto: ${n.creditoFoto || credOficial || "fuente original"}`;
   }
-  // Sin foto oficial no se rellena con una foto que no tiene que ver:
-  // sale la postal de color QPV (decisión 2026-10).
 
-  let plantilla: Plantilla = n.plantilla ?? (c.tipo === "alerta" ? "alerta" : "estandar");
+  // Con foto real: foto arriba y franja azul QPV (la que más pega en Facebook).
+  // Sin foto: postal de color, nunca una foto de relleno.
+  let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "foto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
   if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
-  if (plantilla === "estandar" && process.env.QPV_ESTILO_FOTO === "marco") plantilla = "marco";
 
   return {
     plantilla,
@@ -148,7 +149,7 @@ export async function crearResumenVial(d: Omit<DatosResumenVial, "logo">): Promi
 /** Genera la tarjeta de una nota, la guarda en Netlify Blobs y devuelve su URL pública (/api/image/…). Nunca lanza. */
 export async function crearTarjeta(n: NotaTarjeta): Promise<string | null> {
   // Notas de tránsito (avisos oficiales de Tránsito, Protección Civil, obras…): postal de QPV al Volante.
-  if (n.categoria === "transito") {
+  if (n.categoria === "transito" && !n.fotoFuente) {
     const c = clasificar(n.titulo);
     const oficial = creditoOficial(n.urlFuente);
     const choque = c.tipo === "accidente";

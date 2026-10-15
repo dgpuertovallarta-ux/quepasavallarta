@@ -73,9 +73,19 @@ function buildInstagramCaption(input: SocialPublishInput): string {
 }
 
 /** Facebook: una frase con el dato clave + el enlace (línea editorial 2026-10: sin párrafos ni hashtags). */
-function buildCaption(input: SocialPublishInput): string {
+/**
+ * Texto del post al estilo N+ (2026-10): el hecho contado en una o dos
+ * oraciones completas —qué pasó, dónde y el dato clave—, sin emojis ni
+ * frases de gancho, y al final la liga a la nota.
+ */
+export function buildCaption(input: SocialPublishInput): string {
   const titulo = input.title.trim().replace(/[.\s]+$/, "");
-  return `${titulo}.\n\n${input.articleUrl}`;
+  let lede = (input.excerpt || "").trim().replace(/\s+/g, " ");
+  if (lede.length < 40 || titulo.toLowerCase().includes(lede.toLowerCase().slice(0, 30))) lede = "";
+  if (lede && !/[.!?…]$/.test(lede)) lede += ".";
+  const cuerpo = lede ? `${titulo}. ${lede}` : `${titulo}.`;
+  const enlace = input.articleUrl.includes("/trafico") ? `Tráfico en vivo: ${input.articleUrl}` : `Lee la nota completa: ${input.articleUrl}`;
+  return `${cuerpo}\n\n${enlace}`;
 }
 
 async function postToFacebook(input: SocialPublishInput): Promise<SocialPublishResult["facebook"]> {
