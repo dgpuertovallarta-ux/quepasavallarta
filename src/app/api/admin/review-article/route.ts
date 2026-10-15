@@ -8,6 +8,15 @@ import { isHurricaneSimonContent } from "@/lib/social/editorialPolicy";
 import { siteUrl } from "@/lib/storage/imageBlobs";
 import { getPublishedArticleBySlug } from "@/lib/db/articles";
 import { crearTarjeta } from "@/lib/qpv/tarjetas";
+import { creditoOficial } from "@/lib/qpv/oficiales";
+import { fotoDeArchivo } from "@/lib/qpv/fotoArchivo";
+
+/** Facebook: foto oficial de la nota o, si no, la de archivo del lugar/tema. Nunca la de otro medio. */
+function fotoParaRedes(url: string | undefined, credito: string | undefined, titulo: string, resumen: string, fuente?: string) {
+  if (url && creditoOficial(fuente)) return { fotoFuente: url, creditoFoto: credito };
+  const a = fotoDeArchivo(titulo, resumen);
+  return a ? { fotoFuente: a.url, creditoFoto: a.credito } : {};
+}
 
 async function currentAdmin() {
   const cookieStore = await cookies();
@@ -58,8 +67,7 @@ export async function POST(request: Request) {
       categoria: publicada?.category ?? "comunidad",
       clave: article.slug,
       urlFuente: publicada?.sources[0]?.url,
-      fotoFuente: publicada?.imageUrl,
-      creditoFoto: publicada?.imageCredit,
+      ...fotoParaRedes(publicada?.imageUrl, publicada?.imageCredit, article.title, article.excerpt, publicada?.sources[0]?.url),
     });
     if (!cardUrl) {
       return NextResponse.json({

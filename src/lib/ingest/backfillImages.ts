@@ -12,7 +12,7 @@ import { fotoDeArchivo } from "../qpv/fotoArchivo";
  * Corre solo en cada /api/ingest (pocas por corrida) y también a mano en
  * GET /api/backfill-images (repetir hasta que "remaining" salga en false).
  */
-const MAX_POR_CORRIDA = 6;
+const MAX_POR_CORRIDA = 10;
 
 export type BackfillResult = {
   attempted: number;
@@ -34,14 +34,14 @@ export async function runImageBackfill(max = MAX_POR_CORRIDA): Promise<BackfillR
     candidates.slice(0, max).map(async (a) => {
       result.attempted++;
       try {
-        const foto = await fotoDeFuente(a.sourceUrl, a.sourceName); // solo oficiales
+        const foto = await fotoDeFuente(a.sourceUrl, a.sourceName); // oficial o medio (con crédito)
         const archivo = foto ? null : fotoDeArchivo(a.title, a.excerpt, a.slug);
         await setArticleRealPhoto(
           a.slug,
           foto
             ? { imageUrl: foto.url, imageCredit: foto.credito, imageSourceUrl: foto.urlOriginal }
             : archivo
-              ? { imageUrl: archivo.url, imageCredit: archivo.credito, imageSourceUrl: archivo.url, licencia: "illustrative_fallback" }
+              ? { imageUrl: archivo.url, imageCredit: archivo.credito, imageSourceUrl: "archivo-v2", licencia: "illustrative_fallback" }
               : null
         );
         if (foto || archivo) result.updated++;

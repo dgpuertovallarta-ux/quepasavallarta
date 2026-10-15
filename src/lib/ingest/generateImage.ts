@@ -289,20 +289,23 @@ export async function generateArticleImage(input: {
   if (isImageAiConfigured()) return generateAiImage(input);
 
   // Foto real de la fuente (oficial o medio, con crédito) — ver lib/qpv/fotoFuente.ts
-  // 1) Foto oficial de la fuente; 2) si no, foto de archivo del lugar/tema de la nota.
+  // SITIO: foto real de la fuente (oficial o medio, con crédito); si no hay, foto de archivo.
   const foto = await fotoDeFuente(input.sourceUrl, input.sourceName);
-  const archivo = foto ? null : fotoDeArchivo(input.title, input.excerpt);
+  const archivo = fotoDeArchivo(input.title, input.excerpt);
   const url = foto?.url ?? archivo?.url;
   const credit = foto?.credito ?? archivo?.credito;
+  // FACEBOOK: nunca la foto de otro medio (se veía que copiábamos a Noticias PV):
+  // foto oficial, o si no, la de archivo del lugar/tema. Sin ninguna, no sale a redes.
+  const fotoRedes = foto?.oficial ? { url: foto.url, credito: foto.credito } : archivo ? { url: archivo.url, credito: archivo.credito } : null;
   // La tarjeta de redes lleva esa misma foto real (ya guardada en el sitio) con su crédito.
-  const fotoFuente = url;
+  const fotoFuente = fotoRedes?.url;
 
   const cardUrl = await crearTarjeta({
     titulo: input.title,
     categoria: input.categorySlug,
     clave: input.title,
     fotoFuente,
-    creditoFoto: credit,
+    creditoFoto: fotoRedes?.credito,
     urlFuente: input.sourceUrl,
   });
 

@@ -890,8 +890,10 @@ export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: st
          a.image_license_status = 'ai_generated'
          or a.image_credit ilike '%generada con ia%'
          or (a.image_url is null and a.image_extracted_at is null)
-         -- 2026-10-15: las fotos tomadas de otros medios (Noticias PV…) se cambian por oficial o de archivo
-         or (a.image_license_status = 'source_unlicensed' and a.image_extracted_at < timestamptz '2026-10-15 16:40:00+00')
+         -- 2026-10-15: restaurar las fotos que el cambio de la mañana dejó vacías o de archivo
+         or (a.image_extracted_at >= timestamptz '2026-10-15 16:00:00+00'
+             and ((a.image_url is null and coalesce(a.image_credit, '') <> 'sin-foto-v2')
+               or (a.image_license_status = 'illustrative_fallback' and coalesce(a.image_source_url, '') <> 'archivo-v2')))
        )
      order by a.published_at desc nulls last
      limit $1`,
@@ -920,7 +922,7 @@ export async function setArticleRealPhoto(
      where slug = $5`,
     foto
       ? [foto.imageUrl, foto.imageCredit, foto.imageSourceUrl, foto.licencia ?? "source_unlicensed", slug]
-      : [null, null, null, "illustrative_fallback", slug]
+      : [null, "sin-foto-v2", null, "illustrative_fallback", slug]
   );
 }
 

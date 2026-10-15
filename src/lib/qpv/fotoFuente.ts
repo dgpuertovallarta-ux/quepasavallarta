@@ -47,9 +47,9 @@ export async function fotoDeFuente(sourceUrl?: string | null, sourceName?: strin
   if (!sourceUrl) return null;
   try {
     const oficial = creditoOficial(sourceUrl);
-    // Fotos de otros medios: APAGADAS por omisión (2026-10: se veía que copiábamos
-    // a Noticias PV). Solo se usan si QPV_FOTO_DE_MEDIOS=1.
-    if (!oficial && (process.env.QPV_FOTO_DE_MEDIOS !== "1" || medioBloqueado(sourceUrl))) return null;
+    // En el SITIO sí se usa la foto del medio, con su crédito. En redes no
+    // (ver generateImage.ts: la tarjeta de Facebook solo lleva foto oficial o de archivo).
+    if (!oficial && (process.env.QPV_FOTO_DE_MEDIOS === "0" || medioBloqueado(sourceUrl))) return null;
 
     const og = await extractOgImage(sourceUrl);
     if (!og || NO_ES_FOTO.test(og.url)) return null;
