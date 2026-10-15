@@ -6,6 +6,7 @@ import { NEWS, getNewsBySlug, getCategoryName, type NewsItem } from "@/lib/data"
 import { NewsListItem, SectionHead, Byline, DemoTag } from "@/components/cards";
 import { socialImageSrc, photoCreditLabel } from "@/lib/photos";
 import ArticleBody from "@/components/ArticleBody";
+import EscucharNota from "@/components/EscucharNota";
 import AdSlot from "@/components/AdSlot";
 import { getSponsor } from "@/lib/business/db";
 import { fmtDateTime } from "@/lib/format";
@@ -132,6 +133,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         {sponsor && <p className="sponsor-note">Contenido patrocinado por {sponsor}.</p>}
         <p className="article-dek">{n.dek}</p>
         <Byline n={n} />
+        <EscucharNota slug={n.isDemo ? undefined : n.slug} titulo={n.title} resumen={n.dek} parrafos={n.body} />
       </div>
 
       {/* Solo foto si es de la nota; sin foto propia la nota va directo al texto. */}

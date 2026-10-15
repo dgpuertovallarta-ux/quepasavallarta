@@ -10,6 +10,7 @@ import type { IngestedItem } from "@/lib/ingest/types";
 import { procesarColaRedes } from "@/lib/qpv/colaRedes";
 import { runImageBackfill } from "@/lib/ingest/backfillImages";
 import { limpiarDuplicados } from "@/lib/qpv/duplicados";
+import { audioDeLaUltimaNota } from "@/lib/qpv/voz";
 
 export const maxDuration = 60;
 
@@ -113,7 +114,10 @@ async function runIngest() {
       ? await runImageBackfill(4).catch((err) => ({ error: err instanceof Error ? err.message : String(err) }))
       : "Sin tiempo en esta corrida.";
 
+  // Voz de locutor para la nota más reciente (si QPV_AUDIO_AUTO=1 y hay tiempo).
+  const audio = Date.now() - startedAt < 18_000 ? await audioDeLaUltimaNota().catch(() => "error") : "Sin tiempo en esta corrida.";
   const summary = {
+    audio,
     socialQueue,
     duplicates,
     realPhotos,

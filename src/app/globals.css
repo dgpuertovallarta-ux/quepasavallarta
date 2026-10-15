@@ -1050,3 +1050,15 @@ table.data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border);
 .qpv-tile-ambar { background-image:
     radial-gradient(120% 70% at 110% 120%, rgba(10,31,58,.10) 0 40%, transparent 40.5%),
     radial-gradient(90% 55% at 105% 125%, rgba(10,31,58,.08) 0 45%, transparent 45.5%); }
+
+/* ---------- Escuchar nota (EscucharNota.tsx) ---------- */
+.escuchar-nota { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.escuchar-boton {
+  display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
+  background: #14B8B0; color: #0A1F3A; border: 0; border-radius: 999px;
+  padding: 10px 18px; font: 700 15px/1 var(--font);
+}
+.escuchar-boton:hover { filter: brightness(1.06); }
+.escuchar-icono { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: #0A1F3A; color: #fff; align-items: center; justify-content: center; font-size: 10px; }
+.escuchar-min { font-weight: 500; opacity: .75; }
+.escuchar-detener { background: transparent; color: var(--text-muted); border: 1px solid var(--border, rgba(127,127,127,.4)); border-radius: 999px; padding: 9px 14px; font: 600 14px/1 var(--font); cursor: pointer; }
