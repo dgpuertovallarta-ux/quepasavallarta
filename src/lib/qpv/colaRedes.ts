@@ -78,8 +78,10 @@ export async function procesarColaRedes(): Promise<string> {
     const ultima = publicadasHoy.map((x) => x.publicadaEn!).sort().pop();
     const minutos = ultima ? (Date.now() - new Date(ultima).getTime()) / 60_000 : Infinity;
 
+    // 2026-10-15: lo encolado antes de quitar las fotos de otros medios ya no sale.
+    const CORTE = Date.parse("2026-10-15T16:40:00Z");
     const pendientes = xs
-      .filter((x) => x.estado === "pendiente" && Date.now() - new Date(x.creada).getTime() <= VIGENCIA_MS)
+      .filter((x) => x.estado === "pendiente" && Date.now() - new Date(x.creada).getTime() <= VIGENCIA_MS && Date.parse(x.creada) >= CORTE)
       .sort((a, b) => Number(b.urgente) - Number(a.urgente) || a.creada.localeCompare(b.creada));
     const sig = pendientes.find((x) => x.urgente || minutos >= MINUTOS_ENTRE_POSTS);
     if (!sig) return pendientes.length ? `En espera: faltan ${Math.ceil(MINUTOS_ENTRE_POSTS - minutos)} min para la siguiente.` : "Cola vacía.";

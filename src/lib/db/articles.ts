@@ -878,10 +878,10 @@ export async function updateArticleImage(
  * ninguna) y a las que no se les ha buscado la foto de su fuente.
  * Ver lib/ingest/backfillImages.ts.
  */
-export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: string; sourceUrl: string; sourceName: string | null }[]> {
+export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: string; title: string; excerpt: string; sourceUrl: string; sourceName: string | null }[]> {
   if (!isDatabaseConfigured()) return [];
-  const res = await getPool().query<{ slug: string; source_url: string; source_name: string | null }>(
-    `select a.slug, ss.url as source_url, s.name as source_name
+  const res = await getPool().query<{ slug: string; title: string; excerpt: string | null; source_url: string; source_name: string | null }>(
+    `select a.slug, a.title, a.excerpt, ss.url as source_url, s.name as source_name
      from articles a
      join story_sources ss on ss.story_id = a.story_id
      left join sources s on s.id = ss.source_id
@@ -890,17 +890,19 @@ export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: st
          a.image_license_status = 'ai_generated'
          or a.image_credit ilike '%generada con ia%'
          or (a.image_url is null and a.image_extracted_at is null)
+         -- 2026-10-15: las fotos tomadas de otros medios (Noticias PV…) se cambian por oficial o de archivo
+         or (a.image_license_status = 'source_unlicensed' and a.image_extracted_at < timestamptz '2026-10-15 16:40:00+00')
        )
      order by a.published_at desc nulls last
      limit $1`,
     [limit * 3]
   );
   const seen = new Set<string>();
-  const out: { slug: string; sourceUrl: string; sourceName: string | null }[] = [];
+  const out: { slug: string; title: string; excerpt: string; sourceUrl: string; sourceName: string | null }[] = [];
   for (const r of res.rows) {
     if (seen.has(r.slug)) continue;
     seen.add(r.slug);
-    out.push({ slug: r.slug, sourceUrl: r.source_url, sourceName: r.source_name });
+    out.push({ slug: r.slug, title: r.title, excerpt: r.excerpt ?? "", sourceUrl: r.source_url, sourceName: r.source_name });
     if (out.length >= limit) break;
   }
   return out;
@@ -909,7 +911,7 @@ export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: st
 /** Guarda la foto real de la fuente; con `foto` null marca la nota como "ya se buscó, no tiene" (queda con la pleca de color). */
 export async function setArticleRealPhoto(
   slug: string,
-  foto: { imageUrl: string; imageCredit: string; imageSourceUrl: string } | null
+  foto: { imageUrl: string; imageCredit: string; imageSourceUrl: string; licencia?: "source_unlicensed" | "illustrative_fallback" } | null
 ): Promise<void> {
   await getPool().query(
     `update articles
@@ -917,7 +919,7 @@ export async function setArticleRealPhoto(
          image_license_status = $4, image_extracted_at = now(), updated_at = now()
      where slug = $5`,
     foto
-      ? [foto.imageUrl, foto.imageCredit, foto.imageSourceUrl, "source_unlicensed", slug]
+      ? [foto.imageUrl, foto.imageCredit, foto.imageSourceUrl, foto.licencia ?? "source_unlicensed", slug]
       : [null, null, null, "illustrative_fallback", slug]
   );
 }

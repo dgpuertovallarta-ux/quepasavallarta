@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { saveImageBlob } from "../storage/imageBlobs";
 import { extractOgImage } from "./extractImage";
 import { fotoDeFuente } from "../qpv/fotoFuente";
+import { fotoDeArchivo } from "../qpv/fotoArchivo";
 import { crearTarjeta } from "../qpv/tarjetas";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
@@ -22,7 +23,7 @@ export type GeneratedImage = {
   /** Tarjeta 1080×1350 con titular y logo para Facebook/Instagram (/api/image/…). */
   cardUrl?: string;
   credit?: string;
-  licenseStatus?: "source_unlicensed" | "ai_generated";
+  licenseStatus?: "source_unlicensed" | "ai_generated" | "illustrative_fallback";
   model: string;
 };
 
@@ -288,11 +289,13 @@ export async function generateArticleImage(input: {
   if (isImageAiConfigured()) return generateAiImage(input);
 
   // Foto real de la fuente (oficial o medio, con crédito) — ver lib/qpv/fotoFuente.ts
+  // 1) Foto oficial de la fuente; 2) si no, foto de archivo del lugar/tema de la nota.
   const foto = await fotoDeFuente(input.sourceUrl, input.sourceName);
-  const url = foto?.url;
-  const credit = foto?.credito;
+  const archivo = foto ? null : fotoDeArchivo(input.title, input.excerpt);
+  const url = foto?.url ?? archivo?.url;
+  const credit = foto?.credito ?? archivo?.credito;
   // La tarjeta de redes lleva esa misma foto real (ya guardada en el sitio) con su crédito.
-  const fotoFuente = foto?.url;
+  const fotoFuente = url;
 
   const cardUrl = await crearTarjeta({
     titulo: input.title,
@@ -304,5 +307,5 @@ export async function generateArticleImage(input: {
   });
 
   if (!url && !cardUrl) return null;
-  return { url, cardUrl: cardUrl ?? undefined, credit, licenseStatus: url ? "source_unlicensed" : undefined, model: "qpv-tarjeta" };
+  return { url, cardUrl: cardUrl ?? undefined, credit, licenseStatus: foto ? "source_unlicensed" : archivo ? "illustrative_fallback" : undefined, model: "qpv-tarjeta" };
 }

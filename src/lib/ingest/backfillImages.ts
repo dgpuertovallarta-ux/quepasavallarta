@@ -1,6 +1,7 @@
 import { getArticlesNeedingRealPhoto, setArticleRealPhoto } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { fotoDeFuente } from "../qpv/fotoFuente";
+import { fotoDeArchivo } from "../qpv/fotoArchivo";
 
 /**
  * Cambia la imagen de las notas YA publicadas por la foto REAL de su fuente
@@ -33,9 +34,17 @@ export async function runImageBackfill(max = MAX_POR_CORRIDA): Promise<BackfillR
     candidates.slice(0, max).map(async (a) => {
       result.attempted++;
       try {
-        const foto = await fotoDeFuente(a.sourceUrl, a.sourceName);
-        await setArticleRealPhoto(a.slug, foto ? { imageUrl: foto.url, imageCredit: foto.credito, imageSourceUrl: foto.urlOriginal } : null);
-        if (foto) result.updated++;
+        const foto = await fotoDeFuente(a.sourceUrl, a.sourceName); // solo oficiales
+        const archivo = foto ? null : fotoDeArchivo(a.title, a.excerpt, a.slug);
+        await setArticleRealPhoto(
+          a.slug,
+          foto
+            ? { imageUrl: foto.url, imageCredit: foto.credito, imageSourceUrl: foto.urlOriginal }
+            : archivo
+              ? { imageUrl: archivo.url, imageCredit: archivo.credito, imageSourceUrl: archivo.url, licencia: "illustrative_fallback" }
+              : null
+        );
+        if (foto || archivo) result.updated++;
         else result.sinFoto++;
       } catch (err) {
         result.errors.push({ slug: a.slug, error: err instanceof Error ? err.message : "Error desconocido" });
