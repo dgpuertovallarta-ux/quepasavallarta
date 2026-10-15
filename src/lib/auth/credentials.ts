@@ -16,12 +16,14 @@ function configuredAccounts() {
 }
 
 export function authenticateAdmin(username: string, password: string): AdminIdentity | null {
-  const account = configuredAccounts().find((entry) => entry.username === username && entry.password === password);
+  // El usuario no distingue mayúsculas ni espacios ("adrian" = "ADRIAN"); la contraseña sí, exacta.
+  const u = username.trim().toLowerCase();
+  const account = configuredAccounts().find((entry) => entry.username.trim().toLowerCase() === u && entry.password === password);
   return account ? { username: account.username, displayName: account.displayName } : null;
 }
 
 export function getAdminIdentity(username: string): AdminIdentity | null {
-  const account = configuredAccounts().find((entry) => entry.username === username);
+  const account = configuredAccounts().find((entry) => entry.username.trim().toLowerCase() === username.trim().toLowerCase());
   return account ? { username: account.username, displayName: account.displayName } : null;
 }
 

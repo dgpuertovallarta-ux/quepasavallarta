@@ -18,8 +18,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Usuario o contraseña incorrectos." }, { status: 401 });
   }
 
+  let token: string;
+  try {
+    token = createSessionToken(admin.username);
+  } catch (err) {
+    console.error("[admin-login]", err);
+    return NextResponse.json({ error: "El panel no está configurado (falta ADMIN_SESSION_SECRET en Netlify)." }, { status: 500 });
+  }
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(ADMIN_SESSION_COOKIE, createSessionToken(admin.username), {
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
