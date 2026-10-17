@@ -53,6 +53,8 @@ def main():
     ap.add_argument("--out", default=".")
     ap.add_argument("--force", action="store_true", help="genera aunque el ciclón esté lejos")
     ap.add_argument("--preview", default=None)
+    ap.add_argument("--voice-dir", default=None, help="voces ya hechas (scene_00.mp3…)")
+    ap.add_argument("--print-voice", action="store_true", help="solo imprime el guion de la voz")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
 
@@ -62,7 +64,10 @@ def main():
         tas = nhc.parse_tas(open(os.path.join(S, "trudy_017a_tas.txt")).read())
         g = json.load(open(os.path.join(S, "trudy_017a_gis.json")))
         story = render.build_story(adv, tas, g["cone"], g["ww"], "17A")
-        render.render_video(story, os.path.join(a.out, "video.mp4"), a.preview)
+        if a.print_voice:
+            print(json.dumps([sc.voice for sc in story["scenes"]], ensure_ascii=False))
+            return
+        render.render_video(story, os.path.join(a.out, "video.mp4"), a.preview, a.voice_dir)
         json.dump(story_json(story, {"storm_id": "ep212026", "key": "ep212026-17a-sample"}), open(os.path.join(a.out, "story.json"), "w"), ensure_ascii=False, indent=1)
         print("ok sample")
         return

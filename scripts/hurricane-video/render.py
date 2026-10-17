@@ -262,6 +262,19 @@ class Scene:
     sub: str = ""
     small: str = ""
     data: dict = field(default_factory=dict)
+    voice: str = ""  # lo que narra la voz en esta escena
+
+
+def hour_spoken(dt: datetime) -> str:
+    """Hora como se dice: "4 de la tarde", "mediodía"."""
+    l = local(dt)
+    if l.hour == 12 and l.minute < 30:
+        return "el mediodía"
+    if l.hour == 0 and l.minute < 30:
+        return "la medianoche"
+    h = l.hour % 12 or 12
+    part = "de la mañana" if 5 <= l.hour < 12 else "de la tarde" if 12 <= l.hour < 19 else "de la noche" if l.hour >= 19 else "de la madrugada"
+    return f"las {h} {part}" if h != 1 else f"la 1 {part}"
 
 
 def build_story(adv: nhc.Advisory, tas: nhc.PublicInfo, cone: list, ww: list, public_adv: str | None = None) -> dict:
@@ -284,14 +297,17 @@ def build_story(adv: nhc.Advisory, tas: nhc.PublicInfo, cone: list, ww: list, pu
     scenes: list[Scene] = []
     wide = fit_cam([nhc.PV, (cur.lat, cur.lon)], pad_deg=0.9)
     scenes.append(Scene("hook", 4.0, wide, f"¿Y {('EL HURACÁN' if kt >= 64 else 'LA TORMENTA')} {name.upper()}?", YELLOW,
-                        "Lo que dice el Centro Nacional de Huracanes para Vallarta", "", {"cur": cur}))
+                        "Lo que dice el Centro Nacional de Huracanes para Vallarta", "", {"cur": cur},
+                        f"Esto es lo que dice el Centro Nacional de Huracanes sobre {('el huracán' if kt >= 64 else 'la ' + word)} {name} y Puerto Vallarta."))
     scenes.append(Scene("now", 4.2, fit_cam([nhc.PV, (cur.lat, cur.lon)], pad_deg=0.4), f"{kmh} km/h", PINK,
                         f"{cat_long} · se mueve al {move} a {move_kmh} km/h",
-                        f"Ahora está a unos {round_km(d_now)} km de Puerto Vallarta", {"cur": cur}))
+                        f"Ahora está a unos {round_km(d_now)} km de Puerto Vallarta", {"cur": cur},
+                        f"Tiene vientos de {kmh} kilómetros por hora. Es {('un ' if kt >= 64 else 'una ') + cat_long.lower()}, se mueve al {move} y está a unos {round_km(d_now)} kilómetros de Vallarta."))
     track_pts = [nhc.PV, (cur.lat, cur.lon)] + [(f.lat, f.lon) for f in adv.forecasts[:5]]
     scenes.append(Scene("track", 5.2, fit_cam(track_pts, pad_deg=0.7), "SU CAMINO", YELLOW,
                         "Pronóstico oficial para los próximos días",
-                        "El cono marca por dónde podría pasar el centro", {"cur": cur, "cone": cone, "fc": adv.forecasts}))
+                        "El cono marca por dónde podría pasar el centro", {"cur": cur, "cone": cone, "fc": adv.forecasts},
+                        "Este es su pronóstico oficial. El cono marca por dónde podría pasar el centro."))
     if ww:
         if status:
             title = WW_NAMES[status].upper().replace("AVISO DE ", "AVISO: ").replace("VIGILANCIA DE ", "VIGILANCIA: ")
@@ -299,30 +315,37 @@ def build_story(adv: nhc.Advisory, tas: nhc.PublicInfo, cone: list, ww: list, pu
             small = {"HWR": "Se esperan condiciones de huracán", "HWA": "Son posibles condiciones de huracán",
                      "TWR": "Se esperan condiciones de tormenta tropical", "TWA": "Son posibles condiciones de tormenta tropical"}[status]
             col = WW_COLORS[status] if status != "TWR" else YELLOW
+            vo = f"Vallarta y Bahía de Banderas están bajo {WW_NAMES[status].lower()}. {small}."
         else:
             title, sub, small, col = "AVISOS EN LA COSTA", "Vallarta todavía no está en zona de aviso", "Sigue los próximos boletines", YELLOW
-        scenes.append(Scene("ww", 4.8, (-105.15, 20.05, 4.2), title, col, sub, small, {"ww": ww, "status": status}))
+            vo = "Hay avisos en la costa, pero Vallarta todavía no está en zona de aviso."
+        scenes.append(Scene("ww", 4.8, (-105.15, 20.05, 4.2), title, col, sub, small, {"ww": ww, "status": status}, vo))
     l = local(best.time)
     scenes.append(Scene("closest", 4.8, fit_cam([nhc.PV, (best.lat, best.lon)], pad_deg=0.5, min_span=3.0),
                         f"{DAYS[l.weekday()]} {hour_txt(best.time).upper()}", YELLOW,
                         f"Lo más cerca de Vallarta: el centro pasaría a unos {round_km(d_best)} km",
-                        "Es un pronóstico y puede cambiar", {"best": best, "d": d_best}))
+                        "Es un pronóstico y puede cambiar", {"best": best, "d": d_best},
+                        f"Lo más cerca pasaría el {DAYS[l.weekday()].lower()} a {hour_spoken(best.time)}, a unos {round_km(d_best)} kilómetros. Es un pronóstico y puede cambiar."))
     q = nhc.quadrant_toward((best.lat, best.lon), nhc.PV)
     r34 = (best.radii34 or {}).get(q, 0) * 1.852
     r64 = (best.radii64 or {}).get(q, 0) * 1.852
     if r64 and d_best <= r64:
         wt, ws = "VIENTOS DE HURACÁN", "Vallarta quedaría en la zona de vientos de huracán (119 km/h o más)"
+        wv = "Vallarta quedaría dentro de la zona de vientos de huracán, de 119 kilómetros por hora o más."
     elif r34 and d_best <= r34:
         wt, ws = "VIENTO FUERTE", "Vallarta quedaría en la zona de vientos de tormenta tropical (63 km/h o más)"
+        wv = "Vallarta quedaría dentro de la zona de vientos de tormenta tropical, de 63 kilómetros por hora o más."
     elif r34:
         wt, ws = "VIENTOS", f"La zona de vientos de tormenta tropical quedaría a unos {round_km(d_best - r34)} km de Vallarta"
+        wv = f"La zona de vientos de tormenta tropical quedaría a unos {round_km(d_best - r34)} kilómetros de Vallarta."
     else:
         wt, ws = "VIENTOS", "El NHC no pronostica vientos de tormenta tropical cerca de Vallarta"
+        wv = "El Centro Nacional de Huracanes no pronostica vientos de tormenta tropical cerca de Vallarta."
     max34 = max((cur.radii34 or {"x": 0}).values()) * 1.852
     r_view = max((best.radii34 or {"x": 60}).values()) * 1.852 / 111.0
     scenes.append(Scene("wind", 4.6, fit_cam([nhc.PV, (best.lat + r_view, best.lon), (best.lat - r_view, best.lon)], pad_deg=0.3, min_span=3.4), wt, PINK if "HURACÁN" in wt else YELLOW, ws,
                         f"Hoy alcanzan hasta {round_km(max34)} km del centro" if max34 else "",
-                        {"best": best}))
+                        {"best": best}, wv))
     rain = None
     for r in tas.rain:
         if "Jalisco" in r[3]:
@@ -334,16 +357,20 @@ def build_story(adv: nhc.Advisory, tas: nhc.PublicInfo, cone: list, ww: list, pu
         states = rain[3].split(" en ")[-1].strip()
         scenes.append(Scene("rain", 4.4, (-105.25, 20.55, 2.6), f"{mm(rain[0])}–{mm(rain[1])} mm", (110, 190, 255),
                             f"De lluvia en {states}" + (f", hasta {mm(rain[2])} mm en algunos puntos" if rain[2] else ""),
-                            "Riesgo de inundaciones y deslaves en zonas de cerro", {}))
+                            "Riesgo de inundaciones y deslaves en zonas de cerro", {},
+                            f"Se esperan de {mm(rain[0])} a {mm(rain[1])} milímetros de lluvia" + (f", y hasta {mm(rain[2])} en algunos puntos" if rain[2] else "") + ". Cuidado con inundaciones y deslaves."))
     if tas.surf:
         scenes.append(Scene("sea", 3.8, (-105.35, 20.6, 2.3), "NO AL MAR", PINK,
                             "Oleaje y corrientes peligrosas en la costa",
-                            "Posible marejada en zonas bajas" if tas.surge else "Respeta las banderas de playa", {}))
+                            "Posible marejada en zonas bajas" if tas.surge else "Respeta las banderas de playa", {},
+                            "No te metas al mar: hay oleaje y corrientes peligrosas" + (", y posible marejada en zonas bajas." if tas.surge else ".")))
     scenes.append(Scene("prep", 4.6, (-105.25, 20.6, 3.0), "PREPÁRATE", YELLOW,
-                        "Ten listo lo básico y sigue las indicaciones de Protección Civil", "", {}))
+                        "Ten listo lo básico y sigue las indicaciones de Protección Civil", "", {},
+                        "Ten agua y comida para tres días, linterna, pilas, tus documentos protegidos y el celular cargado. Ubica tu refugio más cercano."))
     nxt = f"Próximo boletín del NHC: {hour_txt(adv.next_advisory)}" if adv.next_advisory else ""
     scenes.append(Scene("cta", 4.2, (-105.25, 20.6, 4.5), "SÍGUENOS", YELLOW,
-                        "Te contamos cada boletín oficial, sin alarmismo", nxt, {}))
+                        "Te contamos cada boletín oficial, sin alarmismo", nxt, {},
+                        "Síguenos en Qué Pasa Vallarta. Te contamos cada boletín oficial, sin alarmismo."))
 
     source = f"Fuente: Centro Nacional de Huracanes (NHC, Miami) · boletín {adv_label} · {issued_txt.replace('CST', 'hora centro')} · distancias: cálculo Qué Pasa Vallarta"
     return {"scenes": scenes, "badge": f"{word.upper()} {name.upper()} · BOLETÍN {adv_label}", "source": source,
@@ -645,13 +672,18 @@ class Renderer:
                 y += 46
 
 
-def render_video(story: dict, out_path: str, preview_dir: str | None = None) -> str:
+def render_video(story: dict, out_path: str, preview_dir: str | None = None, premade_voice: str | None = None) -> str:
+    import audio  # voz + música
+
+    work = os.path.join(os.path.dirname(os.path.abspath(out_path)), "_audio")
+    clips = audio.prepare_voice(story["scenes"], work, premade_voice)  # puede alargar escenas
     r = Renderer(story)
     n = int(r.total * FPS)
+    wav = audio.mix(r.scenes, r.starts, r.total, clips, os.path.join(work, "mix.wav"))
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-           "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+           "-i", wav,
            "-vf", "scale=720:1280:flags=lanczos", "-c:v", "libx264", "-preset", "medium", "-crf", "24", "-maxrate", "1800k", "-bufsize", "3600k",
-           "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "64k", "-shortest", "-movflags", "+faststart", out_path]
+           "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-shortest", "-movflags", "+faststart", out_path]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     for f in range(n):
         t = f / FPS
