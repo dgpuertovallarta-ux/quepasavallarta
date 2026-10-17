@@ -926,3 +926,13 @@ export async function setArticleRealPhoto(
   );
 }
 
+/** Denuncias ciudadanas ya aprobadas (sección /denuncia). */
+export async function getDenuncias(limit = 12): Promise<NewsItem[]> {
+  if (!isDatabaseConfigured()) return [];
+  const res = await getPool().query<ArticleRow>(
+    `${SELECT_BASE} and a.title ilike 'Denuncia ciudadana%' order by a.published_at desc nulls last limit $1`,
+    [limit * 3]
+  );
+  return rowsToNewsItems(res.rows).slice(0, limit);
+}
+

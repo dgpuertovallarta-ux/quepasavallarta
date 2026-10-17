@@ -16,6 +16,7 @@ const SECTIONS = [
   { href: "/", label: "Inicio" },
   { href: "/proteccion-civil", label: "Protección Civil" },
   { href: "/trafico", label: "QPV al Volante" },
+  { href: "/denuncia", label: "Denuncia Ciudadana" },
   { href: "/ahora", label: "Vallarta Ahora" },
   { href: "/explica", label: "Vallarta Explica" },
   { href: "/agenda", label: "Vive Vallarta" },

@@ -43,5 +43,6 @@ export function clasificar(titulo: string, cuerpo = ""): Clasificacion {
     seguridad: "SEGURIDAD", accidente: "ACCIDENTE", alerta: "PROTECCIÓN CIVIL", trafico: "QPV AL VOLANTE",
     servicios: "SERVICIOS", gobierno: "GOBIERNO", comunidad: "COMUNIDAD", general: "PUERTO VALLARTA",
   };
-  return { tipo, ultimaHora, requiereRevision, etiqueta: etiquetas[tipo] };
+  const etiqueta = /^denuncia ciudadana/i.test(titulo.trim()) ? "DENUNCIA CIUDADANA" : etiquetas[tipo];
+  return { tipo, ultimaHora, requiereRevision, etiqueta };
 }

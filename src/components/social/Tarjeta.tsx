@@ -221,7 +221,7 @@ export function Tarjeta(d: DatosTarjeta) {
   if (d.plantilla === "foto") {
     // Foto real arriba y franja azul QPV abajo con sección y titular (2026-10).
     const altoFoto = 860;
-    const colorSeccion = d.etiqueta === "SEGURIDAD" || d.etiqueta === "ALERTA" || d.etiqueta === "ÚLTIMA HORA" ? COLORES.red : d.etiqueta === "QPV AL VOLANTE" || d.etiqueta === "TRÁNSITO" ? COLORES.amber : COLORES.teal;
+    const colorSeccion = d.etiqueta === "DENUNCIA CIUDADANA" || d.etiqueta === "SEGURIDAD" || d.etiqueta === "ALERTA" || d.etiqueta === "ÚLTIMA HORA" ? COLORES.red : d.etiqueta === "QPV AL VOLANTE" || d.etiqueta === "TRÁNSITO" ? COLORES.amber : COLORES.teal;
     const texto = colorSeccion === COLORES.amber ? COLORES.navy : COLORES.white;
     return (
       <div style={base}>
