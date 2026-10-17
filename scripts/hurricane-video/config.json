@@ -1,4 +1,1 @@
-{
-  "publish": false,
-  "_nota": "Cambiar publish a true para que los videos de ciclón se publiquen solos en Facebook."
-}
+{"publish": true}
