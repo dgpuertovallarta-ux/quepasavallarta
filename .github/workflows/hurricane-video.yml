@@ -1,0 +1,112 @@
+# Video automático de ciclones para Facebook (Qué Pasa Vallarta).
+#
+# Después de cada boletín completo del Centro Nacional de Huracanes
+# (03, 09, 15 y 21 UTC = 9 p.m., 3 a.m., 9 a.m. y 3 p.m. hora centro):
+#  1. Revisa los ciclones activos del Pacífico Este (nhc.noaa.gov).
+#  2. Si alguno amenaza a Puerto Vallarta / Bahía de Banderas y ese boletín
+#     no tiene video todavía, genera el video con los datos oficiales.
+#  3. Lo envía al sitio (quepasavta.com), que lo publica como reel.
+#
+# Sin llaves ni contraseñas: el sitio verifica el token OIDC de GitHub.
+# Para pausar: scripts/hurricane-video/config.json → "publish": false.
+name: Video de ciclón
+
+on:
+  schedule:
+    - cron: "12,42 3,9,15,21 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Generar aunque el ciclón esté lejos (prueba)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: hurricane-video
+  cancel-in-progress: false
+
+jobs:
+  video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SITE: https://quepasavta.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Publicación activada?
+        id: cfg
+        run: |
+          echo "publish=$(python3 -c "import json;print(str(json.load(open('scripts/hurricane-video/config.json'))['publish']).lower())")" >> "$GITHUB_OUTPUT"
+
+      - name: Revisar ciclones activos
+        id: check
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, urllib.request
+          sys.path.insert(0, "scripts/hurricane-video")
+          import nhc
+          out = open(os.environ["GITHUB_OUTPUT"], "a")
+          storms = nhc.active_storms()
+          if not storms:
+              print("Sin ciclones en el Pacífico Este"); out.write("go=false\n"); sys.exit(0)
+          for st in storms:
+              adv = (st.get("forecastAdvisory") or {}).get("advNum", "")
+              key = f"{st['id']}-{adv}".lower()
+              with urllib.request.urlopen(f"{os.environ['SITE']}/api/hurricane-video?key={key}", timeout=30) as r:
+                  info = json.load(r)
+              print(st["name"], key, info)
+              if info.get("exists") and "${{ inputs.force }}" != "true":
+                  continue
+              out.write(f"go=true\nkey={key}\n"); sys.exit(0)
+          out.write("go=false\n")
+          PY
+
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.go == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Instalar herramientas
+        if: steps.check.outputs.go == 'true'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q -r scripts/hurricane-video/requirements.txt
+
+      - name: Generar video con datos del NHC
+        if: steps.check.outputs.go == 'true'
+        id: gen
+        run: |
+          FORCE=""
+          if [ "${{ inputs.force }}" = "true" ]; then FORCE="--force"; fi
+          python scripts/hurricane-video/generate.py --live --out out $FORCE
+          if [ -f out/SKIP ]; then echo "made=false" >> "$GITHUB_OUTPUT"; else echo "made=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Guardar copia del video
+        if: steps.gen.outputs.made == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-ciclon
+          path: out/
+          retention-days: 14
+
+      - name: Enviar al sitio y publicar en Facebook
+        if: steps.gen.outputs.made == 'true' && steps.cfg.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          KEY=$(python3 -c "import json;print(json.load(open('out/story.json'))['key'])")
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=quepasavta-hurricane" | python3 -c "import json,sys;print(json.load(sys.stdin)['value'])")
+          split -b 2000000 -d -a 2 out/video.mp4 out/part_
+          N=0
+          for f in out/part_*; do
+            curl -sS --fail-with-body --retry 3 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" \
+              --data-binary @"$f" "$SITE/api/hurricane-video?key=$KEY&part=$N"; echo
+            N=$((N+1))
+          done
+          python3 -c "import json;s=json.load(open('out/story.json'));print(json.dumps({'parts':$N,'caption':s['caption'],'title':s['title']}))" > out/publish.json
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            --data @out/publish.json "$SITE/api/hurricane-video?key=$KEY&action=publish"; echo

@@ -20,7 +20,7 @@ export function siteUrl(): string {
 
 export async function saveImageBlob(bytes: Buffer, contentType: string): Promise<{ key: string; url: string }> {
   const store = getStore(STORE_NAME);
-  const extension = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+  const extension = contentType.includes("mp4") ? "mp4" : contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
   const key = `${crypto.randomUUID()}.${extension}`;
   // @netlify/blobs solo acepta ArrayBuffer (no el Buffer de Node directamente).
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
