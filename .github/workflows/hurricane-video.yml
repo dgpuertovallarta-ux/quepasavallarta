@@ -13,7 +13,9 @@ name: Video de ciclón
 
 on:
   schedule:
-    - cron: "12,42 3,9,15,21 * * *"
+    # GitHub a veces retrasa o salta corridas: revisamos cada 20 min y
+    # solo se genera video cuando hay un boletín nuevo sin publicar.
+    - cron: "7,27,47 * * * *"
   workflow_dispatch:
     inputs:
       force:
