@@ -99,10 +99,26 @@ def music(total: float) -> np.ndarray:
             break
         tt = np.arange(m) / SR
         beat[a:a + m] += (1.0 if k % 2 == 0 else 0.45) * np.sin(2 * np.pi * (55 + 30 * np.exp(-tt * 30)) * tt) * np.exp(-tt * 14)
-    out = out / (np.abs(out).max() + 1e-9) * 0.8 + beat * 0.35
-    # pasa-bajos sencillo para que no estorbe a la voz
-    k = 9
-    out = np.convolve(out, np.ones(k) / k, mode="same")
+    # pasa-bajos suave al colchón para que no estorbe a la voz
+    out = np.convolve(out, np.ones(7) / 7, mode="same")
+    # arpegio tipo "pluck" en registro medio: es lo que se oye en el celular
+    arp = np.zeros(n)
+    step = 0.25
+    pattern = [0, 1, 2, 1, 2, 0, 1, 2]
+    for k in range(int(total / step)):
+        a0 = int(k * step * SR)
+        m = min(n - a0, int(0.9 * SR))
+        if m <= 0:
+            break
+        ch = chords[int(k * step / bar) % 4]
+        f = ch[pattern[k % 8]] * 4
+        tt = np.arange(m) / SR
+        tone = np.sin(2 * np.pi * f * tt) + 0.3 * np.sin(2 * np.pi * 2 * f * tt)
+        arp[a0:a0 + m] += (1.0 if k % 2 == 0 else 0.7) * tone * np.exp(-tt * 7)
+    # eco sencillo para darle espacio
+    d = int(0.375 * SR)
+    arp[d:] += 0.35 * arp[:-d]
+    out = (out / (np.abs(out).max() + 1e-9) * 0.55 + arp / (np.abs(arp).max() + 1e-9) * 0.45 + beat * 0.30)
     fade = np.clip(t / 1.0, 0, 1) * np.clip((total - t) / 1.8, 0, 1)
     return (out * fade).astype(np.float32)
 
@@ -132,7 +148,7 @@ def mix(scenes, starts: list[float], total: float, clips, out_wav: str) -> str:
     envv = np.convolve(np.abs(voice), np.ones(4410) / 4410, mode="same")
     talking = np.clip(envv / 0.02, 0, 1)
     sm = np.convolve(talking, np.ones(8820) / 8820, mode="same")
-    gain = 0.30 - 0.19 * sm
+    gain = 0.55 - 0.30 * sm  # sin voz más presente; con voz baja pero se sigue oyendo
     sfx = np.zeros(n, dtype=np.float32)
     w = whoosh(int(0.7 * SR))
     for st in starts[1:]:
