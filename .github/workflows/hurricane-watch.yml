@@ -1,0 +1,67 @@
+# Vigía de boletines del Centro Nacional de Huracanes.
+#
+# Los horarios (cron) de GitHub se retrasan o se saltan corridas, así que
+# este flujo se queda revisando el NHC cada 5 minutos durante ~5.5 horas y,
+# en cuanto sale un boletín completo nuevo sin video, lanza
+# "Video de ciclón" (hurricane-video.yml). Al terminar se vuelve a lanzar
+# a sí mismo, así nunca se queda sin vigilar. El repo es público, así que
+# los minutos de GitHub Actions no cuestan.
+name: Vigía de boletines NHC
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */2 * * *"   # respaldo por si el vigía se detiene
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: hurricane-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      SITE: https://quepasavta.com
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vigilar boletines
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys, time, urllib.request
+          sys.path.insert(0, "scripts/hurricane-video")
+          import nhc
+          start = time.time()
+          launched = set()
+          while time.time() - start < 5.4 * 3600:
+              try:
+                  cfg = json.load(open("scripts/hurricane-video/config.json"))
+                  if not cfg.get("publish"):
+                      print("publicación desactivada"); break
+                  for st in nhc.active_storms():
+                      adv = (st.get("forecastAdvisory") or {}).get("advNum", "")
+                      key = f"{st['id']}-{adv}".lower()
+                      if not adv or key in launched:
+                          continue
+                      with urllib.request.urlopen(f"https://quepasavta.com/api/hurricane-video?key={key}", timeout=30) as r:
+                          info = json.load(r)
+                      if info.get("exists"):
+                          launched.add(key); continue
+                      print(time.strftime("%H:%M"), "boletín nuevo:", st["name"], key, flush=True)
+                      subprocess.run(["gh", "workflow", "run", "hurricane-video.yml", "-R", __import__("os").environ["REPO"], "--ref", "main"], check=True)
+                      launched.add(key)
+              except Exception as e:
+                  print("error:", e, flush=True)
+              time.sleep(300)
+          PY
+
+      - name: Volver a vigilar
+        if: always()
+        run: gh workflow run hurricane-watch.yml -R "$REPO" --ref main
