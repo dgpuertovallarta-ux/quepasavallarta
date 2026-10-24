@@ -78,6 +78,8 @@ export type NotaTarjeta = {
   creditoFoto?: string;
   urlFuente?: string;
   detalle?: string;
+  /** Resumen de la nota: se muestra solo en la tarjeta sin foto. */
+  resumen?: string;
   plantilla?: Plantilla;
 };
 
@@ -102,7 +104,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     etiqueta: c.etiqueta,
     credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : undefined),
     foto: foto ?? undefined,
-    detalle: n.detalle,
+    detalle: n.detalle ?? (plantilla === "tarjeta" ? n.resumen : undefined),
     accion: c.tipo === "alerta" ? "Emergencias: 911" : undefined,
     logo: await dataUriDeAsset("qpv-logo-blanco.png", "image/png"),
     logoAzul: await dataUriDeAsset("qpv-logo-azul.png", "image/png"),
@@ -147,11 +149,10 @@ export async function crearResumenVial(d: Omit<DatosResumenVial, "logo">): Promi
 
 /** Genera la tarjeta de una nota, la guarda en Netlify Blobs y devuelve su URL pública (/api/image/…). Nunca lanza. */
 export async function crearTarjeta(n: NotaTarjeta): Promise<string | null> {
-  // Regla (2026-10): nada sale a Facebook sin foto real. Sin foto → sin tarjeta (null).
-  if (!n.fotoFuente) return null;
+  // Regla (2026-10): nunca foto de otro medio. Sin foto propia (oficial o de
+  // archivo que sí corresponde) sale la tarjeta tipográfica QPV, sin foto.
   try {
     const datos = await datosTarjeta(n);
-    if (!datos.foto) return null; // la foto no se pudo descargar: no sale
     const png = await renderTarjeta(datos);
     const { url } = await saveImageBlob(png, "image/png");
     return url;

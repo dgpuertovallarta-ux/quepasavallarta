@@ -35,6 +35,33 @@ export type DatosTarjeta = {
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
 
+// Color de acento por sección para la tarjeta sin foto.
+const ACENTOS: Record<string, string> = {
+  SEGURIDAD: COLORES.red,
+  ACCIDENTE: "#F26B1D",
+  "PROTECCIÓN CIVIL": COLORES.amber,
+  "QPV AL VOLANTE": COLORES.amber,
+  SERVICIOS: "#2E8BFF",
+  GOBIERNO: "#8B6CFF",
+  COMUNIDAD: COLORES.teal,
+  "DENUNCIA CIUDADANA": COLORES.red,
+  "PUERTO VALLARTA": COLORES.teal,
+};
+
+function fechaCorta() {
+  return new Date()
+    .toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", day: "numeric", month: "short", year: "numeric" })
+    .replace(/\./g, "")
+    .toUpperCase();
+}
+
+function recortar(t: string, max: number) {
+  const s = t.replace(/\s+/g, " ").trim();
+  if (s.length <= max) return s;
+  const corte = s.slice(0, max);
+  return corte.slice(0, corte.lastIndexOf(" ")).replace(/[,;:.\s]+$/, "") + "…";
+}
+
 // Logo QPV (public/qpv-logo-blanco.png, proporción 900×383). Si no se pasa, se usa el texto.
 function Logo({ logo, size = 40 }: { logo?: string; size?: number }) {
   if (logo) {
@@ -153,18 +180,30 @@ export function Tarjeta(d: DatosTarjeta) {
   }
 
   if (d.plantilla === "tarjeta") {
+    // Tarjeta tipográfica (nota sin foto propia, 2026-10): nunca foto de otro medio.
+    // Color de acento según la sección, titular grande y el dato clave abajo.
+    const acento = ACENTOS[d.etiqueta] ?? COLORES.teal;
+    const detalle = d.detalle ? recortar(d.detalle, 170) : "";
     return (
-      <div style={{ ...base, backgroundImage: "radial-gradient(circle at 85% 10%, rgba(28,184,204,0.25), rgba(10,31,58,0) 55%)" }}>
-        <div style={{ position: "absolute", left: 64, right: 64, top: 64, display: "flex", flexDirection: "column", gap: 120 }}>
-          <Etiqueta texto={d.etiqueta} />
-          <Titular texto={d.titulo} base={116} />
-          {d.detalle && (
-            <div style={{ display: "flex", borderTop: "3px solid rgba(255,255,255,0.25)", paddingTop: 30, color: COLORES.white, fontFamily: F.base, fontWeight: 500, fontSize: 36, lineHeight: 1.35 }}>
-              {d.detalle}
+      <div style={{ ...base, backgroundImage: `radial-gradient(circle at 90% 8%, ${acento}40, rgba(10,31,58,0) 50%), radial-gradient(circle at 0% 100%, rgba(20,184,176,0.18), rgba(10,31,58,0) 45%)` }}>
+        <div style={{ position: "absolute", left: 0, top: 0, width: 22, height: ALTO, display: "flex", background: acento }} />
+        <div style={{ position: "absolute", left: 92, right: 72, top: 84, display: "flex", alignItems: "center", gap: 22 }}>
+          <Etiqueta texto={d.etiqueta} fondo={acento} color={acento === COLORES.amber ? COLORES.navy : COLORES.white} />
+          <div style={{ display: "flex", color: "rgba(255,255,255,0.6)", fontFamily: F.base, fontWeight: 800, fontSize: 26, letterSpacing: 3 }}>{fechaCorta()}</div>
+        </div>
+        <div style={{ position: "absolute", left: 92, right: 72, top: 200, bottom: 190, display: "flex", flexDirection: "column", justifyContent: "center", gap: 46 }}>
+          <div style={{ display: "flex", width: 120, height: 10, background: acento }} />
+          <Titular texto={d.titulo} base={110} />
+          {detalle && (
+            <div style={{ display: "flex", borderLeft: `6px solid ${acento}`, paddingLeft: 28, color: "rgba(255,255,255,0.88)", fontFamily: F.base, fontWeight: 500, fontSize: 36, lineHeight: 1.35 }}>
+              {detalle}
             </div>
           )}
         </div>
-        <Pie logo={d.logo} credito={d.credito} />
+        <div style={{ position: "absolute", left: 92, bottom: 128, display: "flex", color: COLORES.white, fontFamily: F.base, fontWeight: 800, fontSize: 26, letterSpacing: 2 }}>
+          NOTA COMPLETA EN QUEPASAVTA.COM
+        </div>
+        <Pie logo={d.logo} barra={acento} credito={d.credito ?? " "} />
       </div>
     );
   }

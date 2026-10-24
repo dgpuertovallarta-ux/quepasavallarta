@@ -98,8 +98,11 @@ export async function correrMonitor(): Promise<string> {
     }
   }
 
-  // 2) Corredores con retraso fuerte → postal amarilla de QPV al Volante a la cola de redes
-  for (const c of corredores.filter((x) => x.nivel === "pesado")) {
+  // 2) Corredores con retraso fuerte → postal amarilla de QPV al Volante a la cola de redes.
+  // 2026-10-24: el propietario pidió tráfico en Facebook solo a las 8, 14 y 18 h
+  // (los resúmenes de abajo); los avisos sueltos por corredor quedan apagados
+  // salvo que se active QPV_AVISOS_CORREDOR=1.
+  for (const c of process.env.QPV_AVISOS_CORREDOR === "1" ? corredores.filter((x) => x.nivel === "pesado") : []) {
     if (reciente("corr:" + c.id)) continue;
     const def = CORREDORES.find((x) => x.id === c.id)!;
     const def2 = def;
@@ -200,7 +203,7 @@ async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], 
   const titulo = cargadas.length
     ? `Así va el tráfico en Vallarta a las ${horaTexto()}. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
     : `Así va el tráfico en Vallarta a las ${horaTexto()}: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
-  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl });
+  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl }, { tipo: "trafico" });
   return `resumen vial ${slot}:00 enviado a la cola`;
 }
 

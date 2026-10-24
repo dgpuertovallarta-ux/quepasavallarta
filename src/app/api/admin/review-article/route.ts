@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       categoria: publicada?.category ?? "comunidad",
       clave: article.slug,
       urlFuente: publicada?.sources[0]?.url,
+      resumen: article.excerpt,
       ...fotoParaRedes(publicada?.imageUrl, publicada?.imageCredit, article.title, article.excerpt, publicada?.sources[0]?.url),
     });
     if (!cardUrl) {
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
         decision,
         reviewedBy: admin.displayName,
         published: true,
-        socialSkipped: "La nota no tiene foto real, así que no se publicó en Facebook ni Instagram (regla: nada sin foto).",
+        socialSkipped: "No se pudo armar la tarjeta para redes; la nota quedó publicada solo en el sitio.",
       });
     }
     const social = await publishToSocial({
