@@ -15,6 +15,10 @@
 import { getStore } from "@netlify/blobs";
 import { publishToSocial } from "../social/publishToSocial";
 import { clasificar } from "./clasificar";
+import { creditoOficial } from "./oficiales";
+import { fotoDeArchivo } from "./fotoArchivo";
+import { isHurricaneSimonContent } from "../social/editorialPolicy";
+import { siteUrl } from "../storage/imageBlobs";
 
 const MAX_POR_DIA = Number(process.env.QPV_MAX_POR_DIA || 10);
 const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 40);
@@ -147,8 +151,19 @@ export async function procesarColaRedes(): Promise<string> {
     }
 
     // 2) Notas: las más importantes, revueltas.
-    const notas = vigentes.filter((x) => (x.tipo ?? (x.articleUrl.includes("/trafico") ? "trafico" : "nota")) === "nota");
-    if (!notas.length) return "Cola vacía.";
+    let notas = vigentes.filter((x) => (x.tipo ?? (x.articleUrl.includes("/trafico") ? "trafico" : "nota")) === "nota");
+    if (!notas.length) {
+      // Cola vacía: se toma la nota más importante ya publicada en el sitio
+      // (últimas 6 h) que todavía no ha salido a Facebook.
+      const h0 = horaLocalNum();
+      const yaEnCola = new Set(xs.map((x) => x.articleUrl));
+      const hoyPub = xs.filter((x) => x.estado === "publicada" && x.publicadaEn && diaLocal(x.publicadaEn) === hoy && x.tipo !== "trafico").length;
+      if (h0 >= HORA_INICIO && h0 < HORA_FIN && hoyPub < MAX_POR_DIA) {
+        const nuevo = await reabastecer(yaEnCola);
+        if (nuevo) notas = [nuevo];
+      }
+      if (!notas.length) return "Cola vacía.";
+    }
     const publicadasHoy = xs.filter(
       (x) => x.estado === "publicada" && x.publicadaEn && diaLocal(x.publicadaEn) === hoy && (x.tipo ?? (x.articleUrl.includes("/trafico") ? "trafico" : "nota")) === "nota"
     );
@@ -178,6 +193,50 @@ export async function procesarColaRedes(): Promise<string> {
     return `Error en la cola de redes: ${err instanceof Error ? err.message : "desconocido"}`;
   } finally {
     if (token) await soltarCandado(token).catch(() => undefined);
+  }
+}
+
+/**
+ * Arma la tarjeta de la nota publicada más importante (últimas 6 h) que no
+ * ha salido a redes y la mete a la cola. Así las notas que se publicaron
+ * sin tarjeta (o antes de este cambio) también llegan a Facebook.
+ */
+async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
+  try {
+    const { getPublishedArticles } = await import("../db/articles");
+    const { crearTarjeta } = await import("./tarjetas");
+    const recientes = (await getPublishedArticles(40)).filter(
+      (a) =>
+        Date.now() - new Date(a.publishedAt).getTime() < 6 * 3_600_000 &&
+        !yaEnCola.has(`${siteUrl()}/noticia/${a.slug}`) &&
+        !isHurricaneSimonContent(`${a.title} ${a.dek}`)
+    );
+    const a = recientes.sort((x, y) => (y.score ?? 0) - (x.score ?? 0))[0];
+    if (!a) return null;
+    const fuente = a.sources[0]?.url;
+    const oficial = a.imageUrl && (creditoOficial(fuente) || /^denuncia ciudadana/i.test(a.imageCredit ?? ""));
+    const archivo = oficial ? null : fotoDeArchivo(a.title, "");
+    const cardUrl = await crearTarjeta({
+      titulo: a.title,
+      categoria: a.category,
+      clave: a.slug,
+      urlFuente: fuente,
+      resumen: a.dek,
+      fotoFuente: oficial ? a.imageUrl : archivo?.url,
+      creditoFoto: oficial ? a.imageCredit : archivo?.credito,
+    });
+    const articleUrl = `${siteUrl()}/noticia/${a.slug}`;
+    if (!cardUrl) {
+      // Se anota para no volver a intentarla en cada corrida.
+      await store().setJSON("item/sin-" + a.slug.slice(0, 80), { id: "sin-" + a.slug.slice(0, 80), title: a.title, excerpt: a.dek, articleUrl, urgente: false, tipo: "nota", creada: new Date().toISOString(), estado: "fallida", resultado: "sin tarjeta" } satisfies ItemRedes);
+      return null;
+    }
+    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score });
+    const xs = await leerTodos();
+    return xs.find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
+  } catch (err) {
+    console.error("[colaRedes] reabastecer:", err instanceof Error ? err.message : err);
+    return null;
   }
 }
 
