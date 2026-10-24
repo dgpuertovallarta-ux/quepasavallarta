@@ -16,6 +16,7 @@ import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
 import { fotoFondo } from "./fotoArchivo";
+import { titularEnIngles } from "./traducir";
 import { CATEGORY_IMAGES } from "../photos";
 
 /** Foto de ambiente para la tarjeta sin foto: muy difuminada y oscura (con sharp). */
@@ -100,6 +101,8 @@ export type NotaTarjeta = {
   detalle?: string;
   /** Resumen de la nota: se muestra solo en la tarjeta sin foto. */
   resumen?: string;
+  /** true = sin la traducción al inglés debajo del titular. */
+  sinIngles?: boolean;
   plantilla?: Plantilla;
 };
 
@@ -133,6 +136,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     etiqueta: c.etiqueta,
     credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : creditoFondo),
     fondo,
+    tituloEn: (plantilla === "tarjeta" || plantilla === "foto" || plantilla === "alerta") && !n.sinIngles ? (await titularEnIngles(n.titulo)) ?? undefined : undefined,
     foto: foto ?? undefined,
     detalle: n.detalle ?? (plantilla === "tarjeta" ? n.resumen : undefined),
     accion: c.tipo === "alerta" ? "Emergencias: 911" : undefined,

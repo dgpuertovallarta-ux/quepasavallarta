@@ -1,6 +1,7 @@
 import { getStore } from "@netlify/blobs";
 import { getPool, isDatabaseConfigured } from "@/lib/db/client";
 import { saveImageBlob } from "@/lib/storage/imageBlobs";
+import { postEnIngles } from "@/lib/qpv/traducir";
 
 /**
  * Videos automáticos de ciclones (generados en GitHub Actions con datos del
@@ -127,7 +128,9 @@ export async function publishToFacebook(key: string): Promise<{ id: string; kind
   if (row.fbVideoId) return { id: row.fbVideoId, kind: "reel" };
   if (process.env.HURRICANE_VIDEO_PUBLISH === "false") throw new Error("Publicación desactivada (HURRICANE_VIDEO_PUBLISH=false).");
   const { pageId, token } = fbConfig();
-  const description = row.caption || "";
+  // Texto en español y, debajo, en inglés (2026-10-24).
+  const en = row.caption ? await postEnIngles(row.caption.replace(/\s*Fuente: NHC \(Miami\)\.?\s*$/, "")).catch(() => null) : null;
+  const description = (row.caption || "") + (en ? `\n\nEN: ${en} Source: NHC (Miami).` : "");
   try {
     const start = await graph(`/${pageId}/video_reels`, { upload_phase: "start" });
     const videoId = String(start.video_id);

@@ -32,6 +32,7 @@ export type DatosTarjeta = {
   lamina?: string;           // explicador: "1/5" para carruseles
   logoAzul?: string;         // explicador (fondo claro): logo QPV en azul
   fondo?: string;            // tarjeta sin foto: foto de archivo ya difuminada (data URI)
+  tituloEn?: string;         // traducción del titular al inglés (va en chico debajo)
 };
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
@@ -89,6 +90,17 @@ function tamTitular(t: string, base: number) {
   if (n <= 75) return base;
   if (n <= 100) return base * 0.85;
   return base * 0.72;
+}
+
+// Titular en inglés: chico y proporcionado al español, en color más suave.
+function TitularEn({ texto, size = 34 }: { texto?: string; size?: number }) {
+  if (!texto) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 14, color: "rgba(255,255,255,0.78)", fontFamily: F.base, fontWeight: 500, fontSize: size, lineHeight: 1.25 }}>
+      <div style={{ display: "flex", flexShrink: 0, marginTop: size * 0.18, background: "rgba(255,255,255,0.16)", color: "rgba(255,255,255,0.9)", fontWeight: 800, fontSize: size * 0.55, letterSpacing: 2, padding: "3px 8px" }}>EN</div>
+      <div style={{ display: "flex" }}>{texto}</div>
+    </div>
+  );
 }
 
 function Titular({ texto, base = 92 }: { texto: string; base?: number }) {
@@ -198,8 +210,11 @@ export function Tarjeta(d: DatosTarjeta) {
         </div>
         <div style={{ position: "absolute", left: 92, right: 72, top: 200, bottom: 190, display: "flex", flexDirection: "column", justifyContent: "center", gap: 46 }}>
           <div style={{ display: "flex", width: 120, height: 10, background: acento }} />
-          <Titular texto={d.titulo} base={110} />
-          {detalle && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <Titular texto={d.titulo} base={d.tituloEn ? 100 : 110} />
+            <TitularEn texto={d.tituloEn} size={d.titulo.length > 90 ? 32 : 38} />
+          </div>
+          {detalle && !(d.tituloEn && d.titulo.length > 95) && (
             <div style={{ display: "flex", borderLeft: `6px solid ${acento}`, paddingLeft: 28, color: "rgba(255,255,255,0.88)", fontFamily: F.base, fontWeight: 500, fontSize: 36, lineHeight: 1.35 }}>
               {detalle}
             </div>
@@ -224,6 +239,7 @@ export function Tarjeta(d: DatosTarjeta) {
         </div>
         <div style={{ position: "absolute", left: 64, right: 64, bottom: 160, display: "flex", flexDirection: "column", gap: 26 }}>
           <Titular texto={d.titulo} base={94} />
+          <TitularEn texto={d.tituloEn} size={34} />
           {d.detalle && <div style={{ display: "flex", color: COLORES.white, fontFamily: F.base, fontWeight: 500, fontSize: 32 }}>{d.detalle}</div>}
           {d.accion && <div style={{ display: "flex", alignSelf: "flex-start", background: COLORES.amber, color: COLORES.navy, fontFamily: F.base, fontWeight: 800, fontSize: 30, padding: "10px 18px" }}>{d.accion}</div>}
         </div>
@@ -279,7 +295,8 @@ export function Tarjeta(d: DatosTarjeta) {
         <div style={{ position: "absolute", left: 0, right: 0, top: altoFoto + 10, bottom: 0, display: "flex", background: COLORES.navy, backgroundImage: "radial-gradient(circle at 92% 110%, rgba(20,184,176,0.22), rgba(10,31,58,0) 55%)" }} />
         <div style={{ position: "absolute", left: 64, right: 64, top: altoFoto + 44, display: "flex", flexDirection: "column", gap: 22 }}>
           <Etiqueta texto={d.etiqueta} fondo={colorSeccion} color={texto} />
-          <Titular texto={d.titulo} base={78} />
+          <Titular texto={d.titulo} base={d.tituloEn ? 68 : 78} />
+          <TitularEn texto={d.tituloEn} size={d.titulo.length > 80 ? 26 : 30} />
         </div>
         <div style={{ position: "absolute", right: 64, bottom: 40, display: "flex", color: "rgba(255,255,255,0.7)", fontFamily: F.base, fontWeight: 800, fontSize: 24, letterSpacing: 1 }}>quepasavta.com</div>
       </div>

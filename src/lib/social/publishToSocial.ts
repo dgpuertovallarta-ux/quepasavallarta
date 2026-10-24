@@ -17,6 +17,8 @@
  * esta función.
  */
 
+import { postEnIngles } from "../qpv/traducir";
+
 const GRAPH_API_VERSION = process.env.GRAPH_API_VERSION || "v23.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
@@ -78,14 +80,20 @@ function buildInstagramCaption(input: SocialPublishInput): string {
  * oraciones completas —qué pasó, dónde y el dato clave—, sin emojis ni
  * frases de gancho, y al final la liga a la nota.
  */
-export function buildCaption(input: SocialPublishInput): string {
+export function buildCaption(input: SocialPublishInput, ingles?: string | null): string {
   const titulo = input.title.trim().replace(/[.\s]+$/, "");
   let lede = (input.excerpt || "").trim().replace(/\s+/g, " ");
   if (lede.length < 40 || titulo.toLowerCase().includes(lede.toLowerCase().slice(0, 30))) lede = "";
   if (lede && !/[.!?…]$/.test(lede)) lede += ".";
   const cuerpo = lede ? `${titulo}. ${lede}` : `${titulo}.`;
   const enlace = input.articleUrl.includes("/trafico") ? `Tráfico en vivo: ${input.articleUrl}` : `Lee la nota completa: ${input.articleUrl}`;
-  return `${cuerpo}\n\n${enlace}`;
+  // 2026-10-24: debajo, la versión en inglés (Vallarta tiene mucho público extranjero).
+  return ingles ? `${cuerpo}\n\nEN: ${ingles}\n\n${enlace}` : `${cuerpo}\n\n${enlace}`;
+}
+
+/** El cuerpo del post (sin la liga) para traducirlo. */
+function cuerpoPost(input: SocialPublishInput): string {
+  return buildCaption(input).split("\n\n")[0];
 }
 
 async function postToFacebook(input: SocialPublishInput): Promise<SocialPublishResult["facebook"]> {
@@ -99,11 +107,12 @@ async function postToFacebook(input: SocialPublishInput): Promise<SocialPublishR
     // falla la generación): /feed publica un post de solo texto+enlace.
     const endpoint = input.imageUrl ? `${GRAPH_BASE}/${pageId}/photos` : `${GRAPH_BASE}/${pageId}/feed`;
     const body = new URLSearchParams({ access_token: token });
+    const caption = buildCaption(input, await postEnIngles(cuerpoPost(input)));
     if (input.imageUrl) {
       body.set("url", input.imageUrl);
-      body.set("caption", buildCaption(input));
+      body.set("caption", caption);
     } else {
-      body.set("message", buildCaption(input));
+      body.set("message", caption);
       body.set("link", input.articleUrl);
     }
 
