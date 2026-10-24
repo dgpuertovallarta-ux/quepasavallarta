@@ -15,7 +15,8 @@ import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial 
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
-import { fotoFondo } from "./fotoArchivo";
+import { fotoFondo, fotoDeArchivo } from "./fotoArchivo";
+import { fotoDelTema } from "./fotoTema";
 import { titularEnIngles } from "./traducir";
 import { CATEGORY_IMAGES } from "../photos";
 
@@ -27,7 +28,7 @@ async function fondoDifuminado(url: string): Promise<string | null> {
     const sharp = (await import("sharp")).default;
     const out = await sharp(Buffer.from(await r.arrayBuffer()))
       .resize(540, 675, { fit: "cover" })
-      .blur(7)
+      .blur(3.5)
       .modulate({ brightness: 0.95, saturation: 1.05 })
       .jpeg({ quality: 70 })
       .toBuffer();
@@ -121,13 +122,25 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "foto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
   if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
 
-  // Sin foto propia: foto de archivo del tema, difuminada, solo de ambiente.
+  // Sin foto propia: foto de ARCHIVO de lo que trata la nota (si es un choque,
+  // un choque; si es San Pancho, San Pancho), un poco difuminada de fondo.
+  // Orden: búsqueda por tema con IA en Wikimedia → lugar del titular en el
+  // banco propio → foto de la sección.
   let fondo: string | undefined;
   let creditoFondo: string | undefined;
   if (!foto && (plantilla === "tarjeta" || plantilla === "alerta")) {
-    const f = fotoFondo(n.titulo, n.resumen ?? "", c.etiqueta, CATEGORY_IMAGES, n.categoria);
-    fondo = (await fondoDifuminado(f.url)) ?? undefined;
-    if (fondo) creditoFondo = f.credito;
+    const candidatos = [
+      await fotoDelTema(n.titulo, n.resumen ?? ""),
+      fotoDeArchivo(n.titulo, ""),
+      fotoFondo(n.titulo, n.resumen ?? "", c.etiqueta, CATEGORY_IMAGES, n.categoria),
+    ].filter(Boolean) as { url: string; credito: string }[];
+    for (const f of candidatos) {
+      fondo = (await fondoDifuminado(f.url)) ?? undefined;
+      if (fondo) {
+        creditoFondo = f.credito.replace(/^Foto de archivo/, "Fondo: foto de archivo");
+        break;
+      }
+    }
   }
 
   return {
