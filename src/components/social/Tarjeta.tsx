@@ -31,6 +31,7 @@ export type DatosTarjeta = {
   texto?: string;            // explicador: párrafo corto; las palabras entre **asteriscos** se resaltan
   lamina?: string;           // explicador: "1/5" para carruseles
   logoAzul?: string;         // explicador (fondo claro): logo QPV en azul
+  fondo?: string;            // tarjeta sin foto: foto de archivo ya difuminada (data URI)
 };
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
@@ -186,6 +187,10 @@ export function Tarjeta(d: DatosTarjeta) {
     const detalle = d.detalle ? recortar(d.detalle, 170) : "";
     return (
       <div style={{ ...base, backgroundImage: `radial-gradient(circle at 90% 8%, ${acento}40, rgba(10,31,58,0) 50%), radial-gradient(circle at 0% 100%, rgba(20,184,176,0.18), rgba(10,31,58,0) 45%)` }}>
+        {d.fondo && <img src={d.fondo} width={ANCHO} height={ALTO} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, objectFit: "cover" }} />}
+        {d.fondo && (
+          <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, display: "flex", backgroundImage: `linear-gradient(180deg, rgba(10,31,58,0.25) 0%, rgba(10,31,58,0.55) 30%, rgba(10,31,58,0.82) 60%, rgba(10,31,58,0.95) 100%), radial-gradient(circle at 90% 8%, ${acento}55, rgba(10,31,58,0) 50%)` }} />
+        )}
         <div style={{ position: "absolute", left: 0, top: 0, width: 22, height: ALTO, display: "flex", background: acento }} />
         <div style={{ position: "absolute", left: 92, right: 72, top: 84, display: "flex", alignItems: "center", gap: 22 }}>
           <Etiqueta texto={d.etiqueta} fondo={acento} color={acento === COLORES.amber ? COLORES.navy : COLORES.white} />
@@ -211,7 +216,7 @@ export function Tarjeta(d: DatosTarjeta) {
   if (d.plantilla === "alerta") {
     return (
       <div style={base}>
-        {d.foto && <img src={d.foto} width={ANCHO} height={ALTO} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, objectFit: "cover" }} />}
+        {(d.foto || d.fondo) && <img src={d.foto ?? d.fondo} width={ANCHO} height={ALTO} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, objectFit: "cover" }} />}
         <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(6,16,32,0.1) 20%, rgba(6,16,32,0.85) 60%, rgba(6,16,32,0.97) 100%)" }} />
         <div style={{ position: "absolute", left: 0, right: 0, top: 0, height: 110, display: "flex", alignItems: "center", gap: 22, padding: "0 64px", background: COLORES.amber }}>
           <svg width="58" height="52" viewBox="0 0 58 52"><path d="M29 2 L56 50 H2 Z" fill={COLORES.navy} /><rect x="26" y="18" width="6" height="17" fill={COLORES.amber} /><rect x="26" y="39" width="6" height="6" fill={COLORES.amber} /></svg>

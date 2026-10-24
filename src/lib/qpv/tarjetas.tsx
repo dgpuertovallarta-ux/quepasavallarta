@@ -15,6 +15,26 @@ import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial 
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
+import { fotoFondo } from "./fotoArchivo";
+import { CATEGORY_IMAGES } from "../photos";
+
+/** Foto de ambiente para la tarjeta sin foto: muy difuminada y oscura (con sharp). */
+async function fondoDifuminado(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    const sharp = (await import("sharp")).default;
+    const out = await sharp(Buffer.from(await r.arrayBuffer()))
+      .resize(540, 675, { fit: "cover" })
+      .blur(7)
+      .modulate({ brightness: 0.95, saturation: 1.05 })
+      .jpeg({ quality: 70 })
+      .toBuffer();
+    return `data:image/jpeg;base64,${out.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
 
 const UA = "Mozilla/5.0 (compatible; QuePasaVallartaBot/1.0; +https://quepasavta.com)";
 
@@ -98,11 +118,21 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "foto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
   if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
 
+  // Sin foto propia: foto de archivo del tema, difuminada, solo de ambiente.
+  let fondo: string | undefined;
+  let creditoFondo: string | undefined;
+  if (!foto && (plantilla === "tarjeta" || plantilla === "alerta")) {
+    const f = fotoFondo(n.titulo, n.resumen ?? "", c.etiqueta, CATEGORY_IMAGES, n.categoria);
+    fondo = (await fondoDifuminado(f.url)) ?? undefined;
+    if (fondo) creditoFondo = f.credito;
+  }
+
   return {
     plantilla,
     titulo: n.titulo,
     etiqueta: c.etiqueta,
-    credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : undefined),
+    credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : creditoFondo),
+    fondo,
     foto: foto ?? undefined,
     detalle: n.detalle ?? (plantilla === "tarjeta" ? n.resumen : undefined),
     accion: c.tipo === "alerta" ? "Emergencias: 911" : undefined,

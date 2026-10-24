@@ -53,3 +53,29 @@ export function fotoDeArchivo(titulo: string, resumen = "", semilla = titulo): F
   const autor = PHOTO_CREDITS[clave];
   return { url: PHOTOS[clave], credito: `Foto de archivo${autor ? `: ${autor}` : ""}`, clave };
 }
+
+/**
+ * Foto de FONDO para la tarjeta sin foto (2026-10-24): va muy difuminada y
+ * oscurecida, solo para dar ambiente del tema, así que basta con que sea del
+ * tema o de la sección. Nunca falla: siempre devuelve alguna de Vallarta.
+ */
+const FONDO_POR_ETIQUETA: Record<string, PhotoKey[]> = {
+  SEGURIDAD: ["bahiaNoche", "kioscoNoche", "ciudadAerea"],
+  ACCIDENTE: ["puente", "ciudadAerea", "bahiaCiudad"],
+  "PROTECCIÓN CIVIL": ["cieloTormenta", "costaNublada", "marinaNublada"],
+  "QPV AL VOLANTE": ["puente", "ciudadAerea", "bahiaCiudad"],
+  SERVICIOS: ["construccion", "ciudadAerea", "puente"],
+  GOBIERNO: ["plazaArmas", "kiosco", "kioscoNoche"],
+  COMUNIDAD: ["callePapelPicado", "calleSombrillas", "mercadoCuale", "kiosco"],
+  "DENUNCIA CIUDADANA": ["calleSombrillas", "callePapelPicado", "ciudadAerea"],
+  "PUERTO VALLARTA": ["bahiaCiudad", "vistaAerea", "maleconGeneral", "faroMalecon"],
+};
+
+export function fotoFondo(titulo: string, resumen: string, etiqueta: string, categorias: Record<string, PhotoKey[]> = {}, categoria = ""): FotoArchivo {
+  const texto = `${titulo} ${resumen}`;
+  const regla = REGLAS.find((r) => r.re.test(titulo)) ?? REGLAS.find((r) => r.re.test(texto));
+  const opciones = regla?.fotos ?? categorias[categoria] ?? FONDO_POR_ETIQUETA[etiqueta] ?? FONDO_POR_ETIQUETA["PUERTO VALLARTA"];
+  const clave = opciones[hash(titulo) % opciones.length];
+  const autor = PHOTO_CREDITS[clave];
+  return { url: PHOTOS[clave], credito: `Fondo: foto de archivo${autor ? ` · ${autor}` : ""}`, clave };
+}
