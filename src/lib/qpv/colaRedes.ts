@@ -111,6 +111,15 @@ async function publicar(sig: ItemRedes): Promise<string> {
   await s.setJSON("item/" + sig.id, { ...sig, estado: "publicando" } satisfies ItemRedes);
   const r = await publishToSocial({ title: sig.title, excerpt: sig.excerpt, articleUrl: sig.articleUrl, imageUrl: sig.imageUrl });
   const ok = r.facebook.ok || r.instagram.ok;
+  // Token de Facebook vencido/invalidado: la nota NO se gasta, se queda en la
+  // cola y se avisa; en cuanto se ponga un token nuevo vuelve a salir.
+  if (!ok && /access token|session has been invalidated|OAuthException|token/i.test(r.facebook.error ?? "")) {
+    await s.setJSON("item/" + sig.id, { ...sig, estado: "pendiente", resultado: `Token de Facebook inválido: ${r.facebook.error}` } satisfies ItemRedes);
+    await s.setJSON("token-invalido", { en: new Date().toISOString(), error: r.facebook.error });
+    console.error("[colaRedes] TOKEN DE FACEBOOK INVÁLIDO — hay que generar uno nuevo (FB_PAGE_ACCESS_TOKEN):", r.facebook.error);
+    return "Token de Facebook inválido: no se publicó (la nota sigue en cola).";
+  }
+  if (r.facebook.ok) await s.delete("token-invalido").catch(() => undefined);
   await s.setJSON("item/" + sig.id, {
     ...sig,
     estado: ok ? "publicada" : "fallida",
@@ -128,6 +137,9 @@ export async function procesarColaRedes(): Promise<string> {
     token = await tomarCandado();
     if (!token) return "Otra corrida está publicando.";
     const s = store();
+    // Con el token inválido solo se reintenta cada 30 min (por si ya lo cambiaron).
+    const ti = (await s.get("token-invalido", { type: "json" })) as { en: string } | null;
+    if (ti && Date.now() - new Date(ti.en).getTime() < 30 * 60_000) return "Token de Facebook inválido: esperando token nuevo.";
     const xs = await leerTodos();
     const ahora = Date.now();
     const hoy = diaLocal(new Date().toISOString());
@@ -137,6 +149,13 @@ export async function procesarColaRedes(): Promise<string> {
       const edad = ahora - new Date(x.creada).getTime();
       if (x.estado === "pendiente" && edad > VIGENCIA_MS) await s.setJSON("item/" + x.id, { ...x, estado: "vencida" });
       else if (x.estado !== "pendiente" && edad > 3 * 86_400_000) await s.delete("item/" + x.id);
+    }
+    // Las que fallaron solo por el token (antes de este cambio) vuelven a la cola.
+    for (const x of xs) {
+      if (x.estado === "fallida" && /access token|session has been invalidated/i.test(x.resultado ?? "") && ahora - new Date(x.creada).getTime() <= VIGENCIA_MS) {
+        x.estado = "pendiente";
+        await s.setJSON("item/" + x.id, x);
+      }
     }
     const vigentes = xs.filter((x) => x.estado === "pendiente" && ahora - new Date(x.creada).getTime() <= VIGENCIA_MS);
 
