@@ -77,6 +77,14 @@ export async function encolarRedes(
   await store().setJSON("item/" + item.id, item);
 }
 
+/** Huella corta del token (no el token) para saber si lo cambiaron. */
+function huellaToken(): string {
+  const t = process.env.FB_PAGE_ACCESS_TOKEN || "";
+  let h = 0;
+  for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+  return `${t.length}-${h.toString(36)}`;
+}
+
 function diaLocal(iso: string) {
   return new Date(iso).toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
 }
@@ -115,7 +123,7 @@ async function publicar(sig: ItemRedes): Promise<string> {
   // cola y se avisa; en cuanto se ponga un token nuevo vuelve a salir.
   if (!ok && /access token|session has been invalidated|OAuthException|token/i.test(r.facebook.error ?? "")) {
     await s.setJSON("item/" + sig.id, { ...sig, estado: "pendiente", resultado: `Token de Facebook inválido: ${r.facebook.error}` } satisfies ItemRedes);
-    await s.setJSON("token-invalido", { en: new Date().toISOString(), error: r.facebook.error });
+    await s.setJSON("token-invalido", { en: new Date().toISOString(), error: r.facebook.error, huella: huellaToken() });
     console.error("[colaRedes] TOKEN DE FACEBOOK INVÁLIDO — hay que generar uno nuevo (FB_PAGE_ACCESS_TOKEN):", r.facebook.error);
     return "Token de Facebook inválido: no se publicó (la nota sigue en cola).";
   }
@@ -138,8 +146,9 @@ export async function procesarColaRedes(): Promise<string> {
     if (!token) return "Otra corrida está publicando.";
     const s = store();
     // Con el token inválido solo se reintenta cada 30 min (por si ya lo cambiaron).
-    const ti = (await s.get("token-invalido", { type: "json" })) as { en: string } | null;
-    if (ti && Date.now() - new Date(ti.en).getTime() < 30 * 60_000) return "Token de Facebook inválido: esperando token nuevo.";
+    // Si ya pusieron un token distinto en Netlify, se intenta de inmediato.
+    const ti = (await s.get("token-invalido", { type: "json" })) as { en: string; huella?: string } | null;
+    if (ti && ti.huella === huellaToken() && Date.now() - new Date(ti.en).getTime() < 30 * 60_000) return "Token de Facebook inválido: esperando token nuevo.";
     const xs = await leerTodos();
     const ahora = Date.now();
     const hoy = diaLocal(new Date().toISOString());
