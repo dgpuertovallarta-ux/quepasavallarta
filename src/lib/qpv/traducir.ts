@@ -17,33 +17,48 @@ export function postEnIngles(texto: string): Promise<string | null> {
   return traducir(texto, "post");
 }
 
+// Las traducciones se guardan para no pedirlas dos veces (tarjeta y post usan la misma).
+const cache = new Map<string, string>();
+
 async function traducir(titulo: string, tipo: "headline" | "post"): Promise<string | null> {
   if (!process.env.GEMINI_API_KEY || !titulo.trim()) return null;
-  try {
-    const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const res = await Promise.race([
-      client.models.generateContent({
-        model: MODEL,
-        contents: titulo,
-        config: {
-          systemInstruction:
-            (tipo === "headline"
-              ? "Translate this Mexican local-news headline from Puerto Vallarta into natural, concise US English news style. "
-              : "Translate this short Mexican local-news Facebook post from Puerto Vallarta into natural US English news style, same length. ") +
-            "Keep place names in Spanish (Malecón, Río Cuale, Bahía de Banderas). Do not add facts. " +
-            "Reply with the translation only, no quotes, no emojis, no hashtags.",
-          maxOutputTokens: tipo === "headline" ? 120 : 400,
-          temperature: 0.2,
-        },
-      }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 6000)),
-    ]);
-    let t = (res.text || "").trim().replace(/^["“']|["”']$/g, "");
-    if (tipo === "headline") t = t.split("\n")[0].trim();
-    else t = t.replace(/\s*\n+\s*/g, " ").trim();
-    if (!t || t.length > (tipo === "headline" ? 220 : 900) || t.toLowerCase() === titulo.toLowerCase()) return null;
-    return t;
-  } catch {
-    return null;
+  const clave = `${tipo}:${titulo}`;
+  if (cache.has(clave)) return cache.get(clave)!;
+  const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // 2026-10-25: a veces salía sin inglés. El modelo "piensa" antes de contestar y
+  // con un límite de salida chico se acababa el espacio sin dar la traducción;
+  // ahora hay espacio de sobra, más tiempo y un segundo intento.
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const res = await Promise.race([
+        client.models.generateContent({
+          model: MODEL,
+          contents: titulo,
+          config: {
+            systemInstruction:
+              (tipo === "headline"
+                ? "Translate this Mexican local-news headline from Puerto Vallarta into natural, concise US English news style. "
+                : "Translate this short Mexican local-news Facebook post from Puerto Vallarta into natural US English news style, same length. ") +
+              "Keep place names in Spanish (Malecón, Río Cuale, Bahía de Banderas). Do not add facts. " +
+              "Reply with the translation only, no quotes, no emojis, no hashtags.",
+            maxOutputTokens: 4096,
+            temperature: 0.2,
+          },
+        }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("tiempo agotado")), 12000)),
+      ]);
+      let t = (res.text || "").trim().replace(/^["“']|["”']$/g, "");
+      if (tipo === "headline") t = t.split("\n")[0].trim();
+      else t = t.replace(/\s*\n+\s*/g, " ").trim();
+      if (t && t.length <= (tipo === "headline" ? 220 : 900) && t.toLowerCase() !== titulo.toLowerCase()) {
+        cache.set(clave, t);
+        return t;
+      }
+      console.error(`[traducir] respuesta vacía o rara (${tipo}, intento ${intento + 1})`);
+    } catch (err) {
+      console.error(`[traducir] falló (${tipo}, intento ${intento + 1}):`, err instanceof Error ? err.message : err);
+    }
+    await new Promise((r) => setTimeout(r, 1500));
   }
+  return null;
 }

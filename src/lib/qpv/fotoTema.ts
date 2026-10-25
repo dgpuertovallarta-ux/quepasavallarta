@@ -32,11 +32,11 @@ async function busquedas(titulo: string, resumen: string): Promise<string[]> {
             "(ej. 'car crash street', 'house fire firefighters', 'flooded street', 'mosquito aedes'). " +
             "Si trata de un LUGAR concreto (San Pancho, Sayulita, Bucerías, Mismaloya, Punta de Mita, Río Cuale, Ixtapa…), incluye el lugar " +
             "(ej. 'San Pancho Nayarit beach'). Nunca atardeceres ni paisajes genéricos si no tienen que ver. Solo las búsquedas.",
-          maxOutputTokens: 80,
+          maxOutputTokens: 2048,
           temperature: 0.2,
         },
       }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 6000)),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 10000)),
     ]);
     return (res.text || "")
       .split("\n")
