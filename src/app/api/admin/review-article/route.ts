@@ -14,7 +14,7 @@ import { fotoDeArchivo } from "@/lib/qpv/fotoArchivo";
 /** Facebook: foto oficial de la nota o, si no, la de archivo del lugar/tema. Nunca la de otro medio. */
 function fotoParaRedes(url: string | undefined, credito: string | undefined, titulo: string, resumen: string, fuente?: string) {
   // Foto oficial, o la que nos mandó el ciudadano en una denuncia (es nuestra para publicar).
-  if (url && (creditoOficial(fuente) || /^denuncia ciudadana/i.test(credito ?? ""))) return { fotoFuente: url, creditoFoto: credito };
+  if (url && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(credito ?? ""))) return { fotoFuente: url, creditoFoto: credito };
   const a = fotoDeArchivo(titulo, resumen);
   return a ? { fotoFuente: a.url, creditoFoto: a.credito } : {};
 }

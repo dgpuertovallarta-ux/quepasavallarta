@@ -178,6 +178,9 @@ export async function procesarColaRedes(): Promise<string> {
       await s.setJSON("item/" + trafico[0].id, { ...trafico[0], estado: "vencida" });
     }
 
+    // 1b) Invitación a mandar reportes ciudadanos: una vez por semana (lunes) y la primera vez.
+    await promoReporte(xs).catch((err) => console.error("[colaRedes] promo reporte:", err));
+
     // 2) Notas: las más importantes, revueltas.
     let notas = vigentes.filter((x) => (x.tipo ?? (x.articleUrl.includes("/trafico") ? "trafico" : "nota")) === "nota");
     if (!notas.length) {
@@ -242,7 +245,7 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
     const a = recientes.sort((x, y) => (y.score ?? 0) - (x.score ?? 0))[0];
     if (!a) return null;
     const fuente = a.sources[0]?.url;
-    const oficial = a.imageUrl && (creditoOficial(fuente) || /^denuncia ciudadana/i.test(a.imageCredit ?? ""));
+    const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));
     const archivo = oficial ? null : fotoDeArchivo(a.title, "");
     const cardUrl = await crearTarjeta({
       titulo: a.title,
@@ -266,6 +269,42 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
     console.error("[colaRedes] reabastecer:", err instanceof Error ? err.message : err);
     return null;
   }
+}
+
+/**
+ * Post fijo "¿Viste algo en tu colonia? Repórtalo" con liga a /reporte.
+ * Sale la primera vez que corre y luego cada lunes a media mañana.
+ */
+async function promoReporte(xs: ItemRedes[]) {
+  const s = store();
+  const ultima = (await s.get("promo-reporte", { type: "json" })) as { en: string } | null;
+  const h = horaLocalNum();
+  const lunes = new Date().toLocaleDateString("en-US", { timeZone: "America/Mexico_City", weekday: "short" }) === "Mon";
+  const dias = ultima ? (Date.now() - new Date(ultima.en).getTime()) / 86_400_000 : Infinity;
+  if (!(dias === Infinity || (lunes && dias > 5))) return;
+  if (h < 10 || h >= 20) return;
+  if (xs.some((x) => x.articleUrl.endsWith("/reporte") && x.estado === "pendiente")) return;
+  const { crearTarjeta } = await import("./tarjetas");
+  const titulo = "¿Viste algo en tu colonia? Mándanos tu reporte con foto";
+  const cardUrl = await crearTarjeta({
+    titulo,
+    categoria: "comunidad",
+    clave: "promo-reporte",
+    resumen: "Baches, basura, fugas, falta de luz, tráfico o inseguridad. Entra a quepasavta.com/reporte: lo revisamos y lo publicamos. Tus datos nunca se publican.",
+    etiqueta: "REPORTE CIUDADANO",
+    llamado: "REPORTA EN QUEPASAVTA.COM/REPORTE",
+  });
+  if (!cardUrl) return;
+  await encolarRedes(
+    {
+      title: "Reporte ciudadano: ¿viste algo en tu colonia? Mándanos tu reporte con foto",
+      excerpt: "Baches, basura, fugas, falta de luz, tráfico o inseguridad: mándanos tu foto y dónde pasa. Nuestro equipo lo revisa y lo publica en el sitio y en Facebook; tu nombre y tu contacto nunca se publican.",
+      articleUrl: `${siteUrl()}/reporte`,
+      imageUrl: cardUrl,
+    },
+    { score: 95 }
+  );
+  await s.setJSON("promo-reporte", { en: new Date().toISOString() });
 }
 
 /** Para el panel: lo que está en cola y lo publicado hoy. */

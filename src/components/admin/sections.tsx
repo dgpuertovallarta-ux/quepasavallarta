@@ -8,6 +8,7 @@ import { fetchSource } from "@/lib/ingest/fetchSource";
 import { buildStoryGraph, isAutoPublishEligible } from "@/lib/ingest/storyGraph";
 import { isAiConfigured } from "@/lib/ingest/generateArticle";
 import { getPendingArticles } from "@/lib/db/articles";
+import { getStore } from "@netlify/blobs";
 import { getConfiguredAdmins } from "@/lib/auth/credentials";
 import { isDatabaseConfigured } from "@/lib/db/client";
 import ApprovalQueue from "./ApprovalQueue";
@@ -220,11 +221,38 @@ export async function Cola() {
 
 export async function Aprobaciones() {
   const articles = await getPendingArticles();
+  // Datos privados de los reportes ciudadanos pendientes (nunca se publican).
+  const reportes = articles.filter((a) => /^(reporte|denuncia) ciudadan/i.test(a.title));
+  const store = getStore({ name: "qpv-denuncias", consistency: "strong" });
+  const privados = await Promise.all(
+    reportes.map(async (a) => ({ a, d: (await store.get(a.slug, { type: "json" }).catch(() => null)) as { nombre?: string; contacto?: string; lugar?: string; tipo?: string; mapa?: string; recibida?: string } | null }))
+  );
   return (
-    <div className="panel">
-      <strong style={{ fontSize: 13 }}>Publicaciones pendientes ({articles.length})</strong>
-      <ApprovalQueue initialArticles={articles} />
-    </div>
+    <>
+      {privados.length > 0 && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <strong style={{ fontSize: 13 }}>Reportes ciudadanos por revisar — datos privados del ciudadano ({privados.length})</strong>
+          <ul style={{ fontSize: 13.5, margin: "8px 0 0", paddingLeft: 18 }}>
+            {privados.map(({ a, d }) => (
+              <li key={a.slug} style={{ marginBottom: 6 }}>
+                <b>{a.title.replace(/^(reporte|denuncia) ciudadan[oa]:\s*/i, "")}</b>
+                {d?.tipo ? ` · ${d.tipo}` : ""} · {d?.lugar ?? "sin lugar"} · {d?.nombre || "sin nombre"} · {d?.contacto || "sin contacto"}
+                {d?.mapa && (
+                  <>
+                    {" · "}
+                    <a href={d.mapa} target="_blank" rel="noreferrer">ver mapa</a>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="panel">
+        <strong style={{ fontSize: 13 }}>Publicaciones pendientes ({articles.length})</strong>
+        <ApprovalQueue initialArticles={articles} />
+      </div>
+    </>
   );
 }
 

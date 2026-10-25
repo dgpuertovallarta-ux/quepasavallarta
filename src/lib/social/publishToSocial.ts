@@ -86,7 +86,11 @@ export function buildCaption(input: SocialPublishInput, ingles?: string | null):
   if (lede.length < 40 || titulo.toLowerCase().includes(lede.toLowerCase().slice(0, 30))) lede = "";
   if (lede && !/[.!?…]$/.test(lede)) lede += ".";
   const cuerpo = lede ? `${titulo}. ${lede}` : `${titulo}.`;
-  const enlace = input.articleUrl.includes("/trafico") ? `Tráfico en vivo: ${input.articleUrl}` : `Lee la nota completa: ${input.articleUrl}`;
+  const enlace = input.articleUrl.includes("/trafico")
+    ? `Tráfico en vivo: ${input.articleUrl}`
+    : input.articleUrl.endsWith("/reporte")
+      ? `Manda tu reporte aquí: ${input.articleUrl}`
+      : `Lee la nota completa: ${input.articleUrl}`;
   // 2026-10-24: debajo, la versión en inglés (Vallarta tiene mucho público extranjero).
   return ingles ? `${cuerpo}\n\nEN: ${ingles}\n\n${enlace}` : `${cuerpo}\n\n${enlace}`;
 }

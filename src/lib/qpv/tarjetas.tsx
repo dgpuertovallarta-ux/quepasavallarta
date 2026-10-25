@@ -102,6 +102,10 @@ export type NotaTarjeta = {
   detalle?: string;
   /** Resumen de la nota: se muestra solo en la tarjeta sin foto. */
   resumen?: string;
+  /** Texto de abajo en la tarjeta sin foto. */
+  llamado?: string;
+  /** Etiqueta de sección fija (si no, se calcula del titular). */
+  etiqueta?: string;
   /** true = sin la traducción al inglés debajo del titular. */
   sinIngles?: boolean;
   plantilla?: Plantilla;
@@ -146,7 +150,8 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   return {
     plantilla,
     titulo: n.titulo,
-    etiqueta: c.etiqueta,
+    etiqueta: n.etiqueta ?? c.etiqueta,
+    llamado: n.llamado,
     credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : creditoFondo),
     fondo,
     tituloEn: (plantilla === "tarjeta" || plantilla === "foto" || plantilla === "alerta") && !n.sinIngles ? (await titularEnIngles(n.titulo)) ?? undefined : undefined,

@@ -2,10 +2,22 @@ import { NextResponse } from "next/server";
 import { getStore } from "@netlify/blobs";
 import { publishArticle } from "@/lib/db/articles";
 import { isDatabaseConfigured } from "@/lib/db/client";
-import { saveImageBlob } from "@/lib/storage/imageBlobs";
+import { saveImageBlob, siteUrl } from "@/lib/storage/imageBlobs";
+import { avisarEquipo } from "@/lib/qpv/avisosEquipo";
+
+const TIPOS: Record<string, string> = {
+  bache: "Bache o calle dañada",
+  basura: "Basura",
+  agua: "Agua o drenaje",
+  luz: "Alumbrado o luz",
+  transito: "Tráfico o vialidad",
+  seguridad: "Inseguridad",
+  abuso: "Abuso en vía pública",
+  otro: "Otro",
+};
 
 /**
- * Denuncia ciudadana (2026-10): la manda un lector desde /denuncia con foto y
+ * Reporte ciudadano (2026-10): lo manda un lector desde /reporte con foto y
  * ubicación. Entra a la cola de aprobación del panel (nunca se publica sola).
  * El contacto del denunciante NO se publica: se guarda aparte en Blobs
  * ("qpv-denuncias") solo para el equipo.
@@ -36,6 +48,12 @@ export async function POST(req: Request) {
   const titulo = limpio(form.get("titulo"), 110);
   const contacto = limpio(form.get("contacto"), 140);
   const nombre = limpio(form.get("nombre"), 80);
+  const tipo = TIPOS[limpio(form.get("tipo"), 20)] ?? TIPOS.otro;
+  const lat = Number(limpio(form.get("lat"), 20));
+  const lon = Number(limpio(form.get("lon"), 20));
+  const mapa = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+    ? `https://maps.google.com/?q=${lat.toFixed(5)},${lon.toFixed(5)}`
+    : undefined;
   if (lugar.length < 4) return NextResponse.json({ error: "Escribe dónde pasa (colonia, calle o punto de referencia)." }, { status: 400 });
   if (texto.length < 40) return NextResponse.json({ error: "Cuéntanos un poco más: al menos un par de líneas sobre qué pasa." }, { status: 400 });
 
@@ -48,12 +66,12 @@ export async function POST(req: Request) {
   }
 
   const parrafos = texto.split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean);
-  const tituloFinal = `Denuncia ciudadana: ${capitalizar(titulo || `vecinos reportan problema en ${lugar}`)}`.slice(0, 140);
+  const tituloFinal = `Reporte ciudadano: ${capitalizar(titulo || `vecinos reportan ${tipo.toLowerCase()} en ${lugar}`)}`.slice(0, 140);
   const cuerpo = [
-    `Un lector de Qué Pasa Vallarta envió la siguiente denuncia sobre una situación en ${lugar}:`,
+    `Un lector de Qué Pasa Vallarta envió el siguiente reporte (${tipo.toLowerCase()}) sobre una situación en ${lugar}:`,
     ...parrafos.map((p) => `«${p.replace(/[«»"]/g, "")}»`),
     `Ubicación reportada: ${lugar}.`,
-    "Esta es una denuncia ciudadana. Qué Pasa Vallarta la publica para dar voz a los vecinos y buscará la postura de las autoridades correspondientes. ¿Tienes una denuncia? Envíala en quepasavta.com/denuncia.",
+    "Este es un reporte ciudadano. Qué Pasa Vallarta lo publica para dar voz a los vecinos y buscará la postura de las autoridades correspondientes. ¿Viste algo en tu colonia? Mándanos tu reporte con foto en quepasavta.com/reporte.",
   ].join("\n\n");
 
   try {
@@ -66,14 +84,16 @@ export async function POST(req: Request) {
       aiModel: null,
       storyExternalKey: null,
       imageUrl,
-      imageCredit: imageUrl ? "Denuncia ciudadana" : undefined,
+      imageCredit: imageUrl ? "Reporte ciudadano" : undefined,
       imageLicenseStatus: imageUrl ? "source_unlicensed" : undefined,
       status: "pending_review",
       permitirParecida: true,
     });
     await getStore({ name: "qpv-denuncias", consistency: "strong" }).setJSON(slug, {
-      nombre, contacto, lugar, texto, recibida: new Date().toISOString(),
+      nombre, contacto, lugar, texto, tipo, mapa, recibida: new Date().toISOString(),
     });
+    // Aviso por WhatsApp a los números del equipo (configurados en Netlify, nunca públicos).
+    await avisarEquipo({ tipo, lugar, resumen: parrafos.join(" "), foto: imageUrl, mapa, slug }, siteUrl()).catch(() => 0);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[api/denuncia]", err);

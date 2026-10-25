@@ -68,6 +68,7 @@ const FONDO_POR_ETIQUETA: Record<string, PhotoKey[]> = {
   GOBIERNO: ["plazaArmas", "kiosco", "kioscoNoche"],
   COMUNIDAD: ["callePapelPicado", "calleSombrillas", "mercadoCuale", "kiosco"],
   "DENUNCIA CIUDADANA": ["calleSombrillas", "callePapelPicado", "ciudadAerea"],
+  "REPORTE CIUDADANO": ["calleSombrillas", "callePapelPicado", "ciudadAerea"],
   "PUERTO VALLARTA": ["bahiaCiudad", "vistaAerea", "maleconGeneral", "faroMalecon"],
 };
 

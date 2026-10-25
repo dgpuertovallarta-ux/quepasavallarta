@@ -33,6 +33,7 @@ export type DatosTarjeta = {
   logoAzul?: string;         // explicador (fondo claro): logo QPV en azul
   fondo?: string;            // tarjeta sin foto: foto de archivo ya difuminada (data URI)
   tituloEn?: string;         // traducción del titular al inglés (va en chico debajo)
+  llamado?: string;          // tarjeta sin foto: texto de abajo (por omisión "NOTA COMPLETA EN QUEPASAVTA.COM")
 };
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
@@ -47,6 +48,7 @@ const ACENTOS: Record<string, string> = {
   GOBIERNO: "#8B6CFF",
   COMUNIDAD: COLORES.teal,
   "DENUNCIA CIUDADANA": COLORES.red,
+  "REPORTE CIUDADANO": COLORES.red,
   "PUERTO VALLARTA": COLORES.teal,
 };
 
@@ -221,7 +223,7 @@ export function Tarjeta(d: DatosTarjeta) {
           )}
         </div>
         <div style={{ position: "absolute", left: 92, bottom: 128, display: "flex", color: COLORES.white, fontFamily: F.base, fontWeight: 800, fontSize: 26, letterSpacing: 2 }}>
-          NOTA COMPLETA EN QUEPASAVTA.COM
+          {d.llamado ?? "NOTA COMPLETA EN QUEPASAVTA.COM"}
         </div>
         <Pie logo={d.logo} barra={acento} credito={d.credito ?? " "} />
       </div>
@@ -281,7 +283,7 @@ export function Tarjeta(d: DatosTarjeta) {
   if (d.plantilla === "foto") {
     // Foto real arriba y franja azul QPV abajo con sección y titular (2026-10).
     const altoFoto = 860;
-    const colorSeccion = d.etiqueta === "DENUNCIA CIUDADANA" || d.etiqueta === "SEGURIDAD" || d.etiqueta === "ALERTA" || d.etiqueta === "ÚLTIMA HORA" ? COLORES.red : d.etiqueta === "QPV AL VOLANTE" || d.etiqueta === "TRÁNSITO" ? COLORES.amber : COLORES.teal;
+    const colorSeccion = d.etiqueta === "DENUNCIA CIUDADANA" || d.etiqueta === "REPORTE CIUDADANO" || d.etiqueta === "SEGURIDAD" || d.etiqueta === "ALERTA" || d.etiqueta === "ÚLTIMA HORA" ? COLORES.red : d.etiqueta === "QPV AL VOLANTE" || d.etiqueta === "TRÁNSITO" ? COLORES.amber : COLORES.teal;
     const texto = colorSeccion === COLORES.amber ? COLORES.navy : COLORES.white;
     return (
       <div style={base}>
