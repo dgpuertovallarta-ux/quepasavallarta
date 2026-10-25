@@ -285,6 +285,7 @@ export async function generateArticleImage(input: {
   categorySlug: string;
   sourceUrl?: string;
   sourceName?: string;
+  patrocinio?: { nombre: string; logo: string } | null;
 }): Promise<GeneratedImage | null> {
   if (isImageAiConfigured()) return generateAiImage(input);
 
@@ -308,6 +309,7 @@ export async function generateArticleImage(input: {
     creditoFoto: fotoRedes?.credito,
     urlFuente: input.sourceUrl,
     resumen: input.excerpt,
+    patrocinio: input.patrocinio ?? null,
   });
 
   if (!url && !cardUrl) return null;

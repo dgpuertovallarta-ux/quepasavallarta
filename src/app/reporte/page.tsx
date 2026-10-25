@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PresentadoPor from "@/components/PresentadoPor";
 import DenunciaForm from "@/components/DenunciaForm";
 import { NewsCard } from "@/components/cards";
 import { getDenuncias } from "@/lib/db/articles";
@@ -19,6 +20,7 @@ export default async function ReportePage() {
       </div>
       <span className="chip chip-breaking">Reporte ciudadano</span>
       <h1 style={{ margin: "8px 0 6px" }}>¿Viste algo en tu colonia? Repórtalo</h1>
+      <PresentadoPor seccion="reportes" />
       <p style={{ color: "var(--text-muted)", maxWidth: 680, marginBottom: 20 }}>
         Baches, basura, fugas, falta de luz, tráfico, inseguridad o abusos en la vía pública. Mándanos tu reporte con foto: nuestro
         equipo lo revisa y lo publicamos en el sitio y en Facebook para que llegue a las autoridades.

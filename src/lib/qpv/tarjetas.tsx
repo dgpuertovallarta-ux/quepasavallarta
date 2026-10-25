@@ -105,6 +105,8 @@ export type NotaTarjeta = {
   resumen?: string;
   /** Texto de abajo en la tarjeta sin foto. */
   llamado?: string;
+  /** Patrocinador de la sección ("Presentado por"): nombre y URL del logo. */
+  patrocinio?: { nombre: string; logo: string } | null;
   /** Etiqueta de sección fija (si no, se calcula del titular). */
   etiqueta?: string;
   /** true = sin la traducción al inglés debajo del titular. */
@@ -150,9 +152,11 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
 
   return {
     plantilla,
-    titulo: n.titulo,
+    // En reportes ciudadanos la etiqueta ya lo dice: el titular va sin el prefijo.
+    titulo: n.titulo.replace(/^(reporte|denuncia) ciudadan[oa]:\s*/i, "").replace(/^./, (x) => x.toUpperCase()),
     etiqueta: n.etiqueta ?? c.etiqueta,
     llamado: n.llamado,
+    patrocinio: n.patrocinio ? { nombre: n.patrocinio.nombre, logo: (await imagenComoDataUri(n.patrocinio.logo)) ?? undefined } : undefined,
     credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : creditoFondo),
     fondo,
     tituloEn: (plantilla === "tarjeta" || plantilla === "foto" || plantilla === "alerta") && !n.sinIngles ? (await titularEnIngles(n.titulo)) ?? undefined : undefined,
@@ -179,13 +183,14 @@ export function horaLocal(fecha = new Date()): string {
 }
 
 /** Anuncio "Manda tu reporte ciudadano" (pieza de campaña para Facebook). Nunca lanza. */
-export async function crearPromoReporte(): Promise<string | null> {
+export async function crearPromoReporte(pat?: { nombre: string; logo: string } | null): Promise<string | null> {
   try {
     const QR = (await import("qrcode")).default;
     const qr = await QR.toDataURL(`${siteUrl()}/reporte`, { margin: 0, width: 300, color: { dark: "#0A1F3A", light: "#FFFFFF" } });
     const f = fotoFondo("calle colonia Vallarta", "", "COMUNIDAD", CATEGORY_IMAGES, "comunidad");
     const foto = (await fondoDifuminado(f.url)) ?? undefined;
-    const png = await renderElemento(<PromoReporte logo={await dataUriDeAsset("qpv-logo-blanco.png", "image/png")} qr={qr} foto={foto} />);
+    const patrocinio = pat ? { nombre: pat.nombre, logo: (await imagenComoDataUri(pat.logo)) ?? undefined } : undefined;
+    const png = await renderElemento(<PromoReporte logo={await dataUriDeAsset("qpv-logo-blanco.png", "image/png")} qr={qr} foto={foto} patrocinio={patrocinio} />);
     return (await saveImageBlob(png, "image/png")).url;
   } catch (err) {
     console.error("[crearPromoReporte] Falló:", err instanceof Error ? err.message : err);
@@ -205,9 +210,10 @@ export async function crearReporteVial(d: Omit<DatosReporteVial, "logoAzul">): P
 }
 
 /** Postal azul con el semáforo de las vialidades. Nunca lanza. */
-export async function crearResumenVial(d: Omit<DatosResumenVial, "logo">): Promise<string | null> {
+export async function crearResumenVial(d: Omit<DatosResumenVial, "logo" | "patrocinio">, pat?: { nombre: string; logo: string } | null): Promise<string | null> {
   try {
-    const png = await renderElemento(<ResumenVial {...d} logo={await dataUriDeAsset("qpv-logo-blanco.png", "image/png")} />);
+    const patrocinio = pat ? { nombre: pat.nombre, logo: (await imagenComoDataUri(pat.logo)) ?? undefined } : undefined;
+    const png = await renderElemento(<ResumenVial {...d} patrocinio={patrocinio} logo={await dataUriDeAsset("qpv-logo-blanco.png", "image/png")} />);
     return (await saveImageBlob(png, "image/png")).url;
   } catch (err) {
     console.error("[crearResumenVial] Falló:", err instanceof Error ? err.message : err);
@@ -231,7 +237,7 @@ export async function crearTarjeta(n: NotaTarjeta): Promise<string | null> {
 }
 
 /** Tarjeta de mapa (QPV al Volante): punto en el mapa + titular + dato de retraso. Nunca lanza. */
-export async function crearTarjetaMapa(n: { titulo: string; lugar: string; detalle?: string; lat: number; lon: number; etiqueta?: string; zoom?: number }): Promise<string | null> {
+export async function crearTarjetaMapa(n: { titulo: string; lugar: string; detalle?: string; lat: number; lon: number; etiqueta?: string; zoom?: number; patrocinio?: { nombre: string; logo: string } | null }): Promise<string | null> {
   try {
     const { armarMapa } = await import("./mapa");
     const mapa = await armarMapa(n.lat, n.lon, n.zoom ?? 15, { trafico: true });
@@ -245,6 +251,7 @@ export async function crearTarjetaMapa(n: { titulo: string; lugar: string; detal
       credito: process.env.TOMTOM_API_KEY ? "Mapa y tráfico: © TomTom" : "Mapa: © OpenStreetMap",
       mapa,
       logo: await dataUriDeAsset("qpv-logo-blanco.png", "image/png"),
+      patrocinio: n.patrocinio ? { nombre: n.patrocinio.nombre, logo: (await imagenComoDataUri(n.patrocinio.logo)) ?? undefined } : undefined,
     });
     return (await saveImageBlob(png, "image/png")).url;
   } catch (err) {

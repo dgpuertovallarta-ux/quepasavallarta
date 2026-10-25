@@ -97,6 +97,22 @@ export async function recordPageView(
   }
 }
 
+/** Vistas de este mes en esas rutas (y sus subpáginas). */
+export async function vistasDelMes(rutas: string[]): Promise<number> {
+  if (!rutas.length || !(await ready())) return 0;
+  try {
+    const res = await getPool().query<{ n: string }>(
+      `select coalesce(sum(views), 0) as n from site_page_views
+        where day >= date_trunc('month', ${TODAY_MX})::date
+          and (path = any($1) or ${rutas.map((_, i) => `path like $${i + 2}`).join(" or ")})`,
+      [rutas, ...rutas.map((r) => `${r}/%`)],
+    );
+    return Number(res.rows[0]?.n || 0);
+  } catch {
+    return 0;
+  }
+}
+
 export type DailyStat = { day: string; views: number; visitors: number };
 export type PageStat = { path: string; views: number };
 
@@ -230,6 +246,12 @@ export const AD_SLOTS = [
   { id: "home", label: "Portada (franja ancha)" },
   { id: "article", label: "Dentro de las notas" },
   { id: "section", label: "Secciones (arriba de la lista)" },
+  // "Presentado por" (2026-10-25): el logo va en la sección del sitio y en sus
+  // publicaciones automáticas de Facebook. Protección Civil y alertas nunca.
+  { id: "pat-trafico", label: "Presentado por · QPV al Volante (tráfico)" },
+  { id: "pat-huracanes", label: "Presentado por · Videos de huracán" },
+  { id: "pat-clima", label: "Presentado por · Clima" },
+  { id: "pat-reportes", label: "Presentado por · Reporte Ciudadano" },
 ] as const;
 export type AdSlotId = (typeof AD_SLOTS)[number]["id"];
 

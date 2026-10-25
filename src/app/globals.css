@@ -1101,3 +1101,8 @@ table.data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border);
   .masthead-right .btn.btn-reporte { padding: 6px 9px; font-size: 12.5px; }
   .masthead-right .live-pill { padding-left: 10px; padding-right: 10px; }
 }
+
+/* "Presentado por" (patrocinio de sección) */
+.presentado-por { display: inline-flex; align-items: center; gap: 12px; padding: 8px 14px; margin: 4px 0 18px; border: 1px solid var(--border); border-radius: 999px; text-decoration: none; color: var(--text-muted); font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.presentado-por img { height: 30px; width: auto; max-width: 160px; object-fit: contain; }
+.presentado-por:hover { border-color: var(--border-strong); }

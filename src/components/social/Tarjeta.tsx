@@ -34,7 +34,26 @@ export type DatosTarjeta = {
   fondo?: string;            // tarjeta sin foto: foto de archivo ya difuminada (data URI)
   tituloEn?: string;         // traducción del titular al inglés (va en chico debajo)
   llamado?: string;          // tarjeta sin foto: texto de abajo (por omisión "NOTA COMPLETA EN QUEPASAVTA.COM")
+  patrocinio?: { nombre: string; logo?: string }; // "Presentado por" (data URI del logo)
 };
+
+/** Sello "Presentado por [logo]" del patrocinador de la sección. */
+export function SelloPatrocinio({ p, top = 40, right = 40, maxLogo = 220, alto = 56 }: { p?: { nombre: string; logo?: string }; top?: number; right?: number; maxLogo?: number; alto?: number }) {
+  if (!p) return null;
+  return (
+    <div style={{ position: "absolute", top, right, display: "flex", alignItems: "center", gap: 14, background: "#fff", borderRadius: 14, padding: "10px 16px", boxShadow: "0 6px 20px rgba(0,0,0,0.25)" }}>
+      <div style={{ display: "flex", flexDirection: "column", color: "#0A1F3A", fontFamily: "Archivo", fontWeight: 800, fontSize: 15, letterSpacing: 1.5, lineHeight: 1.1 }}>
+        <span>PRESENTADO</span>
+        <span>POR</span>
+      </div>
+      {p.logo ? (
+        <img src={p.logo} height={alto} style={{ height: alto, maxWidth: maxLogo, objectFit: "contain" }} />
+      ) : (
+        <div style={{ display: "flex", color: "#0A1F3A", fontFamily: "Archivo", fontWeight: 800, fontSize: 26 }}>{p.nombre}</div>
+      )}
+    </div>
+  );
+}
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
 
@@ -226,6 +245,7 @@ export function Tarjeta(d: DatosTarjeta) {
           {d.llamado ?? "NOTA COMPLETA EN QUEPASAVTA.COM"}
         </div>
         <Pie logo={d.logo} barra={acento} credito={d.credito ?? " "} />
+        <SelloPatrocinio p={d.patrocinio} top={1150} right={60} maxLogo={160} alto={50} />
       </div>
     );
   }
@@ -301,6 +321,7 @@ export function Tarjeta(d: DatosTarjeta) {
           <TitularEn texto={d.tituloEn} size={d.titulo.length > 80 ? 26 : 30} />
         </div>
         <div style={{ position: "absolute", right: 64, bottom: 40, display: "flex", color: "rgba(255,255,255,0.7)", fontFamily: F.base, fontWeight: 800, fontSize: 24, letterSpacing: 1 }}>quepasavta.com</div>
+        <SelloPatrocinio p={d.patrocinio} top={36} right={36} />
       </div>
     );
   }
@@ -351,6 +372,7 @@ export function Tarjeta(d: DatosTarjeta) {
         {d.detalle && <div style={{ display: "flex", color: COLORES.teal, fontFamily: F.base, fontWeight: 800, fontSize: 32 }}>{d.detalle}</div>}
       </div>
       <Pie logo={d.logo} credito={d.credito} />
+      <SelloPatrocinio p={d.patrocinio} top={50} right={40} />
     </div>
   );
 }

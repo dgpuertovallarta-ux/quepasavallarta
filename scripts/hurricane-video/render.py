@@ -391,6 +391,16 @@ class Renderer:
         self.logo_big = self.logo.copy()
         self.logo_big.thumbnail((620, 420), Image.Resampling.LANCZOS)
         self.icon = storm_icon(150)
+        # Patrocinador "Presentado por" (opcional; logo ya descargado por generate.py)
+        self.sponsor = None
+        sp = story.get("sponsor") or {}
+        if sp.get("logo_path") and os.path.exists(sp["logo_path"]):
+            try:
+                im = Image.open(sp["logo_path"]).convert("RGBA")
+                im.thumbnail((340, 96), Image.Resampling.LANCZOS)
+                self.sponsor = im
+            except Exception:
+                self.sponsor = None
         self.icon_small = storm_icon(92)
         grad = Image.new("L", (1, H), 0)
         for y in range(H):
@@ -620,6 +630,15 @@ class Renderer:
             ov.alpha_composite(lg, (int(W / 2 - lg.width / 2), int(560 - lg.height / 2 + (1 - a) * 40)))
             d.text((W / 2, 900), "quepasavta.com", font=F_SEMI(52), fill=INK + (int(255 * a),), anchor="mm")
             d.text((W / 2, 975), "facebook.com/quepasavallarta", font=F_REG(38), fill=MUTED + (int(255 * a),), anchor="mm")
+            if self.sponsor is not None:
+                sp = self.sponsor
+                bw, bh = max(520, sp.width + 80), sp.height + 110
+                bx, by = int(W / 2 - bw / 2), 1035
+                d.rounded_rectangle([bx, by, bx + bw, by + bh], radius=28, fill=(255, 255, 255, int(245 * a)))
+                d.text((W / 2, by + 42), "PRESENTADO POR", font=F_SEMI(30), fill=(10, 31, 58, int(255 * a)), anchor="mm")
+                spa = sp.copy()
+                spa.putalpha(Image.eval(sp.getchannel("A"), lambda v: int(v * a)))
+                ov.alpha_composite(spa, (int(W / 2 - sp.width / 2), by + 80))
 
     # ---------------------------------------------- marco fijo (logo, barra)
     def chrome(self, ui: Image.Image, i: int, lt: float):

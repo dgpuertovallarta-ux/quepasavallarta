@@ -10,6 +10,8 @@ import { isAiConfigured } from "@/lib/ingest/generateArticle";
 import { getPendingArticles } from "@/lib/db/articles";
 import { getStore } from "@netlify/blobs";
 import { estadoColaRedes } from "@/lib/qpv/colaRedes";
+import { publicacionesDelMes, mesActual, RUTAS_SECCION, type SeccionPatrocinio } from "@/lib/business/patrocinios";
+import { vistasDelMes } from "@/lib/business/db";
 import { getConfiguredAdmins } from "@/lib/auth/credentials";
 import { isDatabaseConfigured } from "@/lib/db/client";
 import ApprovalQueue from "./ApprovalQueue";
@@ -464,6 +466,61 @@ export async function Estadisticas() {
   );
 }
 
+const SECCION_DE_SLOT: Record<string, { s: SeccionPatrocinio; t: string }> = {
+  "pat-trafico": { s: "trafico", t: "QPV al Volante (tráfico)" },
+  "pat-huracanes": { s: "huracanes", t: "Videos de huracán" },
+  "pat-clima": { s: "clima", t: "Clima" },
+  "pat-reportes": { s: "reportes", t: "Reporte Ciudadano" },
+};
+
+async function PatrociniosPanel({ ads }: { ads: Awaited<ReturnType<typeof getAllAds>> }) {
+  const pats = ads.filter((a) => a.slot.startsWith("pat-"));
+  const filas = await Promise.all(
+    pats.map(async (a) => {
+      const sec = SECCION_DE_SLOT[a.slot];
+      const [pubs, vistas] = await Promise.all([publicacionesDelMes(a.id), vistasDelMes(sec ? RUTAS_SECCION[sec.s] : [])]);
+      return { a, sec, pubs: pubs.n, vistas };
+    })
+  );
+  return (
+    <div className="panel">
+      <strong style={{ fontSize: 13 }}>Patrocinios «Presentado por» — resultados de {mesActual()}</strong>
+      {filas.length === 0 ? (
+        <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>Todavía no hay patrocinios. Agrégalos abajo en «Banners y patrocinios».</p>
+      ) : (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Patrocinador</th>
+              <th>Sección</th>
+              <th>Publicaciones en Facebook (mes)</th>
+              <th>Visitas a la sección (mes)</th>
+              <th>Clics al patrocinador</th>
+              <th>Estado</th>
+              <th>Reporte</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filas.map(({ a, sec, pubs, vistas }) => (
+              <tr key={a.id}>
+                <td>{a.advertiser}</td>
+                <td>{sec?.t ?? a.slot}</td>
+                <td>{pubs}</td>
+                <td>{sec?.s === "huracanes" ? "— (va en los videos)" : vistas}</td>
+                <td>{a.clicks}</td>
+                <td>{a.active && (!a.endsAt || a.endsAt >= new Date().toISOString().slice(0, 10)) ? "Activo" : "Pausado / vencido"}</td>
+                <td>
+                  <a href={`/admin/reporte-patrocinio/${a.id}`} target="_blank" rel="noreferrer">Ver reporte</a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export async function Comercial() {
   const [leads, ads, sponsored] = await Promise.all([getLeads(100), getAllAds(), getSponsoredList()]);
   const now = new Date();
@@ -507,8 +564,13 @@ export async function Comercial() {
           </table>
         )}
       </div>
+      <PatrociniosPanel ads={ads} />
       <div className="panel">
-        <strong style={{ fontSize: 13 }}>Banners</strong>
+        <strong style={{ fontSize: 13 }}>Banners y patrocinios «Presentado por»</strong>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "6px 0 10px" }}>
+          Para un patrocinio de sección elige en «Dónde» una opción «Presentado por» y sube el <b>logo</b> del cliente (PNG con fondo
+          transparente de preferencia). Sale en la sección del sitio y en sus publicaciones automáticas de Facebook.
+        </p>
         <AdManager ads={ads} />
       </div>
       <div className="panel">

@@ -8,6 +8,10 @@ const SLOT_LABELS: Record<string, string> = {
   home: "Portada",
   article: "Dentro de las notas",
   section: "Secciones",
+  "pat-trafico": "Presentado por · Tráfico",
+  "pat-huracanes": "Presentado por · Huracanes",
+  "pat-clima": "Presentado por · Clima",
+  "pat-reportes": "Presentado por · Reporte Ciudadano",
 };
 
 export default function AdManager({ ads }: { ads: Ad[] }) {
@@ -65,6 +69,12 @@ export default function AdManager({ ads }: { ads: Ad[] }) {
             <option value="home">Portada</option>
             <option value="article">Dentro de las notas</option>
             <option value="section">Secciones</option>
+            <optgroup label="Patrocinio «Presentado por» (sube el LOGO)">
+              <option value="pat-trafico">Presentado por · Tráfico (QPV al Volante)</option>
+              <option value="pat-huracanes">Presentado por · Videos de huracán</option>
+              <option value="pat-clima">Presentado por · Clima</option>
+              <option value="pat-reportes">Presentado por · Reporte Ciudadano</option>
+            </optgroup>
           </select>
         </label>
         <label className="admin-field">

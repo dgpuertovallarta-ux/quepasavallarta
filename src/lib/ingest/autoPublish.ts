@@ -157,7 +157,10 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
 
       // Foto real de la fuente (con crédito) + postal de color para redes. Ya no se generan imágenes con IA.
       const primarySource = story.items[0];
+      const { patrocinioParaNota } = await import("../business/patrocinios");
+      const pat = await patrocinioParaNota(title, primarySource.categoryGuess);
       const generatedImage = await generateArticleImage({
+        patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
         title,
         excerpt,
         categorySlug: primarySource.categoryGuess,
@@ -189,7 +192,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
           // Ya no se publica en redes al instante: entra a la cola (máximo diario y separación entre posts) — ver lib/qpv/colaRedes.ts.
           // Con foto propia (oficial o de archivo que sí corresponde) o, si no, con la tarjeta tipográfica QPV (2026-10-24).
           if (generatedImage?.cardUrl) {
-            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.cardUrl }, { score: story.maxNewsScore });
+            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.cardUrl }, { score: story.maxNewsScore, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
           }
           result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         }

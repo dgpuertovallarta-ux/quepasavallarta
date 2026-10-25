@@ -3,12 +3,12 @@
 // Pieza de campaña, no de nota: titular grande, temas con íconos, 3 pasos,
 // botón con la dirección y código QR. Solo flexbox y estilos en línea (satori).
 import React from "react";
-import { ANCHO, ALTO, COLORES } from "./Tarjeta";
+import { ANCHO, ALTO, COLORES, SelloPatrocinio } from "./Tarjeta";
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
 const ROJO = COLORES.red;
 
-export type DatosPromoReporte = { logo?: string; qr?: string; foto?: string };
+export type DatosPromoReporte = { logo?: string; qr?: string; foto?: string; patrocinio?: { nombre: string; logo?: string } };
 
 // Íconos simples (trazos blancos) para cada tema.
 const I = {
@@ -150,6 +150,7 @@ export function PromoReporte(d: DatosPromoReporte) {
         )}
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 12, display: "flex", background: ROJO }} />
+      <SelloPatrocinio p={d.patrocinio} top={20} right={236} maxLogo={140} alto={50} />
     </div>
   );
 }

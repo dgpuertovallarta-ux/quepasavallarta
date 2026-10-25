@@ -37,6 +37,8 @@ export type SocialPublishInput = {
   articleUrl: string;
   /** URL pública de la imagen (ver generateImage.ts) — obligatoria para Instagram. */
   imageUrl?: string;
+  /** Patrocinador de la sección ("Presentado por …"). */
+  patrocinador?: string;
 };
 
 export type SocialPublishResult = {
@@ -92,12 +94,13 @@ export function buildCaption(input: SocialPublishInput, ingles?: string | null):
       ? `Manda tu reporte aquí: ${input.articleUrl}`
       : `Lee la nota completa: ${input.articleUrl}`;
   // 2026-10-24: debajo, la versión en inglés (Vallarta tiene mucho público extranjero).
-  return ingles ? `${cuerpo}\n\nEN: ${ingles}\n\n${enlace}` : `${cuerpo}\n\n${enlace}`;
+  const pat = input.patrocinador ? `\n\nPresentado por ${input.patrocinador}.` : "";
+  return ingles ? `${cuerpo}\n\nEN: ${ingles}${pat}\n\n${enlace}` : `${cuerpo}${pat}\n\n${enlace}`;
 }
 
 /** El cuerpo del post (sin la liga) para traducirlo. */
 function cuerpoPost(input: SocialPublishInput): string {
-  return buildCaption(input).split("\n\n")[0];
+  return buildCaption({ ...input, patrocinador: undefined }).split("\n\n")[0];
 }
 
 async function postToFacebook(input: SocialPublishInput): Promise<SocialPublishResult["facebook"]> {

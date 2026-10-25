@@ -4,7 +4,7 @@
 //   - ResumenVial: postal azul con el semáforo de las vialidades (8:00, 14:00, 18:00).
 // Compatible con next/og (satori): solo flexbox y estilos en línea.
 import React from "react";
-import { ANCHO, ALTO, COLORES } from "./Tarjeta";
+import { ANCHO, ALTO, COLORES, SelloPatrocinio } from "./Tarjeta";
 
 const F = { titular: "Archivo Narrow", base: "Archivo" };
 // La fuente no trae la flecha "→": se escribe con palabras.
@@ -30,6 +30,7 @@ export type DatosResumenVial = {
   items: { hora?: string; sem: Semaforo; t: string; d?: string }[]; // hasta 4
   fuente: string;
   logo?: string;
+  patrocinio?: { nombre: string; logo?: string };
 };
 
 function Logo({ src, color }: { src?: string; color: string }) {
@@ -115,6 +116,7 @@ export function ResumenVial(d: DatosResumenVial) {
         <Logo src={d.logo} color="#fff" />
         <div style={{ display: "flex", maxWidth: 560, textAlign: "right", fontWeight: 800, fontSize: 28, lineHeight: 1.35, color: "#cfd8e3" }}>{d.fuente}</div>
       </div>
+      <SelloPatrocinio p={d.patrocinio} top={1056} right={72} />
     </div>
   );
 }

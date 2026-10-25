@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PresentadoPor from "@/components/PresentadoPor";
 import { NEWS, CATEGORIES, getCategoryName } from "@/lib/data";
 import { NewsCard } from "@/components/cards";
 import {
@@ -49,6 +50,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ slug:
         <Link href="/">Inicio</Link> / {name}
       </div>
       <h1 style={{ margin: "0 0 16px" }}>{name}</h1>
+      {slug === "clima" && <PresentadoPor seccion="clima" />}
       <div className="filter-row">
         {chips.map((c) => (
           <Link

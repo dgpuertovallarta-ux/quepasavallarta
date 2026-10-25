@@ -130,7 +130,9 @@ export async function publishToFacebook(key: string): Promise<{ id: string; kind
   const { pageId, token } = fbConfig();
   // Texto en español y, debajo, en inglés (2026-10-24).
   const en = row.caption ? await postEnIngles(row.caption.replace(/\s*Fuente: NHC \(Miami\)\.?\s*$/, "")).catch(() => null) : null;
-  const description = (row.caption || "") + (en ? `\n\nEN: ${en} Source: NHC (Miami).` : "");
+  const { getPatrocinio, contarPublicacion } = await import("@/lib/business/patrocinios");
+  const pat = await getPatrocinio("huracanes");
+  const description = (row.caption || "") + (en ? `\n\nEN: ${en} Source: NHC (Miami).` : "") + (pat ? `\n\nPresentado por ${pat.nombre}.` : "");
   try {
     const start = await graph(`/${pageId}/video_reels`, { upload_phase: "start" });
     const videoId = String(start.video_id);
@@ -142,6 +144,7 @@ export async function publishToFacebook(key: string): Promise<{ id: string; kind
     if (!up.ok || upJson.error) throw new Error(upJson.error?.message || `rupload ${up.status}`);
     await graph(`/${pageId}/video_reels`, { upload_phase: "finish", video_id: videoId, video_state: "PUBLISHED", description });
     await upsert(key, { status: "published", fb_video_id: videoId, error: null });
+    if (pat) await contarPublicacion(pat.id, row.caption?.split(":")[0] || key);
     return { id: videoId, kind: "reel" };
   } catch (reelErr) {
     try {
@@ -153,6 +156,7 @@ export async function publishToFacebook(key: string): Promise<{ id: string; kind
       const json = (await res.json().catch(() => ({}))) as { id?: string; error?: { message?: string } };
       if (!res.ok || !json.id) throw new Error(json.error?.message || `videos ${res.status}`);
       await upsert(key, { status: "published", fb_video_id: json.id, error: `reel: ${(reelErr as Error).message}` });
+      if (pat) await contarPublicacion(pat.id, row.caption?.split(":")[0] || key);
       return { id: json.id, kind: "video" };
     } catch (videoErr) {
       const msg = `reel: ${(reelErr as Error).message} · video: ${(videoErr as Error).message}`;

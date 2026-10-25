@@ -10,6 +10,7 @@ import { getPublishedArticleBySlug } from "@/lib/db/articles";
 import { crearTarjeta } from "@/lib/qpv/tarjetas";
 import { creditoOficial } from "@/lib/qpv/oficiales";
 import { fotoDeArchivo } from "@/lib/qpv/fotoArchivo";
+import { patrocinioParaNota, contarPublicacion } from "@/lib/business/patrocinios";
 
 /** Facebook: foto oficial de la nota o, si no, la de archivo del lugar/tema. Nunca la de otro medio. */
 function fotoParaRedes(url: string | undefined, credito: string | undefined, titulo: string, resumen: string, fuente?: string) {
@@ -63,7 +64,9 @@ export async function POST(request: Request) {
 
     // Aprobada por una persona: sale a redes en ese momento, con su tarjeta QPV (no con imagen de IA).
     const publicada = await getPublishedArticleBySlug(article.slug).catch(() => null);
+    const pat = await patrocinioParaNota(article.title, publicada?.category ?? "comunidad");
     const cardUrl = await crearTarjeta({
+      patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
       titulo: article.title,
       categoria: publicada?.category ?? "comunidad",
       clave: article.slug,
@@ -85,7 +88,9 @@ export async function POST(request: Request) {
       excerpt: article.excerpt,
       articleUrl: `${siteUrl()}/noticia/${article.slug}`,
       imageUrl: cardUrl,
+      patrocinador: pat?.nombre,
     });
+    if (pat && social.facebook.ok) await contarPublicacion(pat.id, article.title);
     return NextResponse.json({ reviewed: true, decision, reviewedBy: admin.displayName, published: true, social });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "No se pudo revisar la publicación." }, { status: 500 });

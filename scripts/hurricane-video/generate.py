@@ -20,6 +20,25 @@ import nhc  # noqa: E402
 import render  # noqa: E402
 
 
+def patrocinador(out: str) -> dict | None:
+    """Patrocinador vigente de los videos de huracán ("Presentado por"), si hay."""
+    import urllib.request
+    site = os.environ.get("SITE", "https://quepasavta.com")
+    try:
+        with urllib.request.urlopen(f"{site}/api/patrocinio?seccion=huracanes", timeout=20) as r:
+            p = json.load(r)
+        if not p or not p.get("logo"):
+            return None
+        path = os.path.join(out, "_sponsor_logo")
+        req = urllib.request.Request(p["logo"], headers={"User-Agent": "QuePasaVallartaBot/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as r, open(path, "wb") as f:
+            f.write(r.read())
+        return {"nombre": p.get("nombre", ""), "logo_path": path}
+    except Exception as e:
+        print("sin patrocinador:", e)
+        return None
+
+
 def caption(story: dict) -> str:
     best = story["best"]
     l = render.local(best.time)
@@ -84,6 +103,7 @@ def main():
         fc_adv = (st.get("forecastAdvisory") or {}).get("advNum") or adv.adv_num
         key = f"{st['id']}-{fc_adv}".lower()  # un video por boletín completo
         story = render.build_story(adv, tas, cone, ww, public_adv)
+        story["sponsor"] = patrocinador(a.out)
         render.render_video(story, os.path.join(a.out, "video.mp4"), a.preview)
         json.dump(story_json(story, {"storm_id": st["id"], "key": key, "reason": why}), open(os.path.join(a.out, "story.json"), "w"), ensure_ascii=False, indent=1)
         print("ok", key)

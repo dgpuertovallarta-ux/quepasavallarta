@@ -189,7 +189,11 @@ async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], 
     .slice(0, 3)
     .map((c) => `${NOMBRE_CORTO[c.id] ?? c.nombre}: ${c.retrasoMin > 0 ? `+${c.retrasoMin} min` : "fluye"}`)
     .join(" · ");
+  // Patrocinador de QPV al Volante ("Presentado por"), si hay uno vigente.
+  const { getPatrocinio } = await import("../business/patrocinios");
+  const pat = await getPatrocinio("trafico");
   const imageUrl = await crearTarjetaMapa({
+    patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
     titulo: "Así va el tráfico en Vallarta",
     lugar: `Resumen ${momento} · ${horaTexto()}`,
     detalle: resumenTexto.replace(/\s*→\s*/g, " a "),
@@ -203,7 +207,7 @@ async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], 
   const titulo = cargadas.length
     ? `Así va el tráfico en Vallarta a las ${horaTexto()}. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
     : `Así va el tráfico en Vallarta a las ${horaTexto()}: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
-  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl }, { tipo: "trafico" });
+  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl }, { tipo: "trafico", patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
   return `resumen vial ${slot}:00 enviado a la cola`;
 }
 

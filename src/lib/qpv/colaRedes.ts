@@ -39,6 +39,8 @@ export type ItemRedes = {
   score?: number;
   /** Sección (etiqueta de clasificar) para revolver las notas. */
   seccion?: string;
+  /** Patrocinio "Presentado por" de la sección (para el texto y su reporte). */
+  patrocinio?: { id: number; nombre: string };
   creada: string;
   estado: "pendiente" | "publicando" | "publicada" | "vencida" | "fallida";
   publicadaEn?: string;
@@ -56,7 +58,7 @@ async function leerTodos(): Promise<ItemRedes[]> {
 
 export async function encolarRedes(
   n: { title: string; excerpt: string; articleUrl: string; imageUrl?: string | null },
-  opts: { tipo?: "nota" | "trafico"; score?: number } = {}
+  opts: { tipo?: "nota" | "trafico"; score?: number; patrocinio?: { id: number; nombre: string } | null } = {}
 ): Promise<void> {
   if (!n.imageUrl) return; // siempre con imagen (foto propia o tarjeta QPV)
   const c = clasificar(n.title, n.excerpt);
@@ -71,6 +73,7 @@ export async function encolarRedes(
     tipo,
     score: opts.score,
     seccion: c.etiqueta,
+    patrocinio: opts.patrocinio ?? undefined,
     creada: new Date().toISOString(),
     estado: "pendiente",
   };
@@ -117,7 +120,7 @@ async function soltarCandado(token: string) {
 async function publicar(sig: ItemRedes): Promise<string> {
   const s = store();
   await s.setJSON("item/" + sig.id, { ...sig, estado: "publicando" } satisfies ItemRedes);
-  const r = await publishToSocial({ title: sig.title, excerpt: sig.excerpt, articleUrl: sig.articleUrl, imageUrl: sig.imageUrl });
+  const r = await publishToSocial({ title: sig.title, excerpt: sig.excerpt, articleUrl: sig.articleUrl, imageUrl: sig.imageUrl, patrocinador: sig.patrocinio?.nombre });
   const ok = r.facebook.ok || r.instagram.ok;
   // Token de Facebook vencido/invalidado: la nota NO se gasta, se queda en la
   // cola y se avisa; en cuanto se ponga un token nuevo vuelve a salir.
@@ -128,6 +131,10 @@ async function publicar(sig: ItemRedes): Promise<string> {
     return "Token de Facebook inválido: no se publicó (la nota sigue en cola).";
   }
   if (r.facebook.ok) await s.delete("token-invalido").catch(() => undefined);
+  if (r.facebook.ok && sig.patrocinio) {
+    const { contarPublicacion } = await import("../business/patrocinios");
+    await contarPublicacion(sig.patrocinio.id, sig.title);
+  }
   await s.setJSON("item/" + sig.id, {
     ...sig,
     estado: ok ? "publicada" : "fallida",
@@ -255,7 +262,10 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
     const fuente = a.sources[0]?.url;
     const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));
     const archivo = oficial ? null : fotoDeArchivo(a.title, "");
+    const { patrocinioParaNota } = await import("../business/patrocinios");
+    const pat = await patrocinioParaNota(a.title, a.category);
     const cardUrl = await crearTarjeta({
+      patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
       titulo: a.title,
       categoria: a.category,
       clave: a.slug,
@@ -270,7 +280,7 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
       await store().setJSON("item/sin-" + a.slug.slice(0, 80), { id: "sin-" + a.slug.slice(0, 80), title: a.title, excerpt: a.dek, articleUrl, urgente: false, tipo: "nota", creada: new Date().toISOString(), estado: "fallida", resultado: "sin tarjeta" } satisfies ItemRedes);
       return null;
     }
-    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score });
+    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
     const xs = await leerTodos();
     return xs.find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
   } catch (err) {
@@ -298,7 +308,9 @@ async function promoReporte(xs: ItemRedes[]) {
   if (h < 10 || h >= 20) return;
   if (ultima && xs.some((x) => x.articleUrl.endsWith("/reporte") && x.estado === "pendiente")) return;
   const { crearPromoReporte } = await import("./tarjetas");
-  const cardUrl = await crearPromoReporte();
+  const { getPatrocinio } = await import("../business/patrocinios");
+  const pat = await getPatrocinio("reportes");
+  const cardUrl = await crearPromoReporte(pat ? { nombre: pat.nombre, logo: pat.logo } : null);
   if (!cardUrl) return;
   await encolarRedes(
     {
@@ -307,7 +319,7 @@ async function promoReporte(xs: ItemRedes[]) {
       articleUrl: `${siteUrl()}/reporte`,
       imageUrl: cardUrl,
     },
-    { score: 95 }
+    { score: 95, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null }
   );
   await s.setJSON("promo-reporte", { en: new Date().toISOString(), version: 2 });
 }

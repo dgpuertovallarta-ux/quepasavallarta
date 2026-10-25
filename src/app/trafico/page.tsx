@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PresentadoPor from "@/components/PresentadoPor";
 import { ultimaInstantanea, avisosTransito } from "@/lib/trafico/monitor";
 import { CENTRO_MAPA } from "@/lib/trafico/corredores";
 
@@ -31,6 +32,7 @@ export default async function TraficoPage() {
       </div>
       <span className="card-kicker">QPV al Volante</span>
       <h1 style={{ margin: "4px 0 6px" }}>Así está el tráfico en Vallarta ahora</h1>
+      <PresentadoPor seccion="trafico" />
       <p style={{ color: "var(--text-muted)", maxWidth: 680, marginBottom: 22 }}>
         {hora
           ? `Actualizado a las ${hora} h. Se revisa cada 20 minutos.`
