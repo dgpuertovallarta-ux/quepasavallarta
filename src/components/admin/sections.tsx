@@ -256,6 +256,49 @@ export async function Aprobaciones() {
   );
 }
 
+/** Reportes ciudadanos (/reporte): solo los reportes, con los datos privados del ciudadano. */
+export async function Reportes() {
+  const todos = await getPendingArticles();
+  const reportes = todos.filter((a) => /^(reporte|denuncia) ciudadan/i.test(a.title));
+  const store = getStore({ name: "qpv-denuncias", consistency: "strong" });
+  const datos = await Promise.all(
+    reportes.map(async (a) => ({ a, d: (await store.get(a.slug, { type: "json" }).catch(() => null)) as { nombre?: string; contacto?: string; lugar?: string; tipo?: string; mapa?: string; recibida?: string } | null }))
+  );
+  return (
+    <>
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <strong style={{ fontSize: 13 }}>Reportes ciudadanos por revisar ({reportes.length})</strong>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "6px 0 10px" }}>
+          Llegan desde quepasavta.com/reporte. Al aprobar, el reporte sale en el sitio y en Facebook con su foto. Nombre, contacto y
+          ubicación exacta nunca se publican.
+        </p>
+        {datos.length === 0 && <p style={{ fontSize: 13.5 }}>No hay reportes nuevos.</p>}
+        <ul style={{ fontSize: 13.5, margin: 0, paddingLeft: 18 }}>
+          {datos.map(({ a, d }) => (
+            <li key={a.slug} style={{ marginBottom: 6 }}>
+              <b>{a.title.replace(/^(reporte|denuncia) ciudadan[oa]:\s*/i, "")}</b>
+              {d?.tipo ? ` · ${d.tipo}` : ""} · {d?.lugar ?? "sin lugar"} · {d?.nombre || "sin nombre"} · {d?.contacto || "sin contacto"}
+              {d?.recibida ? ` · ${new Date(d.recibida).toLocaleString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "short", timeStyle: "short" })}` : ""}
+              {d?.mapa && (
+                <>
+                  {" · "}
+                  <a href={d.mapa} target="_blank" rel="noreferrer">ver mapa</a>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {reportes.length > 0 && (
+        <div className="panel">
+          <strong style={{ fontSize: 13 }}>Aprobar o rechazar</strong>
+          <ApprovalQueue initialArticles={reportes} />
+        </div>
+      )}
+    </>
+  );
+}
+
 export async function Fuentes() {
   const results = await fetchAllSources();
   return (

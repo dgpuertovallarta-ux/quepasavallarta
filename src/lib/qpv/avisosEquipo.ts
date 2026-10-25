@@ -37,7 +37,7 @@ export async function avisarEquipo(r: AvisoReporte, sitio: string): Promise<numb
     r.resumen.slice(0, 280),
     r.mapa ? `Mapa: ${r.mapa}` : "",
     r.foto ? `Foto: ${r.foto}` : "",
-    `Revisar y aprobar: ${sitio}/admin/aprobaciones`,
+    `Revisar y aprobar: ${sitio}/admin/reportes`,
   ]
     .filter(Boolean)
     .join("\n");

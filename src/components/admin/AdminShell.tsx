@@ -5,6 +5,7 @@ const SECTIONS = [
   { id: "resumen", label: "Resumen" },
   { id: "cola", label: "Cola editorial" },
   { id: "aprobaciones", label: "Aprobaciones" },
+  { id: "reportes", label: "Reportes ciudadanos" },
   { id: "fuentes", label: "Fuentes y automatización" },
   { id: "roles", label: "Usuarios y roles" },
   { id: "estadisticas", label: "Estadísticas" },
