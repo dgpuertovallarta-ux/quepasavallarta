@@ -3,8 +3,8 @@
  *
  * Línea pedida por el propietario (2026-10-24):
  *   - Las notas más importantes, revueltas (de distintas secciones): al menos
- *     ~6 al día y como máximo QPV_MAX_POR_DIA (10 por omisión), separadas
- *     QPV_MINUTOS_ENTRE_POSTS (40 por omisión), de 7 a. m. a 11 p. m.
+ *     ~6 al día y como máximo QPV_MAX_POR_DIA (12 por omisión), repartidas
+ *     de 7 a. m. a 11 p. m. (mínimo QPV_MINUTOS_ENTRE_POSTS = 40 min entre una y otra).
  *   - Tráfico solo con el resumen de las 8 a. m., 2 p. m. y 6 p. m. (va aparte
  *     del límite de notas y sale a su hora).
  *   - Urgentes (alertas, Protección Civil, en curso) primero, sin esperar.
@@ -20,7 +20,7 @@ import { fotoDeArchivo } from "./fotoArchivo";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
 import { siteUrl } from "../storage/imageBlobs";
 
-const MAX_POR_DIA = Number(process.env.QPV_MAX_POR_DIA || 10);
+const MAX_POR_DIA = Number(process.env.QPV_MAX_POR_DIA || 12);
 const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 40);
 const VIGENCIA_MS = 8 * 3_600_000;
 const HORA_INICIO = 7;
@@ -180,6 +180,9 @@ export async function procesarColaRedes(): Promise<string> {
 
     // 1b) Invitación a mandar reportes ciudadanos: una vez por semana (lunes) y la primera vez.
     await promoReporte(xs).catch((err) => console.error("[colaRedes] promo reporte:", err));
+    // El anuncio sale enseguida (no cuenta para el límite de notas).
+    const promo = (await leerTodos()).find((x) => x.articleUrl.endsWith("/reporte") && x.estado === "pendiente");
+    if (promo) return await publicar({ ...promo, tipo: "trafico" });
 
     // 2) Notas: las más importantes, revueltas.
     let notas = vigentes.filter((x) => (x.tipo ?? (x.articleUrl.includes("/trafico") ? "trafico" : "nota")) === "nota");
@@ -209,7 +212,12 @@ export async function procesarColaRedes(): Promise<string> {
     if (urgente && minutos >= 10) return await publicar(urgente);
     if (!deDia) return `De noche solo salen urgentes (${notas.length} en espera para la mañana).`;
     if (publicadasHoy.length >= MAX_POR_DIA) return `Límite diario alcanzado (${MAX_POR_DIA}).`;
-    if (minutos < MINUTOS_ENTRE_POSTS) return `En espera: faltan ${Math.ceil(MINUTOS_ENTRE_POSTS - minutos)} min para la siguiente.`;
+    // Reparte las notas a lo largo del día (que no se acaben a mediodía):
+    // separación = lo que falta del día ÷ las notas que quedan, mínimo 40 min.
+    const ahoraMin = h * 60 + Number(new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City", minute: "numeric" }));
+    const quedan = Math.max(1, MAX_POR_DIA - publicadasHoy.length);
+    const espacio = Math.max(MINUTOS_ENTRE_POSTS, Math.min(120, (HORA_FIN * 60 - ahoraMin) / quedan));
+    if (minutos < espacio) return `En espera: faltan ${Math.ceil(espacio - minutos)} min para la siguiente.`;
 
     // Importancia + frescura, y castigo si es de la misma sección que la última publicada.
     const ultimaSeccion = ultimaPub?.seccion;
