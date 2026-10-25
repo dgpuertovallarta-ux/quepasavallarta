@@ -11,6 +11,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "fs/promises";
 import path from "path";
 import { Tarjeta, ANCHO, ALTO, type DatosTarjeta, type Plantilla } from "@/components/social/Tarjeta";
+import { PromoReporte } from "@/components/social/PromoReporte";
 import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial } from "@/components/social/TarjetaVial";
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
@@ -175,6 +176,21 @@ export async function renderTarjeta(d: DatosTarjeta): Promise<Buffer> {
 
 export function horaLocal(fecha = new Date()): string {
   return fecha.toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** Anuncio "Manda tu reporte ciudadano" (pieza de campaña para Facebook). Nunca lanza. */
+export async function crearPromoReporte(): Promise<string | null> {
+  try {
+    const QR = (await import("qrcode")).default;
+    const qr = await QR.toDataURL(`${siteUrl()}/reporte`, { margin: 0, width: 300, color: { dark: "#0A1F3A", light: "#FFFFFF" } });
+    const f = fotoFondo("calle colonia Vallarta", "", "COMUNIDAD", CATEGORY_IMAGES, "comunidad");
+    const foto = (await fondoDifuminado(f.url)) ?? undefined;
+    const png = await renderElemento(<PromoReporte logo={await dataUriDeAsset("qpv-logo-blanco.png", "image/png")} qr={qr} foto={foto} />);
+    return (await saveImageBlob(png, "image/png")).url;
+  } catch (err) {
+    console.error("[crearPromoReporte] Falló:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /** Postal amarilla de QPV al Volante (un incidente o una vialidad cargada). Nunca lanza. */

@@ -277,23 +277,20 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
  */
 async function promoReporte(xs: ItemRedes[]) {
   const s = store();
-  const ultima = (await s.get("promo-reporte", { type: "json" })) as { en: string } | null;
+  const guardada = (await s.get("promo-reporte", { type: "json" })) as { en: string; version?: number } | null;
+  // La versión 2 es el anuncio de campaña; si solo salió la tarjeta sencilla, se manda la buena.
+  const ultima = guardada?.version === 2 ? guardada : null;
+  if (!ultima) {
+    for (const x of xs) if (x.articleUrl.endsWith("/reporte") && x.estado === "pendiente") await s.setJSON("item/" + x.id, { ...x, estado: "vencida" });
+  }
   const h = horaLocalNum();
   const lunes = new Date().toLocaleDateString("en-US", { timeZone: "America/Mexico_City", weekday: "short" }) === "Mon";
   const dias = ultima ? (Date.now() - new Date(ultima.en).getTime()) / 86_400_000 : Infinity;
   if (!(dias === Infinity || (lunes && dias > 5))) return;
   if (h < 10 || h >= 20) return;
-  if (xs.some((x) => x.articleUrl.endsWith("/reporte") && x.estado === "pendiente")) return;
-  const { crearTarjeta } = await import("./tarjetas");
-  const titulo = "¿Viste algo en tu colonia? Mándanos tu reporte con foto";
-  const cardUrl = await crearTarjeta({
-    titulo,
-    categoria: "comunidad",
-    clave: "promo-reporte",
-    resumen: "Baches, basura, fugas, falta de luz, tráfico o inseguridad. Entra a quepasavta.com/reporte: lo revisamos y lo publicamos. Tus datos nunca se publican.",
-    etiqueta: "REPORTE CIUDADANO",
-    llamado: "REPORTA EN QUEPASAVTA.COM/REPORTE",
-  });
+  if (ultima && xs.some((x) => x.articleUrl.endsWith("/reporte") && x.estado === "pendiente")) return;
+  const { crearPromoReporte } = await import("./tarjetas");
+  const cardUrl = await crearPromoReporte();
   if (!cardUrl) return;
   await encolarRedes(
     {
@@ -304,7 +301,7 @@ async function promoReporte(xs: ItemRedes[]) {
     },
     { score: 95 }
   );
-  await s.setJSON("promo-reporte", { en: new Date().toISOString() });
+  await s.setJSON("promo-reporte", { en: new Date().toISOString(), version: 2 });
 }
 
 /** Para el panel: lo que está en cola y lo publicado hoy. */
