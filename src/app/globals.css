@@ -286,7 +286,7 @@ h1 { font-size: clamp(36px, 4.4vw, 58px); margin: 0 0 14px; }
 .compact-left { display: flex; align-items: center; gap: 14px; }
 .compact-left .brand-logo { height: 46px; }
 .compact-nav { display: flex; align-items: center; gap: 28px; }
-.compact-right { display: flex; justify-content: flex-end; }
+.compact-right { display: flex; justify-content: flex-end; gap: 8px; }
 .nav-toggle { display: none; }
 
 @media (max-width: 900px) {
@@ -1085,3 +1085,19 @@ table.data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border);
 .denuncia-trampa { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .denuncia-ok { padding: 20px; border-radius: 10px; border: 1px solid #14B8B0; background: rgba(20,184,176,.08); max-width: 640px; }
 .denuncia-form .btn { margin-top: 12px; align-self: flex-start; }
+
+/* Botón "Reporta" siempre visible arriba (2026-10-24) */
+.btn.btn-reporte { background: #D7262E; color: #fff; border: 1px solid #D7262E; font-weight: 800; letter-spacing: 0.2px; display: inline-flex; align-items: center; gap: 6px; }
+.btn.btn-reporte:hover { background: #b81f26; border-color: #b81f26; color: #fff; }
+@media (max-width: 900px) {
+  .masthead-right .btn.btn-reporte { display: inline-flex; padding: 6px 10px; font-size: 13px; }
+}
+@media (max-width: 900px) {
+  .masthead .brand { flex-shrink: 0; }
+  .masthead .brand-logo { width: auto; max-width: none; }
+}
+@media (max-width: 420px) {
+  .masthead-right { gap: 6px; }
+  .masthead-right .btn.btn-reporte { padding: 6px 9px; font-size: 12.5px; }
+  .masthead-right .live-pill { padding-left: 10px; padding-right: 10px; }
+}

@@ -85,6 +85,7 @@ export default function Header({
     : PRIMARY_FALLBACK.slice(0, 2);
   const primary: { href: string; label: string; alert?: boolean }[] = [
     { href: "/proteccion-civil", label: "Protección Civil", alert: true },
+    { href: "/reporte", label: "Reporte Ciudadano", alert: true },
     { href: "/trafico", label: "Tráfico" },
     ...primarySlugs.map((slug) => ({
       href: `/categoria/${slug}`,
@@ -198,6 +199,9 @@ export default function Header({
               <img src="/brand/logo-transparent.png" alt="Qué Pasa Vallarta" className="brand-logo" />
             </Link>
             <div className="masthead-right">
+              <Link href="/reporte" className="btn btn-reporte" aria-label="Manda tu reporte ciudadano">
+                📷 <span>Reporta</span>
+              </Link>
               <Link href="/#newsletter" className="btn btn-outline">
                 Suscríbete
               </Link>
@@ -236,6 +240,9 @@ export default function Header({
             {navLinks}
           </nav>
           <div className="compact-right">
+            <Link href="/reporte" className="btn btn-reporte btn-sm">
+              📷 <span>Reporta</span>
+            </Link>
             <Link href="/#newsletter" className="btn btn-outline btn-sm">
               Suscríbete
             </Link>
