@@ -42,7 +42,7 @@ export default function LoginForm() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
-          style={{ width: "100%", fontSize: 14, padding: 8 }}
+          style={{ width: "100%", fontSize: 15, padding: "10px 12px", border: "1px solid var(--border-strong)", borderRadius: 8, background: "transparent", color: "inherit" }}
           autoFocus
         />
       </label>
@@ -53,7 +53,7 @@ export default function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
-          style={{ width: "100%", fontSize: 14, padding: 8 }}
+          style={{ width: "100%", fontSize: 15, padding: "10px 12px", border: "1px solid var(--border-strong)", borderRadius: 8, background: "transparent", color: "inherit" }}
         />
       </label>
       {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}

@@ -9,6 +9,7 @@ import { buildStoryGraph, isAutoPublishEligible } from "@/lib/ingest/storyGraph"
 import { isAiConfigured } from "@/lib/ingest/generateArticle";
 import { getPendingArticles } from "@/lib/db/articles";
 import { getStore } from "@netlify/blobs";
+import { estadoColaRedes } from "@/lib/qpv/colaRedes";
 import { getConfiguredAdmins } from "@/lib/auth/credentials";
 import { isDatabaseConfigured } from "@/lib/db/client";
 import ApprovalQueue from "./ApprovalQueue";
@@ -43,7 +44,11 @@ async function fetchAllSources(): Promise<{
         return { sourceId: source.id, ok: false, items: [], error: "No verificada — ver nota en el registro de fuentes.", lastRunAt };
       }
       try {
-        const items = await fetchSource(source);
+        // Ninguna fuente puede trabar el panel: máximo 6 s cada una.
+        const items = await Promise.race([
+          fetchSource(source),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("La fuente tardó demasiado en responder.")), 6000)),
+        ]);
         return { sourceId: source.id, ok: true, items, lastRunAt };
       } catch (err) {
         return {
@@ -104,31 +109,50 @@ function SourcesTable({ results }: { results: Awaited<ReturnType<typeof fetchAll
 }
 
 export async function Resumen() {
-  const results = await fetchAllSources();
-  const allItems = results.flatMap((r) => r.items);
-  const pendientes = allItems.filter((i) => i.status === "needs_review").length;
-  const pendingApprovals = await getPendingArticles();
-  const urgentes = allItems.filter((i) => i.newsScore >= 90).length;
-  const sourcesOk = results.filter((r) => r.ok).length;
+  // 2026-10-25: la portada del panel ya no consulta las 27 fuentes en vivo
+  // (tardaba tanto que el panel se quedaba cargando). Solo datos propios, al instante.
+  const [pendingApprovals, cola] = await Promise.all([
+    getPendingArticles().catch(() => []),
+    estadoColaRedes().catch(() => []),
+  ]);
+  const reportes = pendingApprovals.filter((a) => /^(reporte|denuncia) ciudadan/i.test(a.title)).length;
+  const hoy = new Date().toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
+  const fbHoy = cola.filter((x) => x.estado === "publicada" && x.publicadaEn && new Date(x.publicadaEn).toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" }) === hoy);
+  const enCola = cola.filter((x) => x.estado === "pendiente").length;
+  const tokenMalo = cola.some((x) => x.estado === "pendiente" && /token de facebook inválido/i.test(x.resultado ?? ""));
 
   return (
     <>
       <div className="stat-row">
-        <StatTile n={allItems.length} l="Historias reales descubiertas ahora" />
-        <StatTile n={sourcesOk} l={`Fuentes OK de ${SOURCES.length}`} />
-        <StatTile n={pendientes} l="Pendientes de revisión humana" />
         <StatTile n={pendingApprovals.length} l="Publicaciones por aprobar" />
-        <StatTile n={urgentes} l="Marcadas urgentes" />
+        <StatTile n={reportes} l="Reportes ciudadanos nuevos" />
+        <StatTile n={fbHoy.length} l="Publicadas hoy en Facebook" />
+        <StatTile n={enCola} l="Esperando turno para Facebook" />
         <StatTile n={REAL_BUSINESSES.length} l="Negocios en la Guía" />
       </div>
+      {tokenMalo && (
+        <div className="panel" style={{ marginBottom: 16, borderColor: "var(--danger)" }}>
+          <strong style={{ color: "var(--danger)" }}>La llave de Facebook no funciona.</strong>
+          <p style={{ fontSize: 13.5, margin: "6px 0 0" }}>Las notas se quedan esperando hasta que se ponga una llave nueva en Netlify (FB_PAGE_ACCESS_TOKEN).</p>
+        </div>
+      )}
       <div className="panel">
-        <strong style={{ fontSize: 13 }}>¿Está funcionando el sistema?</strong>
-        <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
-          La automatización revisa fuentes cada 10 minutos. Las notas confiables y corroboradas se
-          publican automáticamente; las que requieren revisión quedan en la cola para los administradores.
+        <strong style={{ fontSize: 13 }}>Últimas publicaciones en Facebook</strong>
+        {fbHoy.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text-muted)" }}>Todavía no sale nada hoy.</p>}
+        <ul style={{ fontSize: 13.5, margin: "8px 0 0", paddingLeft: 18 }}>
+          {fbHoy
+            .sort((a, b) => b.publicadaEn!.localeCompare(a.publicadaEn!))
+            .slice(0, 12)
+            .map((x) => (
+              <li key={x.id} style={{ marginBottom: 4 }}>
+                {new Date(x.publicadaEn!).toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit" })} · {x.title}
+              </li>
+            ))}
+        </ul>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 12 }}>
+          La automatización revisa fuentes cada 10 minutos. Para ver el estado de cada fuente, entra a «Fuentes y automatización».
           {!isDatabaseConfigured() && " Falta configurar DATABASE_URL para guardar y compartir la cola."}
         </p>
-        <SourcesTable results={results} />
       </div>
     </>
   );
