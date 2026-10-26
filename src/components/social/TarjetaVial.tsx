@@ -91,6 +91,11 @@ export function ReporteVial(d: DatosReporteVial) {
 }
 
 export function ResumenVial(d: DatosResumenVial) {
+  // 2026-10-26: hasta 6 renglones (incidentes reales + vialidades); con más de 4 se compactan.
+  const items = d.items.slice(0, 6);
+  const compacto = items.length > 4;
+  const n = d.titulo.length;
+  const tamTit = n <= 22 ? 92 : n <= 34 ? 80 : n <= 48 ? 68 : 58;
   return (
     <div style={{ width: ANCHO, height: ALTO, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden", background: COLORES.navy, color: "#fff", padding: 72, fontFamily: F.base }}>
       <Ola color="rgba(20,184,176,0.08)" />
@@ -98,25 +103,25 @@ export function ResumenVial(d: DatosResumenVial) {
         <div style={{ display: "flex", background: COLORES.amber, color: COLORES.navy, fontFamily: F.titular, fontWeight: 700, fontSize: 34, letterSpacing: 2, padding: "12px 22px" }}>QPV AL VOLANTE</div>
         <div style={{ display: "flex", fontWeight: 900, fontSize: 58 }}>{d.hora}</div>
       </div>
-      <div style={{ display: "flex", marginTop: 56, fontWeight: 900, fontSize: 84, lineHeight: 0.98, textTransform: "uppercase" }}>{txt(d.titulo)}</div>
-      <div style={{ display: "flex", marginTop: 14, fontWeight: 800, fontSize: 36, color: COLORES.teal }}>{d.sub}</div>
-      <div style={{ display: "flex", flexDirection: "column", marginTop: 34 }}>
-        {d.items.slice(0, 4).map((x, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", padding: "20px 0", borderTop: "2px solid rgba(255,255,255,0.18)" }}>
+      <div style={{ display: "flex", marginTop: compacto ? 40 : 56, fontWeight: 900, fontSize: tamTit, lineHeight: 0.98, textTransform: "uppercase" }}>{txt(d.titulo)}</div>
+      <div style={{ display: "flex", marginTop: 14, fontWeight: 800, fontSize: 32, color: COLORES.teal }}>{d.sub}</div>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: compacto ? 22 : 34 }}>
+        {items.map((x, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", padding: compacto ? "13px 0" : "20px 0", borderTop: "2px solid rgba(255,255,255,0.18)" }}>
             {x.hora && <div style={{ display: "flex", width: 110, flexShrink: 0, fontWeight: 800, fontSize: 32, color: COLORES.amber, marginTop: 3 }}>{x.hora}</div>}
-            <div style={{ display: "flex", width: 30, height: 30, borderRadius: 15, background: SEMAFORO[x.sem], flexShrink: 0, marginTop: 8, marginRight: 26 }} />
+            <div style={{ display: "flex", width: 28, height: 28, borderRadius: 14, background: SEMAFORO[x.sem], flexShrink: 0, marginTop: 6, marginRight: 24 }} />
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", fontWeight: 900, fontSize: 38, lineHeight: 1.1 }}>{txt(x.t)}</div>
-              {x.d && <div style={{ display: "flex", fontWeight: 500, fontSize: 29, opacity: 0.82, marginTop: 6 }}>{x.d}</div>}
+              <div style={{ display: "flex", fontWeight: 900, fontSize: compacto ? 33 : 38, lineHeight: 1.1 }}>{txt(x.t)}</div>
+              {x.d && <div style={{ display: "flex", fontWeight: 500, fontSize: compacto ? 25 : 29, opacity: 0.82, marginTop: 5 }}>{x.d}</div>}
             </div>
           </div>
         ))}
       </div>
       <div style={{ position: "absolute", left: 72, right: 72, bottom: 64, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <Logo src={d.logo} color="#fff" />
-        <div style={{ display: "flex", maxWidth: 560, textAlign: "right", fontWeight: 800, fontSize: 28, lineHeight: 1.35, color: "#cfd8e3" }}>{d.fuente}</div>
+        {!d.patrocinio && <div style={{ display: "flex", maxWidth: 560, textAlign: "right", fontWeight: 800, fontSize: 26, lineHeight: 1.35, color: "#cfd8e3" }}>{d.fuente}</div>}
       </div>
-      <SelloPatrocinio p={d.patrocinio} top={1056} right={72} />
+      <SelloPatrocinio p={d.patrocinio} top={1196} right={72} />
     </div>
   );
 }

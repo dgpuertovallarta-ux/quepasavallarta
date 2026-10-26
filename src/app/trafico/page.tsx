@@ -2,6 +2,7 @@ import Link from "next/link";
 import PresentadoPor from "@/components/PresentadoPor";
 import { ultimaInstantanea, avisosTransito } from "@/lib/trafico/monitor";
 import { CENTRO_MAPA } from "@/lib/trafico/corredores";
+import { agruparIncidentes, renglonIncidente } from "@/lib/trafico/resumen";
 
 export const metadata = {
   title: "QPV al Volante — Tráfico en Puerto Vallarta en vivo",
@@ -13,10 +14,6 @@ export const revalidate = 60;
 
 const COLOR = { fluido: "#1E9E5A", lento: "#E0A100", pesado: "#D7262E" } as const;
 const NIVEL = { fluido: "Fluido", lento: "Lento", pesado: "Pesado" } as const;
-const TIPO: Record<string, string> = {
-  accidente: "Accidente", cierre: "Cierre", obra: "Obras", congestion: "Tráfico pesado", inundacion: "Inundación",
-  carril: "Cierre de carril", vehiculo: "Vehículo descompuesto", otro: "Incidente",
-};
 
 export default async function TraficoPage() {
   const [s, avisos] = await Promise.all([ultimaInstantanea(), avisosTransito(8)]);
@@ -76,13 +73,15 @@ export default async function TraficoPage() {
 
           <h2 style={{ fontSize: 20, margin: "24px 0 8px" }}>Incidentes detectados</h2>
           {!s?.incidentes.length && <p style={{ color: "var(--text-muted)" }}>No hay incidentes reportados.</p>}
-          {s?.incidentes.slice(0, 12).map((i) => (
-            <div key={i.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--border, rgba(127,127,127,.25))" }}>
-              <strong style={{ color: i.tipo === "accidente" || i.tipo === "cierre" ? COLOR.pesado : undefined }}>{TIPO[i.tipo] ?? "Incidente"}</strong>
-              {i.de && <span> · {i.de}{i.a && i.a !== i.de ? ` → ${i.a}` : ""}</span>}
-              {i.retrasoMin > 0 && <span style={{ color: "var(--text-muted)" }}> · +{i.retrasoMin} min</span>}
-            </div>
-          ))}
+          {s && agruparIncidentes(s.incidentes).slice(0, 12).map((r, k) => {
+            const { t, d } = renglonIncidente(r);
+            return (
+              <div key={k} style={{ padding: "8px 0", borderBottom: "1px solid var(--border, rgba(127,127,127,.25))" }}>
+                <strong style={{ color: r.tipo === "accidente" || r.tipo === "cierre" || r.tipo === "inundacion" ? COLOR.pesado : undefined }}>{t}</strong>
+                <div style={{ fontSize: 14, color: "var(--text-muted)" }}>{d}</div>
+              </div>
+            );
+          })}
 
           {wa && (
             <a

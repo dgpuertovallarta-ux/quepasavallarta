@@ -13,7 +13,8 @@ import { getStore } from "@netlify/blobs";
 import { CORREDORES } from "./corredores";
 import { incidentes, medirCorredor, type EstadoCorredor, type Incidente } from "./tomtom";
 import { encolarRedes } from "../qpv/colaRedes";
-import { crearTarjetaMapa, horaLocal as horaTexto } from "../qpv/tarjetas";
+import { crearTarjetaMapa, crearResumenVial, horaLocal as horaTexto } from "../qpv/tarjetas";
+import { agruparIncidentes, lineaIncidente, renglonIncidente, type IncidenteResumen } from "./resumen";
 import { getPool } from "../db/client";
 import type { Semaforo } from "@/components/social/TarjetaVial";
 import { publishArticle, getRecentArticleTitles, findDuplicateTitle } from "../db/articles";
@@ -166,48 +167,79 @@ async function avisosOficialesRecientes(horas: number): Promise<{ hora: string; 
 }
 
 async function publicarResumen(corredores: EstadoCorredor[], incs: Incidente[], slot: number): Promise<string> {
-  const items: { hora?: string; sem: Semaforo; t: string; d?: string }[] = [];
-  // Primero lo que está cargado, luego lo que fluye
+  // 2026-10-26: el resumen sale con lo que de verdad está pasando (cierres,
+  // accidentes, tráfico pesado por calle y zona) y un titular que cambia según
+  // la situación, en lugar del mismo mapa con las mismas 3 vialidades.
+  const items: { sem: Semaforo; t: string; d?: string }[] = [];
   const orden = [...corredores].sort((a, b) => b.retrasoMin - a.retrasoMin);
   const oficiales = await avisosOficialesRecientes(6);
-  // 4 renglones: hasta 3 vialidades (las más cargadas) y el aviso oficial más reciente
-  for (const c of orden.slice(0, oficiales.length ? 3 : 4)) {
-    items.push({
-      sem: SEM[c.nivel],
-      t: NOMBRE_CORTO[c.id] ?? c.nombre,
-      d: c.retrasoMin > 0 ? `${c.minutos} min · +${c.retrasoMin} min de retraso` : `${c.minutos} min · fluye normal`,
-    });
-  }
+  const todos = agruparIncidentes(incs).filter((r) => r.tipo !== "vehiculo");
+  // Lo nuevo primero; de lo que ya lleva días (obras, cierres largos) solo 2.
+  const nuevos = todos.filter((r) => r.nuevo);
+  const viejos = todos.filter((r) => !r.nuevo).slice(0, 2);
+  const elegidos = [...nuevos, ...viejos].slice(0, 5);
+  const semDe = (r: IncidenteResumen): Semaforo =>
+    r.tipo === "accidente" || r.tipo === "cierre" || r.tipo === "inundacion" || (r.tipo === "congestion" && r.retrasoMin >= 10) ? "rojo" : "ambar";
+
   for (const a of oficiales.slice(0, 1)) {
     items.push({ sem: "ambar", t: a.titulo.length > 60 ? a.titulo.slice(0, 57) + "…" : a.titulo, d: `Aviso oficial · ${a.hora}` });
   }
-  const graves = incs.filter((i) => i.tipo === "cierre" || i.tipo === "accidente" || i.tipo === "inundacion").length;
+  for (const r of elegidos) items.push({ sem: semDe(r), ...renglonIncidente(r) });
+  const conRetraso = orden.filter((c) => c.retrasoMin > 0);
+  for (const c of conRetraso.slice(0, Math.max(1, 6 - items.length))) {
+    items.push({ sem: SEM[c.nivel], t: NOMBRE_CORTO[c.id] ?? c.nombre, d: `${c.minutos} min · +${c.retrasoMin} min de retraso` });
+  }
+  if (!conRetraso.length && orden.length) {
+    items.push({ sem: "verde", t: "Ameca, Medina Ascencio y Carretera 200", d: "Fluyen sin retrasos" });
+  }
+
+  // Titular según lo más importante del momento.
+  const accidente = elegidos.find((r) => r.tipo === "accidente");
+  const inundacion = elegidos.find((r) => r.tipo === "inundacion");
+  const pesados = orden.filter((c) => c.nivel === "pesado");
+  const cierreNuevo = elegidos.find((r) => r.tipo === "cierre" && r.nuevo);
+  const cierres = todos.filter((r) => r.tipo === "cierre").length;
+  const corto = (s: string) => (s.length > 34 ? s.slice(0, 33) + "…" : s);
+  const titular = accidente
+    ? `Accidente en ${corto(accidente.calle)}`
+    : inundacion
+      ? `Calle inundada en ${corto(inundacion.calle)}`
+      : pesados.length
+        ? `Cargado: ${NOMBRE_CORTO[pesados[0].id] ?? pesados[0].nombre}`
+        : cierreNuevo
+          ? `Cierre en ${corto(cierreNuevo.calle)}`
+          : cierres
+            ? `${cierres} ${cierres === 1 ? "cierre vial activo" : "cierres viales activos"}`
+            : conRetraso.length
+              ? "Tráfico lento en algunos puntos"
+              : "Las vialidades fluyen";
   const momento = slot === 8 ? "de la mañana" : slot === 14 ? "del mediodía" : "de la tarde";
   const fecha = new Date().toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", weekday: "long", day: "numeric", month: "long" });
-  void items;
-  const resumenTexto = orden
-    .slice(0, 3)
-    .map((c) => `${NOMBRE_CORTO[c.id] ?? c.nombre}: ${c.retrasoMin > 0 ? `+${c.retrasoMin} min` : "fluye"}`)
-    .join(" · ");
+
   // Patrocinador de QPV al Volante ("Presentado por"), si hay uno vigente.
   const { getPatrocinio } = await import("../business/patrocinios");
   const pat = await getPatrocinio("trafico");
-  const imageUrl = await crearTarjetaMapa({
-    patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
-    titulo: "Así va el tráfico en Vallarta",
-    lugar: `Resumen ${momento} · ${horaTexto()}`,
-    detalle: resumenTexto.replace(/\s*→\s*/g, " a "),
-    lat: 20.665,
-    lon: -105.245,
-    zoom: 12,
-  });
+  const imageUrl = await crearResumenVial(
+    {
+      hora: horaTexto(),
+      titulo: titular,
+      sub: `Resumen ${momento} · ${fecha}`,
+      items: items.slice(0, 6),
+      fuente: "TomTom Traffic, Tránsito y redacción QPV",
+    },
+    pat ? { nombre: pat.nombre, logo: pat.logo } : null
+  );
   if (!imageUrl) return "resumen sin imagen: no se publicó";
-  void fecha;
-  const cargadas = orden.filter((c) => c.nivel === "pesado").map((c) => NOMBRE_CORTO[c.id] ?? c.nombre);
-  const titulo = cargadas.length
-    ? `Así va el tráfico en Vallarta a las ${horaTexto()}. ${cargadas.length === 1 ? "Vialidad cargada" : "Vialidades cargadas"}: ${cargadas.join(", ")}${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`
-    : `Así va el tráfico en Vallarta a las ${horaTexto()}: las vialidades principales fluyen sin retrasos importantes${graves ? `. ${graves} incidente${graves > 1 ? "s" : ""} reportado${graves > 1 ? "s" : ""}` : ""}`;
-  await encolarRedes({ title: titulo, excerpt: "Tráfico en vivo", articleUrl: `${siteUrl()}/trafico`, imageUrl }, { tipo: "trafico", patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
+
+  const lineas = [
+    ...elegidos.map(lineaIncidente),
+    ...conRetraso.slice(0, 3).map((c) => `${NOMBRE_CORTO[c.id] ?? c.nombre}: ${c.minutos} min, +${c.retrasoMin} de retraso`),
+  ];
+  const titulo = `Así va el tráfico en Vallarta a las ${horaTexto()}: ${titular.charAt(0).toLowerCase() + titular.slice(1)}`;
+  const excerpt = lineas.length
+    ? lineas.join(". ")
+    : "Las vialidades principales fluyen sin retrasos importantes y no hay cierres reportados";
+  await encolarRedes({ title: titulo, excerpt, articleUrl: `${siteUrl()}/trafico`, imageUrl }, { tipo: "trafico", patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
   return `resumen vial ${slot}:00 enviado a la cola`;
 }
 
