@@ -25,7 +25,7 @@ def patrocinador(out: str) -> dict | None:
     import urllib.request
     site = os.environ.get("SITE", "https://quepasavta.com")
     try:
-        with urllib.request.urlopen(f"{site}/api/patrocinio?seccion=huracanes", timeout=20) as r:
+        with urllib.request.urlopen(f"{site}/wp-json/qpv/v1/patrocinio?seccion=huracanes", timeout=20) as r:
             p = json.load(r)
         if not p or not p.get("logo"):
             return None
