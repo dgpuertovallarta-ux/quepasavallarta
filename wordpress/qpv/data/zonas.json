@@ -1,0 +1,38 @@
+[
+ {
+  "slug": "centro",
+  "name": "Centro"
+ },
+ {
+  "slug": "5-de-diciembre",
+  "name": "5 de Diciembre"
+ },
+ {
+  "slug": "versalles",
+  "name": "Versalles"
+ },
+ {
+  "slug": "zona-hotelera",
+  "name": "Zona Hotelera"
+ },
+ {
+  "slug": "marina",
+  "name": "Marina Vallarta"
+ },
+ {
+  "slug": "fluvial",
+  "name": "Fluvial Vallarta"
+ },
+ {
+  "slug": "pitillal",
+  "name": "Pitillal"
+ },
+ {
+  "slug": "las-juntas",
+  "name": "Las Juntas"
+ },
+ {
+  "slug": "ixtapa",
+  "name": "Ixtapa"
+ }
+]

@@ -1,0 +1,22 @@
+[
+ {
+  "id": "basico",
+  "name": "Básico",
+  "desc": "Ficha de tu negocio en la Guía (fotos, WhatsApp, mapa y horarios) + 2 publicaciones al mes en nuestra página de Facebook."
+ },
+ {
+  "id": "negocio",
+  "name": "Negocio",
+  "desc": "Banner en una sección del sitio + 4 publicaciones al mes en Facebook + una historia cada semana."
+ },
+ {
+  "id": "destacado",
+  "name": "Destacado",
+  "desc": "Banner en la portada + una nota patrocinada + un reel + 4 publicaciones al mes en Facebook."
+ },
+ {
+  "id": "campana",
+  "name": "Nota o reel patrocinado",
+  "desc": "Una pieza suelta para un lanzamiento, evento o promoción, marcada como \"Patrocinado\"."
+ }
+]
