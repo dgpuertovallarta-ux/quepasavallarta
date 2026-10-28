@@ -1,0 +1,42 @@
+# Arma la postal de Facebook de una nota (con foto de stock difuminada) y la guarda en la rama "postales".
+name: Postal para Facebook
+
+on:
+  workflow_dispatch:
+    inputs:
+      titulo: { required: true, description: "Titular" }
+      resumen: { required: true, description: "Resumen" }
+      titulo_en: { required: false, description: "Titular en inglés" }
+      categoria: { default: "transito", description: "Sección" }
+      busqueda: { default: "traffic jam street|traffic congestion city", description: "Qué foto buscar (en inglés, separar con |)" }
+      archivo: { required: true, description: "Nombre del archivo (sin .png)" }
+
+permissions:
+  contents: write
+
+jobs:
+  postal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POSTAL_TITULO: ${{ inputs.titulo }}
+      POSTAL_RESUMEN: ${{ inputs.resumen }}
+      POSTAL_TITULO_EN: ${{ inputs.titulo_en }}
+      POSTAL_CATEGORIA: ${{ inputs.categoria }}
+      POSTAL_BUSQUEDA: ${{ inputs.busqueda }}
+      POSTAL_ARCHIVO: ${{ inputs.archivo }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: mkdir -p postales && npx tsx scripts/robot/postal.ts
+      - name: Guardar en la rama postales
+        run: |
+          git config user.name "QPV Robot"; git config user.email "robot@quepasavta.com"
+          cp postales/*.png /tmp/
+          git fetch origin postales || true
+          git checkout -B postales origin/postales 2>/dev/null || git checkout --orphan postales
+          git rm -rq --cached . 2>/dev/null || true
+          mkdir -p postales && cp /tmp/*.png postales/
+          git add postales/*.png && git commit -qm "Postal ${{ inputs.archivo }}" && git push -q origin postales

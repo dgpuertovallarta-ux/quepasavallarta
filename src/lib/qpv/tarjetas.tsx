@@ -22,7 +22,7 @@ import { titularEnIngles } from "./traducir";
 import { CATEGORY_IMAGES } from "../photos";
 
 /** Foto de ambiente para la tarjeta sin foto: muy difuminada y oscura (con sharp). */
-async function fondoDifuminado(url: string): Promise<string | null> {
+export async function fondoDifuminado(url: string): Promise<string | null> {
   try {
     const r = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return null;
