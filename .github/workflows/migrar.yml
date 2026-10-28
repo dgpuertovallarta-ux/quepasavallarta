@@ -5,6 +5,10 @@ name: Migrar notas a WordPress
 
 on:
   workflow_dispatch:
+    inputs:
+      que:
+        description: "notas = pasar notas y anuncios · fotos = recuperar fotos"
+        default: notas
 
 permissions:
   contents: read
@@ -25,4 +29,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npx tsx scripts/robot/migrar.ts
+      - if: inputs.que != 'fotos'
+        run: npx tsx scripts/robot/migrar.ts
+      - if: inputs.que == 'fotos'
+        run: npx tsx scripts/robot/fotos.ts
