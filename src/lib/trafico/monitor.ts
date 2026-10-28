@@ -150,6 +150,7 @@ const NOMBRE_CORTO: Record<string, string> = {
   "medina-norte": "Medina Ascencio → Aeropuerto",
   bucerias: "Bucerías → Aeropuerto",
   pitillal: "El Pitillal → Zona Hotelera",
+  mojoneras: "Av. Mojoneras",
   sur: "Centro → Mismaloya",
 };
 

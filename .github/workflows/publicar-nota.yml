@@ -1,0 +1,35 @@
+# Publica una nota en el sitio a pedido (la redacción la manda desde aquí o Claude con tu permiso).
+# El robot la toma después para la cola de Facebook.
+name: Publicar nota
+
+on:
+  workflow_dispatch:
+    inputs:
+      titulo: { description: "Titular", required: true }
+      resumen: { description: "Resumen (una o dos frases)", required: true }
+      cuerpo: { description: "Texto (párrafos separados con \\n\\n)", required: true }
+      categoria: { description: "Sección (slug)", default: "transito" }
+      verificada: { description: "¿Confirmada con fuente oficial?", type: boolean, default: false }
+
+permissions:
+  contents: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USER: ${{ secrets.WP_USER }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      NOTA_TITULO: ${{ inputs.titulo }}
+      NOTA_RESUMEN: ${{ inputs.resumen }}
+      NOTA_CUERPO: ${{ inputs.cuerpo }}
+      NOTA_CATEGORIA: ${{ inputs.categoria }}
+      NOTA_VERIFICADA: ${{ inputs.verificada }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsx scripts/robot/publicar.ts

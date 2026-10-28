@@ -36,6 +36,11 @@ export const CORREDORES: Corredor[] = [
     origen: [20.6510, -105.2190], destino: [20.6436, -105.2350], umbralMin: 6,
   },
   {
+    // 2026-10-28: agregado por reportes de lectores (baches). Coordenadas aproximadas: verificar.
+    id: "mojoneras", nombre: "Av. Mojoneras (El Pitillal → Mojoneras)", gancho: "Así está la avenida Mojoneras en este momento",
+    origen: [20.6583, -105.2185], destino: [20.6870, -105.2045], umbralMin: 6,
+  },
+  {
     id: "sur", nombre: "Centro → Mismaloya (Carretera 200 sur)", gancho: "Si vas para la zona sur, así está la carretera",
     origen: [20.6105, -105.2335], destino: [20.5310, -105.2900], umbralMin: 8,
   },
