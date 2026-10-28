@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import { usaWordPress, wpBase, subirMedio } from "../wp/cliente";
 
 /**
  * Almacén de imágenes generadas por IA (ver generateImage.ts). Se guardan
@@ -15,13 +16,19 @@ import { getStore } from "@netlify/blobs";
 const STORE_NAME = "article-images";
 
 export function siteUrl(): string {
+  if (usaWordPress()) return (process.env.QPV_SITE_URL || wpBase()).replace(/\/$/, "");
   return (process.env.URL || process.env.DEPLOY_URL || "https://quepasavta.com").replace(/\/$/, "");
 }
 
 export async function saveImageBlob(bytes: Buffer, contentType: string): Promise<{ key: string; url: string }> {
-  const store = getStore(STORE_NAME);
   const extension = contentType.includes("mp4") ? "mp4" : contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
   const key = `${crypto.randomUUID()}.${extension}`;
+  // Con el sitio en WordPress: va a la biblioteca de medios (URL pública directa).
+  if (usaWordPress()) {
+    const m = await subirMedio(bytes, contentType, `qpv-${key}`);
+    return { key: String(m.id), url: m.url };
+  }
+  const store = getStore(STORE_NAME);
   // @netlify/blobs solo acepta ArrayBuffer (no el Buffer de Node directamente).
   const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   await store.set(key, arrayBuffer, { metadata: { contentType } });

@@ -5,9 +5,10 @@
 #  1. Revisa los ciclones activos del Pacífico Este (nhc.noaa.gov).
 #  2. Si alguno amenaza a Puerto Vallarta / Bahía de Banderas y ese boletín
 #     no tiene video todavía, genera el video con los datos oficiales.
-#  3. Lo envía al sitio (quepasavta.com), que lo publica como reel.
+#  3. Lo sube a WordPress (quepasavta.com) y lo publica como reel en Facebook.
 #
-# Sin llaves ni contraseñas: el sitio verifica el token OIDC de GitHub.
+# Desde 2026-10-27 el sitio es WordPress en HostGator: usa los secretos del robot
+# (WP_URL, WP_USER, WP_APP_PASSWORD, FB_PAGE_ID, FB_PAGE_ACCESS_TOKEN, GEMINI_API_KEY).
 # Para pausar: scripts/hurricane-video/config.json → "publish": false.
 name: Video de ciclón
 
@@ -25,7 +26,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: hurricane-video
@@ -37,6 +37,12 @@ jobs:
     timeout-minutes: 25
     env:
       SITE: https://quepasavta.com
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USER: ${{ secrets.WP_USER }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +57,17 @@ jobs:
           python3 - <<'PY'
           import json, os, sys, urllib.request
           sys.path.insert(0, "scripts/hurricane-video")
-          import nhc
+          import nhc, base64, urllib.error
+          def wp_existe(key):
+              # Registro del video en WordPress (almacén del robot). 404 = todavía no hay video.
+              auth = base64.b64encode(f"{os.environ['WP_USER']}:{os.environ['WP_APP_PASSWORD'].replace(' ', '')}".encode()).decode()
+              req = urllib.request.Request(f"{os.environ['WP_URL'].rstrip('/')}/wp-json/qpv/v1/kv/qpv-huracanes/{key}", headers={"Authorization": "Basic " + auth, "User-Agent": "QPV-Robot/1.0"})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return True
+              except urllib.error.HTTPError as e:
+                  if e.code == 404: return False
+                  raise
           out = open(os.environ["GITHUB_OUTPUT"], "a")
           storms = nhc.active_storms()
           if not storms:
@@ -59,8 +75,7 @@ jobs:
           for st in storms:
               adv = (st.get("forecastAdvisory") or {}).get("advNum", "")
               key = f"{st['id']}-{adv}".lower()
-              with urllib.request.urlopen(f"{os.environ['SITE']}/api/hurricane-video?key={key}", timeout=30) as r:
-                  info = json.load(r)
+              info = {"exists": wp_existe(key)}
               print(st["name"], key, info)
               if info.get("exists") and "${{ inputs.force }}" != "true":
                   continue
@@ -96,19 +111,14 @@ jobs:
           path: out/
           retention-days: 14
 
-      - name: Enviar al sitio y publicar en Facebook
+      - uses: actions/setup-node@v4
+        if: steps.gen.outputs.made == 'true' && steps.cfg.outputs.publish == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Subir a WordPress y publicar en Facebook
         if: steps.gen.outputs.made == 'true' && steps.cfg.outputs.publish == 'true'
         run: |
-          set -euo pipefail
-          KEY=$(python3 -c "import json;print(json.load(open('out/story.json'))['key'])")
-          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=quepasavta-hurricane" | python3 -c "import json,sys;print(json.load(sys.stdin)['value'])")
-          split -b 2000000 -d -a 2 out/video.mp4 out/part_
-          N=0
-          for f in out/part_*; do
-            curl -sS --fail-with-body --retry 3 -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" \
-              --data-binary @"$f" "$SITE/api/hurricane-video?key=$KEY&part=$N"; echo
-            N=$((N+1))
-          done
-          python3 -c "import json;s=json.load(open('out/story.json'));print(json.dumps({'parts':$N,'caption':s['caption'],'title':s['title']}))" > out/publish.json
-          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-            --data @out/publish.json "$SITE/api/hurricane-video?key=$KEY&action=publish"; echo
+          npm ci --no-audit --no-fund
+          npx tsx scripts/robot/huracan.ts publicar out

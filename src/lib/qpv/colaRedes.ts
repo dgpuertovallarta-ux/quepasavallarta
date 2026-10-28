@@ -12,7 +12,7 @@
  *   - Una nota que lleva más de 8 h esperando ya no sale (dejó de ser noticia).
  * Se procesa al final de cada corrida de /api/ingest (cada 10 min).
  */
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
 import { publishToSocial } from "../social/publishToSocial";
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";

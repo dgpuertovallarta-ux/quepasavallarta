@@ -5,13 +5,23 @@
  * Aparecen en la sección del sitio y en las publicaciones automáticas de
  * Facebook de esa sección; cada publicación se cuenta para su reporte del mes.
  */
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
+import { usaWordPress, wp, wpBase } from "../wp/cliente";
 import { getActiveAd } from "./db";
 
 export type SeccionPatrocinio = "trafico" | "huracanes" | "clima" | "reportes";
 export type Patrocinio = { id: number; nombre: string; logo: string; clic: string; destino: string };
 
 export async function getPatrocinio(seccion: SeccionPatrocinio): Promise<Patrocinio | null> {
+  // Sitio en WordPress: los anuncios viven en el panel (menú Anuncios).
+  if (usaWordPress()) {
+    try {
+      const p = await wp<{ id: number; nombre: string; logo: string } | null>(`/qpv/v1/patrocinio?seccion=${seccion}`);
+      return p ? { id: p.id, nombre: p.nombre, logo: p.logo, clic: `${wpBase()}/?qpv_ad=${p.id}`, destino: "" } : null;
+    } catch {
+      return null;
+    }
+  }
   try {
     const ad = await getActiveAd(`pat-${seccion}` as never);
     if (!ad) return null;

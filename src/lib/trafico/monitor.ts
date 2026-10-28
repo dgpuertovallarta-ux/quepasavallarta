@@ -9,7 +9,8 @@
  *  - Guarda la última medición para la página pública /trafico.
  * Sin TOMTOM_API_KEY no hace nada.
  */
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
+import { usaWordPress } from "../wp/cliente";
 import { CORREDORES } from "./corredores";
 import { incidentes, medirCorredor, type EstadoCorredor, type Incidente } from "./tomtom";
 import { encolarRedes } from "../qpv/colaRedes";
@@ -21,7 +22,7 @@ import { publishArticle, getRecentArticleTitles, findDuplicateTitle } from "../d
 import { isDatabaseConfigured } from "../db/client";
 import { siteUrl } from "../storage/imageBlobs";
 
-export type Instantanea = { actualizado: string; corredores: EstadoCorredor[]; incidentes: Incidente[] };
+export type Instantanea = { actualizado: string; corredores: EstadoCorredor[]; incidentes: Incidente[]; resumen?: { tipo: string; t: string; d: string }[] };
 
 const store = () => getStore({ name: "qpv-trafico", consistency: "strong" });
 const HORAS_ENTRE_AVISOS = 2;
@@ -63,7 +64,9 @@ export async function correrMonitor(): Promise<string> {
     h >= 5 && h < 23 ? Promise.all(CORREDORES.map((c) => medirCorredor(c).catch(() => null))) : Promise.resolve([]),
   ]);
   const corredores = (corr as (EstadoCorredor | null)[]).filter(Boolean) as EstadoCorredor[];
-  await s.setJSON("instantanea", { actualizado: new Date().toISOString(), corredores, incidentes: incs } satisfies Instantanea);
+  // "resumen": la lista ya agrupada y legible que muestra /trafico (también en WordPress).
+  const lista = agruparIncidentes(incs).map((r) => ({ tipo: r.tipo, ...renglonIncidente(r) }));
+  await s.setJSON("instantanea", { actualizado: new Date().toISOString(), corredores, incidentes: incs, resumen: lista } satisfies Instantanea);
 
   const avisados = ((await s.get("avisados", { type: "json" })) ?? {}) as Record<string, string>;
   const reciente = (k: string) => {
@@ -152,6 +155,10 @@ const NOMBRE_CORTO: Record<string, string> = {
 
 /** Avisos viales oficiales publicados en el sitio en las últimas horas (categoría Tránsito). */
 async function avisosOficialesRecientes(horas: number): Promise<{ hora: string; titulo: string }[]> {
+  if (usaWordPress()) {
+    const { avisosTransito } = await import("../wp/articulos");
+    return (await avisosTransito(horas).catch(() => [])).map((a) => ({ hora: horaTexto(new Date(a.fecha)), titulo: a.titulo }));
+  }
   if (!isDatabaseConfigured()) return [];
   try {
     const { rows } = await getPool().query<{ title: string; published_at: string }>(

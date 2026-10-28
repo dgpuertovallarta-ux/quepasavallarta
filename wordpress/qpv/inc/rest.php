@@ -44,7 +44,7 @@ function qpv_kv_set(string $almacen, string $clave, $valor): void
 $puede = fn() => current_user_can('edit_others_posts');
 
 add_action('rest_api_init', function () use ($puede) {
-    $ok = '[a-z0-9_.:\/-]+';
+    $ok = '.+';
     register_rest_route('qpv/v1', '/kv/(?P<almacen>[a-z0-9-]+)/(?P<clave>' . $ok . ')', [
         ['methods' => 'GET', 'permission_callback' => $puede, 'callback' => function ($r) {
             $v = qpv_kv_get($r['almacen'], $r['clave']);
@@ -85,9 +85,11 @@ add_action('rest_api_init', function () use ($puede) {
 });
 
 /* El robot busca notas por su slug anterior o por la clave del hecho. */
-add_filter('rest_post_query', function ($args, $req) {
+$qpv_filtro_meta = function ($args, $req) {
     foreach (['qpv_original_slug', 'qpv_story_key'] as $k) {
         if (!empty($req[$k])) $args['meta_query'][] = ['key' => $k, 'value' => sanitize_text_field($req[$k])];
     }
     return $args;
-}, 10, 2);
+};
+add_filter('rest_post_query', $qpv_filtro_meta, 10, 2);
+add_filter('rest_explica_query', $qpv_filtro_meta, 10, 2);

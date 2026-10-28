@@ -1,7 +1,11 @@
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
 import { getPool, isDatabaseConfigured } from "@/lib/db/client";
 import { saveImageBlob } from "@/lib/storage/imageBlobs";
 import { postEnIngles } from "@/lib/qpv/traducir";
+import { usaWordPress } from "@/lib/wp/cliente";
+
+// Con el sitio en WordPress (2026-10-27) el registro de cada video vive en el almacén del sitio.
+const registro = () => getStore({ name: "qpv-huracanes", consistency: "strong" });
 
 /**
  * Videos automáticos de ciclones (generados en GitHub Actions con datos del
@@ -55,6 +59,10 @@ export function validKey(key: string | null): key is string {
 }
 
 export async function getVideo(key: string): Promise<HurricaneVideoRow | null> {
+  if (usaWordPress()) {
+    const r = (await registro().get(key, { type: "json" })) as Record<string, string | null> | null;
+    return r ? { key, status: r.status || "receiving", videoUrl: r.video_url ?? null, fbVideoId: r.fb_video_id ?? null, error: r.error ?? null, caption: r.caption ?? null } : null;
+  }
   if (!isDatabaseConfigured()) return null;
   await ensureSchema();
   const { rows } = await getPool().query(
@@ -66,6 +74,11 @@ export async function getVideo(key: string): Promise<HurricaneVideoRow | null> {
 }
 
 async function upsert(key: string, fields: Partial<{ status: string; caption: string; title: string; video_url: string; fb_video_id: string; error: string | null }>) {
+  if (usaWordPress()) {
+    const actual = ((await registro().get(key, { type: "json" })) as Record<string, unknown> | null) ?? {};
+    await registro().setJSON(key, { ...actual, ...fields, actualizado: new Date().toISOString() });
+    return;
+  }
   await ensureSchema();
   const cols = Object.keys(fields);
   const vals = Object.values(fields);
@@ -75,6 +88,14 @@ async function upsert(key: string, fields: Partial<{ status: string; caption: st
      on conflict (key) do update set ${sets}${sets ? ", " : ""}updated_at = now()`,
     [key, ...vals]
   );
+}
+
+/** Guarda el MP4 completo (robot en GitHub Actions, sitio en WordPress) y devuelve su URL pública. */
+export async function guardarVideo(key: string, video: Buffer, caption: string, title: string): Promise<string> {
+  if (video.subarray(4, 8).toString("latin1") !== "ftyp") throw new Error("El archivo no es un MP4 válido.");
+  const { url } = await saveImageBlob(video, "video/mp4");
+  await upsert(key, { status: "stored", caption: caption.slice(0, 2000), title: title.slice(0, 200), video_url: url, error: null });
+  return url;
 }
 
 export async function savePart(key: string, part: number, bytes: ArrayBuffer) {

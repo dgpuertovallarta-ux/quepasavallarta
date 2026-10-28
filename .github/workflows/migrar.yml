@@ -1,0 +1,28 @@
+# Pasa las notas y anuncios del sitio anterior (Postgres) a WordPress. Se corre a mano una vez
+# (Actions → "Migrar notas a WordPress" → Run workflow). Se puede repetir: no duplica.
+# Necesita el secreto DATABASE_URL (la misma cadena que estaba en Netlify) además de los de WP.
+name: Migrar notas a WordPress
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USER: ${{ secrets.WP_USER }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsx scripts/robot/migrar.ts

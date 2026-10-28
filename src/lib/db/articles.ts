@@ -3,6 +3,8 @@ import { getPool, isDatabaseConfigured } from "./client";
 import type { NewsItem, Media, ExplicaItem } from "../data";
 import { illustrationFor } from "../photos";
 import { repairArticle, isBadTitle } from "../ingest/articleFormat";
+import { usaWordPress } from "../wp/cliente";
+import * as WP from "../wp/articulos";
 
 /**
  * Lectura y publicación real de artículos — conecta la portada pública
@@ -134,6 +136,7 @@ const SELECT_BASE = `
 `;
 
 export async function getPublishedArticles(limit = 30): Promise<NewsItem[]> {
+  if (usaWordPress()) return WP.publicadas(limit);
   if (!isDatabaseConfigured()) return [];
   const pool = getPool();
   // Se piden más filas que el límite porque el join con story_sources
@@ -146,6 +149,7 @@ export async function getPublishedArticles(limit = 30): Promise<NewsItem[]> {
 }
 
 export async function getPublishedArticlesByCategory(categorySlug: string, limit = 30): Promise<NewsItem[]> {
+  if (usaWordPress()) return WP.porCategoria(categorySlug, limit);
   if (!isDatabaseConfigured()) return [];
   const pool = getPool();
   const res = await pool.query<ArticleRow>(
@@ -296,6 +300,7 @@ const SEARCH_STOPWORDS = new Set([
 ]);
 
 export async function getPublishedArticleBySlug(slug: string): Promise<NewsItem | null> {
+  if (usaWordPress()) return WP.porSlug(slug);
   if (!isDatabaseConfigured()) return null;
   const pool = getPool();
   const res = await pool.query<ArticleRow>(`${SELECT_BASE} and a.slug = $1 limit 1`, [slug]);
@@ -375,6 +380,7 @@ export async function getPublishedExplainerBySlug(slug: string): Promise<Explica
 
 /** Evita generar un explicador para una Story que ya tiene uno. */
 export async function hasExplainerForStory(storyExternalKey: string): Promise<boolean> {
+  if (usaWordPress()) return WP.hayNotaDeHistoria(storyExternalKey, true);
   if (!isDatabaseConfigured()) return false;
   const pool = getPool();
   const res = await pool.query(
@@ -386,6 +392,7 @@ export async function hasExplainerForStory(storyExternalKey: string): Promise<bo
 
 /** Controla la cadencia (~4 al día) de "Vallarta Explica" — ver explicaPublish.ts. */
 export async function getLastExplainerPublishedAt(): Promise<Date | null> {
+  if (usaWordPress()) return WP.ultimoExplicador();
   if (!isDatabaseConfigured()) return null;
   const pool = getPool();
   const res = await pool.query<{ published_at: string | Date | null }>(
@@ -520,6 +527,7 @@ export function findDuplicateTitle(title: string, recent: RecentTitle[], excerpt
 
 /** Títulos publicados en los últimos días, para comparar contra ellos sin consultar la base en cada intento. */
 export async function getRecentArticleTitles(opts: { sinceDays?: number; isExplainer?: boolean } = {}): Promise<RecentTitle[]> {
+  if (usaWordPress()) return WP.titulosRecientes(opts.sinceDays ?? 3, !!opts.isExplainer);
   if (!isDatabaseConfigured()) return [];
   const { sinceDays = 3, isExplainer = false } = opts;
   const pool = getPool();
@@ -547,6 +555,7 @@ export async function findSimilarRecentArticle(title: string, opts: { sinceDays?
 
 /** Para el flujo manual de publicación: recupera un link+nombre de fuente de una Story ya persistida, para poder extraer su foto real. */
 export async function getPrimarySourceForStory(storyExternalKey: string): Promise<{ url: string; sourceName: string } | null> {
+  if (usaWordPress()) return null;
   if (!isDatabaseConfigured()) return null;
   const pool = getPool();
   const res = await pool.query<{ url: string; name: string }>(
@@ -565,6 +574,7 @@ export async function getPrimarySourceForStory(storyExternalKey: string): Promis
 
 /** Evita republicar la misma Story en cada corrida del cron (cada 10 min). */
 export async function hasPublishedArticleForStory(storyExternalKey: string): Promise<boolean> {
+  if (usaWordPress()) return WP.hayNotaDeHistoria(storyExternalKey);
   if (!isDatabaseConfigured()) return false;
   const pool = getPool();
   const res = await pool.query(
@@ -600,6 +610,8 @@ export type PublishArticleInput = {
   status?: "published" | "pending_review";
   /** Boletines oficiales periódicos (aviso de huracán cada 3 h): se parecen al anterior a propósito; no se frenan por parecido. */
   permitirParecida?: boolean;
+  /** Fuentes citadas (en WordPress se guardan con la nota; en Postgres salen de la historia). */
+  fuentes?: { label: string; url: string }[];
 };
 
 /** La nota ya existe (misma historia o casi el mismo título): no se inserta. */
@@ -620,6 +632,7 @@ const LOCK_PUBLICAR = 7_204_2026;
  * acción editorial. La publicación pública requiere aprobación explícita.
  */
 export async function publishArticle(input: PublishArticleInput): Promise<{ slug: string }> {
+  if (usaWordPress()) return publicarEnWordPress(input);
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -879,6 +892,7 @@ export async function updateArticleImage(
  * Ver lib/ingest/backfillImages.ts.
  */
 export async function getArticlesNeedingRealPhoto(limit = 6): Promise<{ slug: string; title: string; excerpt: string; sourceUrl: string; sourceName: string | null }[]> {
+  if (usaWordPress()) return [];
   if (!isDatabaseConfigured()) return [];
   const res = await getPool().query<{ slug: string; title: string; excerpt: string | null; source_url: string; source_name: string | null }>(
     `select a.slug, a.title, a.excerpt, ss.url as source_url, s.name as source_name
@@ -936,3 +950,36 @@ export async function getDenuncias(limit = 12): Promise<NewsItem[]> {
   return rowsToNewsItems(res.rows).slice(0, limit);
 }
 
+
+
+/* ---------- WordPress (HostGator, 2026-10-27) ---------- */
+// Un candado sencillo en el almacén del sitio para que dos corridas del robot no publiquen la misma nota.
+async function publicarEnWordPress(input: PublishArticleInput): Promise<{ slug: string }> {
+  if (input.storyExternalKey && (await WP.hayNotaDeHistoria(input.storyExternalKey, !!input.isExplainer))) {
+    throw new DuplicateArticleError(input.storyExternalKey, "misma historia");
+  }
+  if (!input.permitirParecida) {
+    const recientes = await WP.titulosRecientes(3, !!input.isExplainer);
+    const parecida = findDuplicateTitle(input.title, recientes, input.excerpt);
+    if (parecida) throw new DuplicateArticleError(parecida, "título casi igual");
+    const txt = `${input.title} ${input.excerpt}`;
+    const media = Date.now() - 30 * 60_000;
+    const mismoTema = recientes.find((r) => new Date(r.fecha).getTime() > media && parecido(txt, `${r.title} ${r.excerpt ?? ""}`) >= 0.25);
+    if (mismoTema) throw new DuplicateArticleError(mismoTema.slug, "mismo tema en la última media hora");
+  }
+  const r = await WP.crear({
+    title: input.title,
+    excerpt: input.excerpt,
+    body: input.body,
+    categorySlug: input.categorySlug,
+    newsScore: input.newsScore,
+    storyExternalKey: input.storyExternalKey,
+    imageUrl: input.imageLicenseStatus === "ai_generated" ? undefined : input.imageUrl,
+    imageCredit: input.imageCredit,
+    isExplainer: input.isExplainer,
+    status: input.status ?? "published",
+    fuentes: input.fuentes ?? [],
+    autor: input.aiModel ? "ia" : "redaccion",
+  });
+  return { slug: r.slug };
+}

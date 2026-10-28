@@ -42,6 +42,7 @@ const QPV_META = [
     'qpv_story_key' => 'string',     // clave del hecho (evita duplicados del robot)
     'qpv_original_slug' => 'string', // slug en el sitio anterior
     'qpv_audio_url' => 'string',     // MP3 de la nota (voz)
+    'qpv_es_reporte' => 'integer',   // 1 = reporte ciudadano
 ];
 
 add_action('init', function () {

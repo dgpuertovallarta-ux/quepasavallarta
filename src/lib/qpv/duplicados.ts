@@ -12,7 +12,7 @@
  * se quedó, para que los posts de Facebook que ya la compartieron no den 404.
  * Corre en cada /api/ingest.
  */
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
 import { getPool } from "../db/client";
 import { esDuplicada, parecido } from "./dedupe";
 

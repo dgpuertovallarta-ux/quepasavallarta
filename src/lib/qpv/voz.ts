@@ -9,7 +9,7 @@
  *   ELEVENLABS_VOICE_ID  — la voz elegida (ID que se copia en ElevenLabs → Voices)
  *   QPV_AUDIO_AUTO=1     — generar solo el audio de cada nota nueva (si no, solo a mano)
  */
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
 
 const store = () => getStore({ name: "qpv-audio", consistency: "strong" });
 const MAX_CARACTERES = 4500; // ~3 min de audio; cuida los créditos

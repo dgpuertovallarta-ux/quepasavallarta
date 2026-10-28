@@ -5,6 +5,7 @@ import { parseArticleDraft, looksLikeInsufficientMaterial, isBadTitle } from "./
 import { generateArticleImage } from "./generateImage";
 import { hasExplainerForStory, getLastExplainerPublishedAt, findSimilarRecentArticle, publishArticle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
+import { usaWordPress } from "../wp/cliente";
 
 // ~4 al día: solo genera uno nuevo si pasaron al menos 5.5 horas desde el
 // último (24h / 4 ≈ 6h, con margen para que no dependa de que el cron
@@ -27,7 +28,7 @@ export type ExplicaPublishResult =
  * un "resumen interno" publicado como si fuera una pieza real.
  */
 export async function runExplicaPublish(stories: Story[], options: { startBefore?: number } = {}): Promise<ExplicaPublishResult> {
-  if (!isAiConfigured() || !isDatabaseConfigured()) {
+  if (!isAiConfigured() || !(isDatabaseConfigured() || usaWordPress())) {
     return { ran: false, reason: "GEMINI_API_KEY o DATABASE_URL no configuradas." };
   }
   // Un explicador tarda lo mismo que una nota (texto + imagen). Si a esta
@@ -82,6 +83,7 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
         newsScore: story.maxNewsScore,
         aiModel: draft.model,
         storyExternalKey: story.storyId,
+        fuentes: story.items.slice(0, 3).map((it) => ({ label: it.sourceName, url: it.link })),
         imageUrl: generatedImage?.url,
         imageCredit: generatedImage?.credit,
         imageLicenseStatus: generatedImage?.licenseStatus,

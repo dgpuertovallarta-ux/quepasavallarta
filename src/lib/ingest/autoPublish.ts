@@ -5,6 +5,7 @@ import { parseArticleDraft, looksLikeInsufficientMaterial, isBadTitle } from "./
 import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles, publishArticle, DuplicateArticleError, type RecentTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
+import { usaWordPress } from "../wp/cliente";
 import { sortByEditorialFocus, isOffTopicStory, isOfficialBulletinStory } from "./localFocus";
 import { loadSkips, saveSkips } from "./skipMemory";
 import { encolarRedes } from "../qpv/colaRedes";
@@ -72,7 +73,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
     skippedKnown: 0,
     errors: [],
   };
-  if (!isAiConfigured() || !isDatabaseConfigured()) return result;
+  if (!isAiConfigured() || !(isDatabaseConfigured() || usaWordPress())) return result;
   if (options.startBefore !== undefined && Date.now() > options.startBefore) return result;
 
   // Enfoque editorial (ver localFocus.ts): se descartan las historias que
@@ -177,6 +178,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         newsScore: story.maxNewsScore,
         aiModel: draft.model,
         storyExternalKey: story.storyId,
+        fuentes: story.items.slice(0, 3).map((it) => ({ label: it.sourceName, url: it.link })),
         imageUrl: generatedImage?.url,
         imageCredit: generatedImage?.credit,
         imageLicenseStatus: generatedImage?.licenseStatus,

@@ -24,6 +24,7 @@ async function monitorTrafico() {
 
 export default monitorTrafico;
 
-export const config: Config = {
-  schedule: "*/20 * * * *",
-};
+// 2026-10-27: apagado. El sitio pasó a WordPress (HostGator) y este trabajo lo hace
+// el robot de GitHub Actions (.github/workflows/robot.yml). Si se volviera a
+// programar aquí, las notas y los posts de Facebook saldrían dobles.
+export const config: Config = {};

@@ -1,0 +1,76 @@
+# Robot de Qué Pasa Vallarta (2026-10-27).
+#
+# El sitio ahora vive en WordPress (HostGator). Este flujo hace el trabajo que
+# antes hacían las funciones programadas de Netlify: buscar noticias, redactarlas
+# con IA y publicarlas en WordPress, la cola de Facebook, el tráfico y los reels.
+#
+# Se queda trabajando ~5.6 horas (una vuelta cada 10 minutos) y al terminar se
+# vuelve a lanzar solo. El repo es público: los minutos de Actions no cuestan.
+#
+# Secretos (Settings → Secrets and variables → Actions):
+#   WP_URL, WP_USER, WP_APP_PASSWORD   acceso del robot a WordPress
+#   GEMINI_API_KEY                     redacción y traducción con IA
+#   FB_PAGE_ID, FB_PAGE_ACCESS_TOKEN   publicar en Facebook
+#   TOMTOM_API_KEY                     tráfico
+#   ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID (opcional) voz de las notas
+name: Robot QPV
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutos:
+        description: "Cuánto tiempo trabaja antes de relanzarse"
+        default: "335"
+  schedule:
+    - cron: "7 */3 * * *"   # respaldo por si el robot se detiene
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: robot-qpv
+  cancel-in-progress: false
+
+jobs:
+  robot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USER: ${{ secrets.WP_USER }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      QPV_SITE_URL: https://quepasavta.com
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+      TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+      TZ: America/Mexico_City
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar
+        run: npm ci --no-audit --no-fund
+
+      - name: Probar conexión con WordPress
+        run: npx tsx scripts/robot/robot.ts estado
+
+      - name: Trabajar
+        run: npx tsx scripts/robot/robot.ts vigilar "${{ inputs.minutos || '335' }}"
+
+      - name: Esperar antes de reintentar (si algo falló)
+        if: failure()
+        run: sleep 600
+
+      - name: Volver a lanzar
+        if: always() && github.event_name != 'schedule'
+        run: gh workflow run robot.yml -R "$REPO" --ref main

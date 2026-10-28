@@ -1,4 +1,4 @@
-import { getStore } from "@netlify/blobs";
+import { getStore } from "../storage/blobs";
 
 /**
  * Memoria de historias descartadas antes de crear borradores para aprobación.
