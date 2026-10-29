@@ -6,6 +6,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getVideo, guardarVideo, publishToFacebook, validKey } from "../../src/lib/hurricane/videos";
+import { asegurarTokenDePagina } from "../../src/lib/social/tokenPagina";
 
 async function main() {
   const [orden, arg] = process.argv.slice(2);
@@ -16,6 +17,7 @@ async function main() {
     return;
   }
   if (orden === "publicar") {
+    console.log("token de Facebook:", await asegurarTokenDePagina());
     const dir = arg || "out";
     const story = JSON.parse(await readFile(path.join(dir, "story.json"), "utf8")) as { key: string; caption: string; title: string };
     const existente = await getVideo(story.key);

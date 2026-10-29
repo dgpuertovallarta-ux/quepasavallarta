@@ -25,6 +25,7 @@ import { getPageReels } from "../../src/lib/social/reels";
 import { audioDeLaUltimaNota } from "../../src/lib/qpv/voz";
 import { usaWordPress, wp } from "../../src/lib/wp/cliente";
 import { getStore } from "../../src/lib/storage/blobs";
+import { asegurarTokenDePagina } from "../../src/lib/social/tokenPagina";
 import type { IngestedItem } from "../../src/lib/ingest/types";
 
 const hora = () => new Date().toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour12: false });
@@ -121,6 +122,7 @@ async function pruebaFacebook() {
 async function main() {
   const [orden = "ciclo", arg] = process.argv.slice(2);
   if (!usaWordPress()) throw new Error("Faltan WP_URL, WP_USER o WP_APP_PASSWORD (secretos del repositorio en GitHub).");
+  log("token de Facebook:", await asegurarTokenDePagina());
   if (orden === "estado") {
     const faltan = ["GEMINI_API_KEY", "FB_PAGE_ID", "FB_PAGE_ACCESS_TOKEN", "TOMTOM_API_KEY"].filter((k) => !process.env[k]);
     log(faltan.length ? `Faltan llaves en GitHub: ${faltan.join(", ")}` : "Todas las llaves están puestas.");
