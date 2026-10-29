@@ -97,12 +97,34 @@ async function ciclo() {
   await cadaTanto("audio", 10, audioDeLaUltimaNota);
 }
 
+// Errores internos (p. ej. "[colaRedes] Facebook falló: …") también como aviso visible en GitHub.
+if (process.env.GITHUB_ACTIONS) {
+  const original = console.error.bind(console);
+  console.error = (...a: unknown[]) => {
+    original(...a);
+    const txt = a.map((x) => (x instanceof Error ? x.message : typeof x === "string" ? x : JSON.stringify(x))).join(" ");
+    console.log(`::warning title=${hora()}::${txt.replace(/\r?\n/g, " ").slice(0, 900)}`);
+  };
+}
+
+/** Revisa el token de Facebook sin publicar nada. */
+async function pruebaFacebook() {
+  const v = process.env.GRAPH_API_VERSION || "v23.0";
+  const t = process.env.FB_PAGE_ACCESS_TOKEN || "";
+  const r = await fetch(`https://graph.facebook.com/${v}/${process.env.FB_PAGE_ID}?fields=name&access_token=${encodeURIComponent(t)}`);
+  log("facebook página:", r.status, JSON.stringify(await r.json()).replace(/"access_token":"[^"]+"/g, "").slice(0, 300));
+  const d = await fetch(`https://graph.facebook.com/${v}/debug_token?input_token=${encodeURIComponent(t)}&access_token=${encodeURIComponent(t)}`);
+  const j = (await d.json()) as { data?: { type?: string; is_valid?: boolean; expires_at?: number; scopes?: string[]; error?: { message?: string } } };
+  log("facebook token:", JSON.stringify({ tipo: j.data?.type, valido: j.data?.is_valid, vence: j.data?.expires_at ? new Date(j.data.expires_at * 1000).toISOString() : "nunca", permisos: j.data?.scopes, error: j.data?.error?.message }));
+}
+
 async function main() {
   const [orden = "ciclo", arg] = process.argv.slice(2);
   if (!usaWordPress()) throw new Error("Faltan WP_URL, WP_USER o WP_APP_PASSWORD (secretos del repositorio en GitHub).");
   if (orden === "estado") {
     const faltan = ["GEMINI_API_KEY", "FB_PAGE_ID", "FB_PAGE_ACCESS_TOKEN", "TOMTOM_API_KEY"].filter((k) => !process.env[k]);
     log(faltan.length ? `Faltan llaves en GitHub: ${faltan.join(", ")}` : "Todas las llaves están puestas.");
+    if (process.env.FB_PAGE_ACCESS_TOKEN) await pruebaFacebook().catch((e) => log("prueba de Facebook falló:", String(e)));
     log(JSON.stringify(await wp("/qpv/v1/estado")));
     return;
   }
