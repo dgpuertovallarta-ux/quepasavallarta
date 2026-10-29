@@ -7,8 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       que:
-        description: "notas = pasar notas y anuncios · fotos = recuperar fotos"
+        description: "notas = pasar notas y anuncios · fotos = recuperar fotos · rellenar = poner foto a las que no tienen"
         default: notas
+      secciones:
+        description: "Para rellenar: explica, comunidad, cultura… o todas"
+        default: "explica,comunidad,cultura"
+      cuantas:
+        description: "Máximo de notas por corrida"
+        default: "300"
 
 permissions:
   contents: read
@@ -22,6 +28,9 @@ jobs:
       WP_URL: ${{ secrets.WP_URL }}
       WP_USER: ${{ secrets.WP_USER }}
       WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      RELLENAR_TIPOS: ${{ inputs.secciones }}
+      RELLENAR_MAX: ${{ inputs.cuantas }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +38,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - if: inputs.que != 'fotos'
+      - if: inputs.que == 'notas'
         run: npx tsx scripts/robot/migrar.ts
       - if: inputs.que == 'fotos'
         run: npx tsx scripts/robot/fotos.ts
+      - if: inputs.que == 'rellenar'
+        run: npx tsx scripts/robot/rellenar-fotos.ts
