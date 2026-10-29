@@ -28,7 +28,12 @@ import { getStore } from "../../src/lib/storage/blobs";
 import type { IngestedItem } from "../../src/lib/ingest/types";
 
 const hora = () => new Date().toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour12: false });
-const log = (...a: unknown[]) => console.log(`[${hora()}]`, ...a);
+const log = (...a: unknown[]) => {
+  const txt = a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ");
+  console.log(`[${hora()}]`, txt);
+  // También como aviso de GitHub (se ve en el resumen de la corrida y por la API, sin abrir los registros).
+  if (process.env.GITHUB_ACTIONS) console.log(`::notice title=${hora()}::${txt.replace(/\r?\n/g, " ").slice(0, 900)}`);
+};
 
 async function ingesta() {
   const inicio = Date.now();
@@ -96,6 +101,8 @@ async function main() {
   const [orden = "ciclo", arg] = process.argv.slice(2);
   if (!usaWordPress()) throw new Error("Faltan WP_URL, WP_USER o WP_APP_PASSWORD (secretos del repositorio en GitHub).");
   if (orden === "estado") {
+    const faltan = ["GEMINI_API_KEY", "FB_PAGE_ID", "FB_PAGE_ACCESS_TOKEN", "TOMTOM_API_KEY"].filter((k) => !process.env[k]);
+    log(faltan.length ? `Faltan llaves en GitHub: ${faltan.join(", ")}` : "Todas las llaves están puestas.");
     log(JSON.stringify(await wp("/qpv/v1/estado")));
     return;
   }
