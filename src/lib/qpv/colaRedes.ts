@@ -171,6 +171,10 @@ export async function procesarColaRedes(): Promise<string> {
       if (x.estado === "fallida" && /access token|session has been invalidated/i.test(x.resultado ?? "") && ahora - new Date(x.creada).getTime() <= VIGENCIA_MS) {
         x.estado = "pendiente";
         await s.setJSON("item/" + x.id, x);
+      } else if (x.estado === "fallida" && x.imageUrl && !(x as { reintento?: boolean }).reintento && ahora - new Date(x.creada).getTime() <= VIGENCIA_MS) {
+        // 2026-10-28: un segundo intento para las que fallaron por otra causa (p. ej. token de usuario en vez de página).
+        Object.assign(x, { estado: "pendiente", reintento: true });
+        await s.setJSON("item/" + x.id, x);
       }
     }
     const vigentes = xs.filter((x) => x.estado === "pendiente" && ahora - new Date(x.creada).getTime() <= VIGENCIA_MS);
