@@ -96,7 +96,7 @@ export const SOURCES: Source[] = [
     trustLevel: 1,
     allowImageExtraction: false,
     autoDetectOnly: false,
-    verified: true,
+    verified: false, // 2026-10-29: el propietario ya no quiere publicar huracanes,
     bulletin: true,
     titleInclude: /aviso p[uú]blico/i,
     mustMention: COSTA_LOCAL,

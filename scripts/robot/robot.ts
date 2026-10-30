@@ -26,6 +26,7 @@ import { audioDeLaUltimaNota } from "../../src/lib/qpv/voz";
 import { usaWordPress, wp } from "../../src/lib/wp/cliente";
 import { getStore } from "../../src/lib/storage/blobs";
 import { asegurarTokenDePagina } from "../../src/lib/social/tokenPagina";
+import { esContenidoDeHuracan } from "../../src/lib/social/editorialPolicy";
 import type { IngestedItem } from "../../src/lib/ingest/types";
 
 const hora = () => new Date().toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour12: false });
@@ -48,7 +49,10 @@ async function ingesta() {
       }
     })
   );
-  const historias = buildStoryGraph(res.flatMap((r) => r.items));
+  // Sin notas de huracanes (pedido del propietario, 2026-10-29).
+  const historias = buildStoryGraph(res.flatMap((r) => r.items)).filter(
+    (h) => !esContenidoDeHuracan(h.items.map((i) => `${i.title} ${i.excerpt}`).join(" "))
+  );
   // Sin el límite de 60 s de Netlify: hay más tiempo para cada intento.
   const hasta = inicio + 120_000;
   const explicadorPrimero = new Date(inicio).getUTCMinutes() < 10;
