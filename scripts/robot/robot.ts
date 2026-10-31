@@ -64,7 +64,16 @@ async function ingesta() {
     nota = await runAutoPublish(historias, { attemptsUntil: hasta });
     explica = await runExplicaPublish(historias, { startBefore: nota.queuedForReview + nota.autoPublished > 0 ? inicio : hasta });
   }
-  log("ingesta:", JSON.stringify({ fuentesOk: res.filter((r) => r.ok).length, historias: historias.length, publicadas: nota.autoPublished, pendientes: nota.queuedForReview, explica: explica.ran && explica.queuedForReview, errores: res.filter((r) => "error" in r && r.error).map((r) => r.id) }));
+  const resumen = {
+    fuentesOk: res.filter((r) => r.ok).length, historias: historias.length, publicadas: nota.autoPublished, pendientes: nota.queuedForReview,
+    explica: explica.ran && explica.queuedForReview, errores: res.filter((r) => "error" in r && r.error).map((r) => r.id),
+    intentos: nota.attempted, yaPublicadas: nota.alreadyPublished, repetidas: nota.sameAsPublished, descartadas: nota.skippedKnown,
+    // 2026-10-31: los errores de redacción (p. ej. la llave de Gemini) también, para poder revisarlos sin abrir los registros.
+    fallas: nota.errors.slice(0, 4).map((e) => e.error.replace(/key=[^&\s]+/gi, "key=***").slice(0, 220)),
+  };
+  log("ingesta:", JSON.stringify(resumen));
+  // Último resumen guardado en WordPress (qpv-robot/ultima-ingesta) para revisarlo en cualquier momento.
+  await getStore({ name: "qpv-robot", consistency: "strong" }).setJSON("ultima-ingesta", { en: new Date().toISOString(), ...resumen }).catch(() => undefined);
 }
 
 /** Corre una tarea solo si ya pasó su intervalo (la última vez se guarda en WordPress). */
