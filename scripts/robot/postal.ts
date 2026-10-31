@@ -4,7 +4,7 @@
  * Variables: POSTAL_TITULO, POSTAL_RESUMEN, POSTAL_CATEGORIA, POSTAL_TITULO_EN, POSTAL_BUSQUEDA, POSTAL_ARCHIVO
  */
 import { writeFile } from "node:fs/promises";
-import { datosTarjeta, renderTarjeta, fondoDifuminado } from "../../src/lib/qpv/tarjetas";
+import { datosTarjeta, renderTarjeta, fondoDifuminado, imagenComoDataUri } from "../../src/lib/qpv/tarjetas";
 
 const UA = "QuePasaVallartaBot/1.0 (https://quepasavta.com)";
 
@@ -31,10 +31,16 @@ async function main() {
   if (e.POSTAL_TITULO_EN) d.tituloEn = e.POSTAL_TITULO_EN;
   for (const q of (e.POSTAL_BUSQUEDA || "traffic jam street").split("|")) {
     const f = await fotoStock(q.trim());
+    // POSTAL_PLANTILLA=impacto: foto completa (sin difuminar) con etiqueta roja y lugar resaltado.
+    if (f && e.POSTAL_PLANTILLA === "impacto") {
+      const foto = await imagenComoDataUri(f.url);
+      if (foto) { Object.assign(d, { plantilla: "impacto", foto, credito: f.credito.replace(/^Foto de archivo · /, "Foto: ") }); break; }
+      continue;
+    }
     const fondo = f ? await fondoDifuminado(f.url) : null;
     if (fondo) { d.fondo = fondo; break; }
   }
   await writeFile(`postales/${e.POSTAL_ARCHIVO || "postal"}.png`, await renderTarjeta(d));
-  console.log("listo, con fondo:", !!d.fondo);
+  console.log("listo, plantilla:", d.plantilla, "con foto:", !!(d.fondo || d.foto));
 }
 main().catch((err) => { console.error(err); process.exit(1); });

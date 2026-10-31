@@ -7,7 +7,7 @@ export const COLORES = { navy: "#0A1F3A", teal: "#14B8B0", red: "#D7262E", amber
 export const ANCHO = 1080;
 export const ALTO = 1350;
 
-export type Plantilla = "estandar" | "ultimahora" | "tarjeta" | "alerta" | "mapa" | "explicador" | "marco" | "foto";
+export type Plantilla = "estandar" | "ultimahora" | "tarjeta" | "alerta" | "mapa" | "explicador" | "marco" | "foto" | "impacto";
 
 export type MapaTiles = {
   tiles: { src: string; x: number; y: number }[]; // posiciones en px dentro del área del mapa
@@ -120,6 +120,39 @@ function TitularEn({ texto, size = 34 }: { texto?: string; size?: number }) {
     <div style={{ display: "flex", alignItems: "flex-start", gap: 14, color: "rgba(255,255,255,0.78)", fontFamily: F.base, fontWeight: 500, fontSize: size, lineHeight: 1.25 }}>
       <div style={{ display: "flex", flexShrink: 0, marginTop: size * 0.18, background: "rgba(255,255,255,0.16)", color: "rgba(255,255,255,0.9)", fontWeight: 800, fontSize: size * 0.55, letterSpacing: 2, padding: "3px 8px" }}>EN</div>
       <div style={{ display: "flex" }}>{texto}</div>
+    </div>
+  );
+}
+
+/**
+ * Palabras del titular que van resaltadas en rojo (plantilla "impacto"):
+ * el primer nombre propio de lugar o institución (palabras con mayúscula
+ * seguidas, sin contar la primera palabra) o, si no hay, la primera cifra.
+ */
+export function palabrasResaltadas(titulo: string): Set<number> {
+  const ws = titulo.split(/\s+/);
+  const conectores = /^(de|del|la|las|los|el|y)$/i;
+  const mayus = (w: string) => /^[A-ZÁÉÍÓÚÑ¿¡"“]/.test(w) && !/^[A-ZÁÉÍÓÚÑ]{1,2}[.:]?$/.test(w);
+  for (let i = 1; i < ws.length; i++) {
+    if (!mayus(ws[i])) continue;
+    let j = i;
+    // incluye "El Pitillal", "Bahía de Banderas", "Protección Civil"
+    if (i > 1 && /^(el|la|los|las)$/i.test(ws[i - 1])) i--;
+    while (j + 1 < ws.length && (mayus(ws[j + 1]) || (conectores.test(ws[j + 1]) && j + 2 < ws.length && mayus(ws[j + 2])))) j++;
+    if (j - i > 3) j = i + 3;
+    return new Set(Array.from({ length: j - i + 1 }, (_, k) => i + k));
+  }
+  const n = ws.findIndex((w) => /\d/.test(w));
+  return n >= 0 ? new Set([n]) : new Set();
+}
+
+function TitularResaltado({ texto, size }: { texto: string; size: number }) {
+  const marcadas = palabrasResaltadas(texto);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", fontFamily: F.titular, fontWeight: 700, fontSize: size, lineHeight: 1.04, letterSpacing: -0.5 }}>
+      {texto.split(/\s+/).map((w, i) => (
+        <span key={i} style={{ color: marcadas.has(i) ? "#FF3B45" : COLORES.white, marginRight: size * 0.24 }}>{w}</span>
+      ))}
     </div>
   );
 }
@@ -296,6 +329,42 @@ export function Tarjeta(d: DatosTarjeta) {
           {d.logoAzul ? <img src={d.logoAzul} width={141} height={60} style={{ width: 141, height: 60 }} /> : <div style={{ display: "flex", color: COLORES.navy, fontFamily: F.titular, fontWeight: 700, fontSize: 36 }}>QPV</div>}
           {d.credito && <div style={{ display: "flex", color: "rgba(10,31,58,0.6)", fontFamily: F.base, fontWeight: 500, fontSize: 22 }}>{d.credito}</div>}
         </div>
+      </div>
+    );
+  }
+
+  if (d.plantilla === "impacto") {
+    // Estilo "noticiero en redes" (2026-10-31): foto a todo el cuadro, degradado
+    // oscuro, etiqueta roja, titular grande con el lugar resaltado en rojo.
+    const tam = tamTitular(d.titulo, d.tituloEn ? 70 : 80);
+    const rojo = COLORES.red;
+    return (
+      <div style={base}>
+        {d.foto && <img src={d.foto} width={ANCHO} height={ALTO} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, objectFit: "cover" }} />}
+        <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: 260, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(6,16,32,0.7), rgba(6,16,32,0))" }} />
+        <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(6,16,32,0) 32%, rgba(6,16,32,0.78) 56%, rgba(6,16,32,0.97) 78%, #061020 100%)" }} />
+        <div style={{ position: "absolute", left: 0, top: 0, width: 16, height: ALTO, display: "flex", background: rojo }} />
+        <div style={{ position: "absolute", left: 60, top: 48, display: "flex" }}><Logo logo={d.logo} size={38} /></div>
+        {!d.patrocinio && (
+          <div style={{ position: "absolute", right: 48, top: 58, display: "flex", color: "rgba(255,255,255,0.9)", fontFamily: F.base, fontWeight: 800, fontSize: 22, letterSpacing: 2, border: "2px solid rgba(255,255,255,0.55)", padding: "8px 14px" }}>{fechaCorta()}</div>
+        )}
+        <div style={{ position: "absolute", left: 64, right: 64, bottom: 170, display: "flex", flexDirection: "column", gap: 26 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            <div style={{ display: "flex", background: rojo, color: COLORES.white, fontFamily: F.base, fontWeight: 900, fontSize: 30, letterSpacing: 3, padding: "12px 22px" }}>{d.etiqueta}</div>
+            <div style={{ display: "flex", width: 14, height: 58, background: COLORES.white }} />
+          </div>
+          <TitularResaltado texto={d.titulo} size={tam} />
+          <TitularEn texto={d.tituloEn} size={d.titulo.length > 80 ? 26 : 30} />
+        </div>
+        <div style={{ position: "absolute", left: 64, right: 64, bottom: 118, height: 3, display: "flex", background: "rgba(255,255,255,0.22)" }} />
+        <div style={{ position: "absolute", left: 64, right: 64, bottom: 48, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex", background: COLORES.white, color: COLORES.navy, fontFamily: F.base, fontWeight: 900, fontSize: 22, letterSpacing: 2, padding: "8px 14px" }}>NOTA COMPLETA</div>
+            <div style={{ display: "flex", color: COLORES.white, fontFamily: F.base, fontWeight: 800, fontSize: 28 }}>quepasavta.com</div>
+          </div>
+          {d.credito && <div style={{ display: "flex", color: "rgba(255,255,255,0.62)", fontFamily: F.base, fontWeight: 500, fontSize: 20 }}>{d.credito}</div>}
+        </div>
+        <SelloPatrocinio p={d.patrocinio} top={40} right={40} />
       </div>
     );
   }

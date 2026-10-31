@@ -19,6 +19,7 @@ import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
 import { fotoFondo, fotoDeArchivo } from "./fotoArchivo";
 import { fotoDelTema } from "./fotoTema";
 import { titularEnIngles } from "./traducir";
+import { llevaIngles } from "../social/publishToSocial";
 import { CATEGORY_IMAGES } from "../photos";
 
 /** Foto de ambiente para la tarjeta sin foto: muy difuminada y oscura (con sharp). */
@@ -126,7 +127,8 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   }
 
   // Con foto real: foto arriba y franja azul QPV (la que más pega en Facebook).
-  let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "foto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
+  // 2026-10-31: con foto real, postal "impacto" (foto completa, etiqueta roja y lugar resaltado).
+  let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "impacto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
   if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
 
   // Sin foto propia: foto de ARCHIVO de lo que trata la nota (si es un choque,
@@ -159,7 +161,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     patrocinio: n.patrocinio ? { nombre: n.patrocinio.nombre, logo: (await imagenComoDataUri(n.patrocinio.logo)) ?? undefined } : undefined,
     credito: credito ?? (credOficial ? `Fuente: ${credOficial}` : creditoFondo),
     fondo,
-    tituloEn: (plantilla === "tarjeta" || plantilla === "foto" || plantilla === "alerta") && !n.sinIngles ? (await titularEnIngles(n.titulo)) ?? undefined : undefined,
+    tituloEn: (plantilla === "tarjeta" || plantilla === "foto" || plantilla === "impacto" || plantilla === "alerta") && !n.sinIngles && llevaIngles({ title: n.titulo, excerpt: n.resumen ?? "", articleUrl: "" }) ? (await titularEnIngles(n.titulo)) ?? undefined : undefined,
     foto: foto ?? undefined,
     detalle: n.detalle ?? (plantilla === "tarjeta" ? n.resumen : undefined),
     accion: c.tipo === "alerta" ? "Emergencias: 911" : undefined,

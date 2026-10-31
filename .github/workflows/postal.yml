@@ -10,6 +10,7 @@ on:
       categoria: { default: "transito", description: "Sección" }
       busqueda: { default: "traffic jam street|traffic congestion city", description: "Qué foto buscar (en inglés, separar con |)" }
       archivo: { required: true, description: "Nombre del archivo (sin .png)" }
+      plantilla: { required: false, default: "", description: "impacto = foto completa con etiqueta roja" }
 
 permissions:
   contents: write
@@ -25,6 +26,7 @@ jobs:
       POSTAL_CATEGORIA: ${{ inputs.categoria }}
       POSTAL_BUSQUEDA: ${{ inputs.busqueda }}
       POSTAL_ARCHIVO: ${{ inputs.archivo }}
+      POSTAL_PLANTILLA: ${{ inputs.plantilla }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

@@ -266,7 +266,7 @@ export async function procesarColaRedes(): Promise<string> {
     const ultimaSeccion = ultimaPub?.seccion;
     const puntaje = (x: ItemRedes) => {
       const horas = (ahora - new Date(x.creada).getTime()) / 3_600_000;
-      // 2026-10-31: las notas con foto real tienen mucho más alcance que las tarjetas de solo texto.
+      // 2026-10-31: las postales con foto real de fondo tienen mucho más alcance que las de solo texto.
       return (x.score ?? 50) - horas * 4 - (x.seccion && x.seccion === ultimaSeccion ? 15 : 0) + (x.conFoto ? 12 : 0);
     };
     const sig = notas.sort((a, b) => puntaje(b) - puntaje(a))[0];
@@ -300,12 +300,9 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
     const fuente = a.sources[0]?.url;
     const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));
     const archivo = oficial ? null : fotoDeArchivo(a.title, "");
-    // 2026-10-31: con foto real (oficial o de archivo) sale la foto sola, no la tarjeta.
-    const fotoSola = oficial ? a.imageUrl : archivo?.url;
-    const creditoSolo = oficial ? a.imageCredit : archivo?.credito;
     const { patrocinioParaNota } = await import("../business/patrocinios");
     const pat = await patrocinioParaNota(a.title, a.category);
-    const cardUrl = fotoSola ? null : await crearTarjeta({
+    const cardUrl = await crearTarjeta({
       patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
       titulo: a.title,
       categoria: a.category,
@@ -316,16 +313,12 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
       creditoFoto: oficial ? a.imageCredit : archivo?.credito,
     });
     const articleUrl = `${siteUrl()}/noticia/${a.slug}`;
-    if (fotoSola) {
-      await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: fotoSola, creditoFoto: creditoSolo }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category, conFoto: true });
-      return (await leerTodos()).find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
-    }
     if (!cardUrl) {
       // Se anota para no volver a intentarla en cada corrida.
       await store().setJSON("item/sin-" + a.slug.slice(0, 80), { id: "sin-" + a.slug.slice(0, 80), title: a.title, excerpt: a.dek, articleUrl, urgente: false, tipo: "nota", creada: new Date().toISOString(), estado: "fallida", resultado: "sin tarjeta" } satisfies ItemRedes);
       return null;
     }
-    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category, conFoto: !!(oficial || archivo) });
+    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category, conFoto: !!(oficial || archivo?.url) });
     const xs = await leerTodos();
     return xs.find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
   } catch (err) {
