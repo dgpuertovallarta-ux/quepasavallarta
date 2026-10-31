@@ -133,11 +133,13 @@ export function palabrasResaltadas(titulo: string): Set<number> {
   const ws = titulo.split(/\s+/);
   const conectores = /^(de|del|la|las|los|el|y)$/i;
   const mayus = (w: string) => /^[A-ZÁÉÍÓÚÑ¿¡"“]/.test(w) && !/^[A-ZÁÉÍÓÚÑ]{1,2}[.:]?$/.test(w);
-  for (let i = 1; i < ws.length; i++) {
+  // Si el titular arranca con un nombre propio ("Protección Civil …"), ese no cuenta.
+  let desde = 1;
+  if (mayus(ws[0])) while (desde < ws.length && mayus(ws[desde])) desde++;
+  for (let i = desde; i < ws.length; i++) {
     if (!mayus(ws[i])) continue;
     let j = i;
     // incluye "El Pitillal", "Bahía de Banderas", "Protección Civil"
-    if (i > 1 && /^(el|la|los|las)$/i.test(ws[i - 1])) i--;
     while (j + 1 < ws.length && (mayus(ws[j + 1]) || (conectores.test(ws[j + 1]) && j + 2 < ws.length && mayus(ws[j + 2])))) j++;
     if (j - i > 3) j = i + 3;
     return new Set(Array.from({ length: j - i + 1 }, (_, k) => i + k));
@@ -370,7 +372,7 @@ export function Tarjeta(d: DatosTarjeta) {
             <div style={{ display: "flex", background: COLORES.white, color: COLORES.navy, fontFamily: F.base, fontWeight: 900, fontSize: 22, letterSpacing: 2, padding: "8px 14px" }}>NOTA COMPLETA</div>
             <div style={{ display: "flex", color: COLORES.white, fontFamily: F.base, fontWeight: 800, fontSize: 28 }}>quepasavta.com</div>
           </div>
-          {d.credito && <div style={{ display: "flex", color: "rgba(255,255,255,0.62)", fontFamily: F.base, fontWeight: 500, fontSize: 20 }}>{d.credito}</div>}
+          {d.credito && <div style={{ display: "flex", color: "rgba(255,255,255,0.62)", fontFamily: F.base, fontWeight: 500, fontSize: 19 }}>{d.credito.replace(/\s*·\s*CC[^·]*|\s*·\s*Wikimedia/gi, "").slice(0, 34)}</div>}
         </div>
         <SelloPatrocinio p={d.patrocinio} top={40} right={40} />
       </div>
