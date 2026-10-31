@@ -10,6 +10,9 @@
  *   - Urgentes (alertas, Protección Civil, en curso) primero, sin esperar.
  *   - Huracanes: los videos por boletín van por otro camino (hurricane-video).
  *   - Una nota que lleva más de 8 h esperando ya no sale (dejó de ser noticia).
+ *   - 2026-10-31: el propietario pidió que NO salga tráfico en Facebook. Las
+ *     notas de tráfico/tránsito nunca entran a la cola, y los resúmenes de
+ *     8, 14 y 18 h solo salen si se activa QPV_TRAFICO_FB=1.
  * Se procesa al final de cada corrida de /api/ingest (cada 10 min).
  */
 import { getStore } from "../storage/blobs";
@@ -25,6 +28,15 @@ const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 40);
 const VIGENCIA_MS = 8 * 3_600_000;
 const HORA_INICIO = 7;
 const HORA_FIN = 23;
+/** Resúmenes viales de 8, 14 y 18 h en Facebook (apagados salvo QPV_TRAFICO_FB=1). */
+const RESUMENES_TRAFICO = process.env.QPV_TRAFICO_FB === "1";
+
+/** ¿Es una nota de tráfico/tránsito? (por sección, liga o contenido). */
+export function esDeTrafico(titulo: string, resumen = "", categoria?: string | null, url = ""): boolean {
+  if (categoria && /^(transito|trafico)$/i.test(categoria)) return true;
+  if (url.includes("/trafico")) return true;
+  return clasificar(titulo, resumen).tipo === "trafico";
+}
 
 export type ItemRedes = {
   id: string;
@@ -58,11 +70,15 @@ async function leerTodos(): Promise<ItemRedes[]> {
 
 export async function encolarRedes(
   n: { title: string; excerpt: string; articleUrl: string; imageUrl?: string | null },
-  opts: { tipo?: "nota" | "trafico"; score?: number; patrocinio?: { id: number; nombre: string } | null } = {}
+  opts: { tipo?: "nota" | "trafico"; score?: number; patrocinio?: { id: number; nombre: string } | null; categoria?: string | null } = {}
 ): Promise<void> {
   if (!n.imageUrl) return; // siempre con imagen (foto propia o tarjeta QPV)
   const c = clasificar(n.title, n.excerpt);
   const tipo = opts.tipo ?? (n.articleUrl.includes("/trafico") ? "trafico" : "nota");
+  // Sin tráfico en Facebook (2026-10-31): las notas viales no entran nunca;
+  // los resúmenes de 8/14/18 h solo con QPV_TRAFICO_FB=1.
+  if (tipo === "trafico" && !RESUMENES_TRAFICO) return;
+  if (tipo === "nota" && esDeTrafico(n.title, n.excerpt, opts.categoria, n.articleUrl)) return;
   const item: ItemRedes = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     title: n.title,
@@ -177,6 +193,16 @@ export async function procesarColaRedes(): Promise<string> {
         await s.setJSON("item/" + x.id, x);
       }
     }
+    // Lo de tráfico que ya estaba esperando se descarta (no sale a Facebook).
+    for (const x of xs) {
+      if (x.estado !== "pendiente" || x.articleUrl.endsWith("/reporte")) continue;
+      const resumen = (x.tipo ?? (x.articleUrl.includes("/trafico") ? "trafico" : "nota")) === "trafico";
+      if (resumen ? !RESUMENES_TRAFICO : esDeTrafico(x.title, x.excerpt, null, x.articleUrl)) {
+        x.estado = "vencida";
+        x.resultado = "tráfico: no se publica en Facebook";
+        await s.setJSON("item/" + x.id, x);
+      }
+    }
     const vigentes = xs.filter((x) => x.estado === "pendiente" && ahora - new Date(x.creada).getTime() <= VIGENCIA_MS);
 
     // 1) Tráfico: el resumen de su hora sale enseguida (máx. 2 h de espera).
@@ -259,7 +285,8 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
       (a) =>
         Date.now() - new Date(a.publishedAt).getTime() < 6 * 3_600_000 &&
         !yaEnCola.has(`${siteUrl()}/noticia/${a.slug}`) &&
-        !isHurricaneSimonContent(`${a.title} ${a.dek}`)
+        !isHurricaneSimonContent(`${a.title} ${a.dek}`) &&
+        !esDeTrafico(a.title, a.dek, a.category)
     );
     const a = recientes.sort((x, y) => (y.score ?? 0) - (x.score ?? 0))[0];
     if (!a) return null;
@@ -284,7 +311,7 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
       await store().setJSON("item/sin-" + a.slug.slice(0, 80), { id: "sin-" + a.slug.slice(0, 80), title: a.title, excerpt: a.dek, articleUrl, urgente: false, tipo: "nota", creada: new Date().toISOString(), estado: "fallida", resultado: "sin tarjeta" } satisfies ItemRedes);
       return null;
     }
-    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
+    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category });
     const xs = await leerTodos();
     return xs.find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
   } catch (err) {

@@ -194,7 +194,7 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
           // Ya no se publica en redes al instante: entra a la cola (máximo diario y separación entre posts) — ver lib/qpv/colaRedes.ts.
           // Con foto propia (oficial o de archivo que sí corresponde) o, si no, con la tarjeta tipográfica QPV (2026-10-24).
           if (generatedImage?.cardUrl) {
-            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.cardUrl }, { score: story.maxNewsScore, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null });
+            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.cardUrl }, { score: story.maxNewsScore, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: primarySource.categoryGuess });
           }
           result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         }
