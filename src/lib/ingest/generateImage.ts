@@ -22,6 +22,9 @@ export type GeneratedImage = {
   url?: string;
   /** Tarjeta 1080×1350 con titular y logo para Facebook/Instagram (/api/image/…). */
   cardUrl?: string;
+  /** Foto real que SÍ puede ir sola a Facebook (oficial o de archivo; nunca la de otro medio). */
+  fotoRedes?: string;
+  creditoRedes?: string;
   credit?: string;
   licenseStatus?: "source_unlicensed" | "ai_generated" | "illustrative_fallback";
   model: string;
@@ -313,5 +316,5 @@ export async function generateArticleImage(input: {
   });
 
   if (!url && !cardUrl) return null;
-  return { url, cardUrl: cardUrl ?? undefined, credit, licenseStatus: foto ? "source_unlicensed" : archivo ? "illustrative_fallback" : undefined, model: "qpv-tarjeta" };
+  return { url, cardUrl: cardUrl ?? undefined, fotoRedes: fotoRedes?.url, creditoRedes: fotoRedes?.credito, credit, licenseStatus: foto ? "source_unlicensed" : archivo ? "illustrative_fallback" : undefined, model: "qpv-tarjeta" };
 }

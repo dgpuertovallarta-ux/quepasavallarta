@@ -49,6 +49,10 @@ export type ItemRedes = {
   tipo?: "nota" | "trafico";
   /** Importancia de la nota (newsScore de la ingesta, 0–100). */
   score?: number;
+  /** Lleva foto real (oficial, de la fuente o de archivo) y no solo tarjeta de texto. */
+  conFoto?: boolean;
+  /** Crédito de la foto real (va en el texto del post). */
+  creditoFoto?: string;
   /** Sección (etiqueta de clasificar) para revolver las notas. */
   seccion?: string;
   /** Patrocinio "Presentado por" de la sección (para el texto y su reporte). */
@@ -69,8 +73,8 @@ async function leerTodos(): Promise<ItemRedes[]> {
 }
 
 export async function encolarRedes(
-  n: { title: string; excerpt: string; articleUrl: string; imageUrl?: string | null },
-  opts: { tipo?: "nota" | "trafico"; score?: number; patrocinio?: { id: number; nombre: string } | null; categoria?: string | null } = {}
+  n: { title: string; excerpt: string; articleUrl: string; imageUrl?: string | null; creditoFoto?: string | null },
+  opts: { tipo?: "nota" | "trafico"; score?: number; patrocinio?: { id: number; nombre: string } | null; categoria?: string | null; conFoto?: boolean } = {}
 ): Promise<void> {
   if (!n.imageUrl) return; // siempre con imagen (foto propia o tarjeta QPV)
   const c = clasificar(n.title, n.excerpt);
@@ -88,6 +92,8 @@ export async function encolarRedes(
     urgente: tipo === "nota" && (c.tipo === "alerta" || c.ultimaHora),
     tipo,
     score: opts.score,
+    conFoto: opts.conFoto,
+    creditoFoto: n.creditoFoto ?? undefined,
     seccion: c.etiqueta,
     patrocinio: opts.patrocinio ?? undefined,
     creada: new Date().toISOString(),
@@ -136,7 +142,7 @@ async function soltarCandado(token: string) {
 async function publicar(sig: ItemRedes): Promise<string> {
   const s = store();
   await s.setJSON("item/" + sig.id, { ...sig, estado: "publicando" } satisfies ItemRedes);
-  const r = await publishToSocial({ title: sig.title, excerpt: sig.excerpt, articleUrl: sig.articleUrl, imageUrl: sig.imageUrl, patrocinador: sig.patrocinio?.nombre });
+  const r = await publishToSocial({ title: sig.title, excerpt: sig.excerpt, articleUrl: sig.articleUrl, imageUrl: sig.imageUrl, patrocinador: sig.patrocinio?.nombre, creditoFoto: sig.creditoFoto });
   const ok = r.facebook.ok || r.instagram.ok;
   // Token de Facebook vencido/invalidado: la nota NO se gasta, se queda en la
   // cola y se avisa; en cuanto se ponga un token nuevo vuelve a salir.
@@ -260,7 +266,8 @@ export async function procesarColaRedes(): Promise<string> {
     const ultimaSeccion = ultimaPub?.seccion;
     const puntaje = (x: ItemRedes) => {
       const horas = (ahora - new Date(x.creada).getTime()) / 3_600_000;
-      return (x.score ?? 50) - horas * 4 - (x.seccion && x.seccion === ultimaSeccion ? 15 : 0);
+      // 2026-10-31: las notas con foto real tienen mucho más alcance que las tarjetas de solo texto.
+      return (x.score ?? 50) - horas * 4 - (x.seccion && x.seccion === ultimaSeccion ? 15 : 0) + (x.conFoto ? 12 : 0);
     };
     const sig = notas.sort((a, b) => puntaje(b) - puntaje(a))[0];
     return await publicar(sig);
@@ -293,9 +300,12 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
     const fuente = a.sources[0]?.url;
     const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));
     const archivo = oficial ? null : fotoDeArchivo(a.title, "");
+    // 2026-10-31: con foto real (oficial o de archivo) sale la foto sola, no la tarjeta.
+    const fotoSola = oficial ? a.imageUrl : archivo?.url;
+    const creditoSolo = oficial ? a.imageCredit : archivo?.credito;
     const { patrocinioParaNota } = await import("../business/patrocinios");
     const pat = await patrocinioParaNota(a.title, a.category);
-    const cardUrl = await crearTarjeta({
+    const cardUrl = fotoSola ? null : await crearTarjeta({
       patrocinio: pat ? { nombre: pat.nombre, logo: pat.logo } : null,
       titulo: a.title,
       categoria: a.category,
@@ -306,12 +316,16 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
       creditoFoto: oficial ? a.imageCredit : archivo?.credito,
     });
     const articleUrl = `${siteUrl()}/noticia/${a.slug}`;
+    if (fotoSola) {
+      await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: fotoSola, creditoFoto: creditoSolo }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category, conFoto: true });
+      return (await leerTodos()).find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
+    }
     if (!cardUrl) {
       // Se anota para no volver a intentarla en cada corrida.
       await store().setJSON("item/sin-" + a.slug.slice(0, 80), { id: "sin-" + a.slug.slice(0, 80), title: a.title, excerpt: a.dek, articleUrl, urgente: false, tipo: "nota", creada: new Date().toISOString(), estado: "fallida", resultado: "sin tarjeta" } satisfies ItemRedes);
       return null;
     }
-    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category });
+    await encolarRedes({ title: a.title, excerpt: a.dek, articleUrl, imageUrl: cardUrl }, { score: a.score, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: a.category, conFoto: !!(oficial || archivo) });
     const xs = await leerTodos();
     return xs.find((x) => x.articleUrl === articleUrl && x.estado === "pendiente") ?? null;
   } catch (err) {

@@ -193,8 +193,9 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         } else {
           // Ya no se publica en redes al instante: entra a la cola (máximo diario y separación entre posts) — ver lib/qpv/colaRedes.ts.
           // Con foto propia (oficial o de archivo que sí corresponde) o, si no, con la tarjeta tipográfica QPV (2026-10-24).
-          if (generatedImage?.cardUrl) {
-            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.cardUrl }, { score: story.maxNewsScore, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: primarySource.categoryGuess });
+          // 2026-10-31: con foto real (oficial o de archivo) sale la foto sola, no la tarjeta de texto.
+          if (generatedImage?.fotoRedes || generatedImage?.cardUrl) {
+            await encolarRedes({ title, excerpt, articleUrl: `${siteUrl()}/noticia/${slug}`, imageUrl: generatedImage.fotoRedes ?? generatedImage.cardUrl, creditoFoto: generatedImage.fotoRedes ? generatedImage.creditoRedes : undefined }, { score: story.maxNewsScore, patrocinio: pat ? { id: pat.id, nombre: pat.nombre } : null, categoria: primarySource.categoryGuess, conFoto: !!generatedImage.fotoRedes });
           }
           result.socialResults.push({ storyId: story.storyId, facebook: "skipped", instagram: "skipped" });
         }
