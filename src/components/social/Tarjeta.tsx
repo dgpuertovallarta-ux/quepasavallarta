@@ -148,10 +148,18 @@ export function palabrasResaltadas(titulo: string): Set<number> {
 
 function TitularResaltado({ texto, size }: { texto: string; size: number }) {
   const marcadas = palabrasResaltadas(texto);
+  // Las palabras resaltadas van juntas (que "El Pitillal" no se parta en dos renglones).
+  const trozos: { t: string; rojo: boolean }[] = [];
+  texto.split(/\s+/).forEach((w, i) => {
+    const rojo = marcadas.has(i);
+    const ult = trozos[trozos.length - 1];
+    if (rojo && ult?.rojo) ult.t += " " + w;
+    else trozos.push({ t: w, rojo });
+  });
   return (
     <div style={{ display: "flex", flexWrap: "wrap", fontFamily: F.titular, fontWeight: 700, fontSize: size, lineHeight: 1.04, letterSpacing: -0.5 }}>
-      {texto.split(/\s+/).map((w, i) => (
-        <span key={i} style={{ color: marcadas.has(i) ? "#FF3B45" : COLORES.white, marginRight: size * 0.24 }}>{w}</span>
+      {trozos.map((x, i) => (
+        <span key={i} style={{ color: x.rojo ? "#FF3B45" : COLORES.white, marginRight: size * 0.24 }}>{x.t}</span>
       ))}
     </div>
   );

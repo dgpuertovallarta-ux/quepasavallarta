@@ -17,7 +17,7 @@ const ACCIDENTE = R(["accidente", "choque", "chocan", "volcadura", "vuelca", "at
 const ALERTA = R(["protecci[oó]n civil", "alerta (roja|naranja|amarilla|verde|azul|preventiva|meteorol|por|ante|de tormenta|de hurac|de tsunami|sísmica|s[ií]smica)", "en alerta", "hurac[aá]n", "tormenta", "ciclón", "cicl[oó]n", "lluvia", "inundaci", "inundad", "evacua", "sismo", "temblor",
   "marea", "oleaje", "bandera roja", "creciente", "desborda"]);
 const TRAFICO = R(["tr[aá]fico", "circulaci", "obras afectan", "vehiculo descompuesto", "veh[ií]culo descompuesto", "vialidad", "cierre", "cerrad[ao] la", "carril", "embotell", "congesti", "puente", "desv[ií]o", "obra vial", "bacheo"]);
-const SERVICIOS = R(["seapal", "agua potable", "corte de agua", "sin agua", "cfe", "apag[oó]n", "sin luz", "basura", "recolecci", "alumbrado", "bache", "drenaje", "fuga"]);
+const SERVICIOS = R(["seapal", "agua potable", "corte de agua", "sin agua", "servicio de agua", "suministro de agua", "interrupci[oó]n en el servicio", "cfe", "apag[oó]n", "sin luz", "basura", "recolecci", "alumbrado", "bache", "drenaje", "fuga"]);
 const GOBIERNO = R(["ayuntamiento", "presidente municipal", "presidenta municipal", "cabildo", "regidor", "gobierno", "diputad", "congreso", "presupuesto", "licitaci"]);
 const COMUNIDAD = R(["vecinos", "deport", "campeon", "medalla", "festival", "evento", "concierto", "escuela", "estudiante"]);
 // "Vuelve la calma", "se aleja", "deja atrás las tormentas": habla del clima pero NO es alerta.
