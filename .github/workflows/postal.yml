@@ -26,8 +26,8 @@ jobs:
       POSTAL_BUSQUEDA: ${{ inputs.busqueda }}
       POSTAL_ARCHIVO: ${{ inputs.archivo }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
       - run: mkdir -p postales && npx tsx scripts/robot/postal.ts

@@ -25,6 +25,11 @@ export class WpError extends Error {
   }
 }
 
+/** Quita emojis y otros caracteres fuera del plano básico (la base utf8 no los acepta). */
+export function quitarCaracteres4Bytes(txt: string): string {
+  return txt.replace(/[\u{10000}-\u{10FFFF}]/gu, "").replace(/\uFE0F|\u200D/g, "");
+}
+
 /** Llama a la API REST de WordPress (ruta relativa a /wp-json). */
 export async function wp<T = unknown>(ruta: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const headers = new Headers(init.headers);
@@ -34,6 +39,11 @@ export async function wp<T = unknown>(ruta: string, init: RequestInit & { json?:
   if (init.json !== undefined) {
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(init.json);
+    // 2026-10-31: la base de datos de HostGator está en utf8 (no utf8mb4) y
+    // rechaza en silencio los emojis y demás caracteres de 4 bytes; por eso
+    // no se guardaban los reels ni algunas entradas de la cola. Las notas
+    // (/wp/v2) las convierte WordPress solo; para nuestras rutas se quitan.
+    if (ruta.startsWith("/qpv/")) body = quitarCaracteres4Bytes(body as string);
   }
   let ultimo: unknown;
   for (let intento = 0; intento < 3; intento++) {
