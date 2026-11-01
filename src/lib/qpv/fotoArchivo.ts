@@ -87,13 +87,14 @@ export function fotoFondo(titulo: string, resumen: string, etiqueta: string, cat
  * titular, pero nunca muestra víctimas ni personas identificables. Se marca
  * "Imagen ilustrativa". En temas de menores, abuso o suicidio no hay imagen.
  */
-const ILUSTRATIVAS: { re: RegExp; foto: PhotoKey }[] = [
-  { re: /desaparec|desaparici|b[uú]squeda|ficha de|paradero|localizar a|familiares (exigen|piden|marchan)/i, foto: "ilusVeladoras" },
-  { re: /incendio|se incendia|incendi[oó]|quema|llamas|bomberos/i, foto: "ilusBomberos" },
-  { re: /accidente|choque|chocan?|volcadura|vuelca|atropell|lesionad|herid|ambulancia|cruz roja/i, foto: "ilusAmbulancia" },
-  { re: /homicid|asesin|sin vida|cad[aá]ver|restos|balace|dispar|baleado|ejecut|fosa|hallazgo/i, foto: "ilusCinta" },
-  { re: /guardia nacional|ej[eé]rcito|militar|marina armada|operativo|cateo|despliegue/i, foto: "ilusGuardia" },
-  { re: /detien|detenid|captur|arrest|robo|rob[aó]|asalt|polic[ií]a|patrulla|seguridad|fiscal/i, foto: "ilusPatrulla" },
+const ILUSTRATIVAS: { re: RegExp; foto: PhotoKey; tema: string }[] = [
+  { re: /desaparec|desaparici|b[uú]squeda|ficha de|paradero|localizar a|familiares (exigen|piden|marchan)/i, foto: "ilusVeladoras", tema: "busqueda" },
+  { re: /incendio|se incendia|incendi[oó]|quema|llamas|bomberos/i, foto: "ilusBomberos", tema: "bomberos" },
+  { re: /accidente|choque|chocan?|volcadura|vuelca|atropell|lesionad|herid|ambulancia|cruz roja/i, foto: "ilusAmbulancia", tema: "ambulancia" },
+  { re: /homicid|asesin|sin vida|cad[aá]ver|restos|balace|dispar|baleado|ejecut|fosa|hallazgo/i, foto: "ilusCinta", tema: "cinta" },
+  { re: /guardia nacional|ej[eé]rcito|militar|marina armada|operativo|cateo|despliegue/i, foto: "ilusGuardia", tema: "guardia" },
+  { re: /protecci[oó]n civil|rescate|rescat|evacua/i, foto: "ilusAmbulancia", tema: "proteccion-civil" },
+  { re: /detien|detenid|captur|arrest|robo|rob[aó]|asalt|polic[ií]a|patrulla|seguridad|fiscal/i, foto: "ilusPatrulla", tema: "policia" },
 ];
 const SIN_ILUSTRATIVA = /menor de edad|\bmenor(es)?\b|niñ[oa]s?|adolescente|abuso|violaci|suicid|feminicid/i;
 
@@ -104,4 +105,11 @@ export function fotoIlustrativaDelicada(titulo: string, resumen = ""): FotoArchi
   if (!regla) return null;
   const autor = PHOTO_CREDITS[regla.foto];
   return { url: PHOTOS[regla.foto], credito: `Imagen ilustrativa${autor ? ` · ${autor}` : ""}`, clave: regla.foto };
+}
+
+/** Tema de la imagen ilustrativa ("policia", "bomberos", "proteccion-civil"…) o null. */
+export function temaIlustrativo(titulo: string, resumen = ""): string | null {
+  const t = `${titulo} ${resumen}`;
+  if (SIN_ILUSTRATIVA.test(t)) return null;
+  return (ILUSTRATIVAS.find((r) => r.re.test(titulo)) ?? ILUSTRATIVAS.find((r) => r.re.test(t)))?.tema ?? null;
 }

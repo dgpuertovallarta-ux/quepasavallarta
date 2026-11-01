@@ -16,7 +16,8 @@ import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial 
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
-import { fotoFondo, fotoDeArchivo, fotoIlustrativaDelicada } from "./fotoArchivo";
+import { fotoFondo, fotoDeArchivo, fotoIlustrativaDelicada, temaIlustrativo } from "./fotoArchivo";
+import { usaWordPress, wp } from "../wp/cliente";
 import { fotoDelTema } from "./fotoTema";
 import { titularEnIngles } from "./traducir";
 import { llevaIngles } from "../social/publishToSocial";
@@ -117,6 +118,39 @@ export type NotaTarjeta = {
 
 const DELICADA = /\b(desaparec|desaparici|b[uú]squeda de|ficha de b[uú]squeda|privaci[oó]n de la libertad|secuestr|v[ií]ctima|sin vida|cad[aá]ver|fosa|homicid|asesin|feminicid|violaci|abuso|menor de edad|lesionad|herid|muert|falleci)/i;
 
+/**
+ * Fotos propias para las imágenes ilustrativas (2026-10-31): el propietario sube
+ * a Medios de WordPress fotos de Policía, Bomberos, Protección Civil, Cruz Roja…
+ * de Vallarta con el nombre "qpv-ilustrativa-<tema>-<número>" (p. ej.
+ * qpv-ilustrativa-bomberos-1). En "Leyenda" pone el crédito (p. ej. "Bomberos de
+ * Puerto Vallarta"). Se elige una al azar; si no hay, se usa el banco genérico.
+ */
+const cacheMedios = new Map<string, { url: string; credito: string }[]>();
+async function fotoPropiaDeMedios(tema: string): Promise<{ url: string; credito: string } | null> {
+  if (!usaWordPress()) return null;
+  try {
+    if (!cacheMedios.has(tema)) {
+      const xs = await wp<{ source_url: string; slug: string; title?: { rendered?: string }; caption?: { rendered?: string }; mime_type: string }[]>(
+        `/wp/v2/media?search=${encodeURIComponent("qpv-ilustrativa-" + tema)}&per_page=30&media_type=image&_fields=source_url,slug,title,caption,mime_type`
+      );
+      const clave = new RegExp(`^qpv-ilustrativa-${tema}(-|$)`, "i");
+      cacheMedios.set(
+        tema,
+        (xs ?? [])
+          .filter((m) => /jpe?g|png|webp/.test(m.mime_type) && (clave.test(m.slug) || clave.test((m.title?.rendered ?? "").trim())))
+          .map((m) => {
+            const leyenda = (m.caption?.rendered ?? "").replace(/<[^>]+>/g, "").trim();
+            return { url: m.source_url, credito: `Imagen ilustrativa${leyenda ? ` · ${leyenda.slice(0, 40)}` : ""}` };
+          })
+      );
+    }
+    const lista = cacheMedios.get(tema) ?? [];
+    return lista.length ? lista[Math.floor(Math.random() * lista.length)] : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   const c = clasificar(n.titulo);
   const credOficial = creditoOficial(n.urlFuente) ?? creditoOficial(n.fotoFuente);
@@ -138,7 +172,12 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     // genérica de la sección (salía un delfín en una nota de desaparecidos).
     // En nota roja, desapariciones o víctimas: ninguna foto de archivo.
     const delicada = c.tipo === "seguridad" || c.tipo === "accidente" || c.requiereRevision || DELICADA.test(`${n.titulo} ${n.resumen ?? ""}`);
-    const candidatos = delicada
+    // Fotos propias subidas a Medios de WordPress ("qpv-ilustrativa-policia-1"…), antes que el banco genérico.
+    const tema = temaIlustrativo(n.titulo, n.resumen ?? "");
+    const propia = tema && (delicada || tema === "proteccion-civil" || tema === "bomberos") ? await fotoPropiaDeMedios(tema) : null;
+    const candidatos = propia
+      ? [propia]
+      : delicada
       ? ([fotoIlustrativaDelicada(n.titulo, n.resumen ?? "")].filter(Boolean) as { url: string; credito: string }[])
       : ([await fotoDelTema(n.titulo, n.resumen ?? "").catch(() => null), fotoDeArchivo(n.titulo, "")].filter(Boolean) as { url: string; credito: string }[]);
     for (const f of candidatos) {
