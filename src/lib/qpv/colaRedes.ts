@@ -22,6 +22,7 @@ import { creditoOficial } from "./oficiales";
 import { fotoDeArchivo } from "./fotoArchivo";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
 import { siteUrl } from "../storage/imageBlobs";
+import { esExpress } from "./express";
 
 const MAX_POR_DIA = Number(process.env.QPV_MAX_POR_DIA || 12);
 const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 40);
@@ -89,7 +90,8 @@ export async function encolarRedes(
     excerpt: n.excerpt,
     articleUrl: n.articleUrl,
     imageUrl: n.imageUrl ?? undefined,
-    urgente: tipo === "nota" && (c.tipo === "alerta" || c.ultimaHora),
+    // Express (lib/qpv/express.ts): notas positivas de Diego Franco salen sin esperar.
+    urgente: tipo === "nota" && (c.tipo === "alerta" || c.ultimaHora || esExpress(`${n.title} ${n.excerpt}`)),
     tipo,
     score: opts.score,
     conFoto: opts.conFoto,
@@ -295,7 +297,9 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
         !isHurricaneSimonContent(`${a.title} ${a.dek}`) &&
         !esDeTrafico(a.title, a.dek, a.category)
     );
-    const a = recientes.sort((x, y) => (y.score ?? 0) - (x.score ?? 0))[0];
+    // Las express van primero; luego por importancia.
+    const exp = (x: { title: string; dek: string }) => Number(esExpress(`${x.title} ${x.dek}`));
+    const a = recientes.sort((x, y) => exp(y) - exp(x) || (y.score ?? 0) - (x.score ?? 0))[0];
     if (!a) return null;
     const fuente = a.sources[0]?.url;
     const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));

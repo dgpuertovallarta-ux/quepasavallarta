@@ -11,6 +11,7 @@ import { loadSkips, saveSkips } from "./skipMemory";
 import { encolarRedes } from "../qpv/colaRedes";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
 import { siteUrl } from "../storage/imageBlobs";
+import { mencionaExpress, esExpress } from "../qpv/express";
 
 // Una noticia publicada o enviada a revisión por corrida. El texto y la
 // imagen se generan dentro de la ingesta; mantener el límite evita
@@ -79,7 +80,12 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
   // Enfoque editorial (ver localFocus.ts): se descartan las historias que
   // claramente son de otro lugar y se ordena lo demás poniendo primero
   // los avisos oficiales, Protección Civil y lo que pasa en Vallarta.
-  const candidates = sortByEditorialFocus(stories.filter((s) => (isAutoPublishEligible(s) || isHumanReviewEligible(s)) && !isOffTopicStory(s)));
+  // Notas «express» (ver lib/qpv/express.ts): las que mencionan a Diego Franco entran
+  // aunque solo las reporte una fuente y van al principio de la fila.
+  const textoHistoria = (s: Story) => s.items.map((i) => `${i.title} ${i.excerpt}`).join(" ");
+  const candidates = sortByEditorialFocus(
+    stories.filter((s) => (isAutoPublishEligible(s) || isHumanReviewEligible(s) || mencionaExpress(textoHistoria(s))) && !isOffTopicStory(s))
+  ).sort((a, b) => Number(mencionaExpress(textoHistoria(b))) - Number(mencionaExpress(textoHistoria(a))));
 
   // Se recorre la lista hasta publicar o enviar a revisión una nota. Las historias ya
   // publicadas y las que ya se descartaron en una corrida anterior se
@@ -169,7 +175,11 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
         sourceName: primarySource.sourceName,
       });
 
-      const automatic = isAutoPublishEligible(story);
+      // Express: positiva o neutral → directo al sitio; si trae señales de crítica → siempre a Reportes.
+      const textoNota = `${title} ${excerpt} ${bodyParagraphs.join(" ")}`;
+      const automatic = mencionaExpress(textoNota) || mencionaExpress(textoHistoria(story))
+        ? esExpress(textoNota)
+        : isAutoPublishEligible(story);
       const { slug } = await publishArticle({
         title,
         excerpt,
