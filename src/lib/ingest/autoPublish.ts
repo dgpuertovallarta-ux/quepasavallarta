@@ -177,9 +177,14 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
 
       // Express: positiva o neutral → directo al sitio; si trae señales de crítica → siempre a Reportes.
       const textoNota = `${title} ${excerpt} ${bodyParagraphs.join(" ")}`;
+      // 2026-10-31 (pedido del propietario: no hay tiempo de aprobar): las notas
+      // confirmadas por un medio o fuente oficial se publican solas aunque sean de
+      // revisión. Solo quedan para aprobar los temas de menores, abuso sexual o
+      // suicidio. Con QPV_CON_APROBACION=1 vuelve la regla anterior.
+      const delicadaExtrema = /\b(menor(es)? de edad|niñ[oa]s?|adolescente|abuso sexual|violaci[oó]n|violad|suicid|feminicid)/i.test(textoNota);
       const automatic = mencionaExpress(textoNota) || mencionaExpress(textoHistoria(story))
         ? esExpress(textoNota)
-        : isAutoPublishEligible(story);
+        : isAutoPublishEligible(story) || (process.env.QPV_CON_APROBACION !== "1" && story.hasCorroboration && !delicadaExtrema);
       const { slug } = await publishArticle({
         title,
         excerpt,

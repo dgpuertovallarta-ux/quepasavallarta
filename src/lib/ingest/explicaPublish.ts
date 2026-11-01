@@ -88,7 +88,8 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
         imageCredit: generatedImage?.credit,
         imageLicenseStatus: generatedImage?.licenseStatus,
         isExplainer: true,
-        status: "pending_review",
+        // 2026-10-31: los explicadores también salen solos (QPV_CON_APROBACION=1 para revisarlos antes).
+        status: process.env.QPV_CON_APROBACION === "1" ? "pending_review" : "published",
       });
 
       return { ran: true, queuedForReview: true, storyId: story.storyId };
