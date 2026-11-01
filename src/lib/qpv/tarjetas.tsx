@@ -126,10 +126,27 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     if (foto) credito = `Foto: ${n.creditoFoto || credOficial || "fuente original"}`;
   }
 
-  // Con foto real: foto arriba y franja azul QPV (la que más pega en Facebook).
-  // 2026-10-31: con foto real, postal "impacto" (foto completa, etiqueta roja y lugar resaltado).
-  let plantilla: Plantilla = n.plantilla ?? (foto ? (c.tipo === "alerta" ? "alerta" : "impacto") : c.tipo === "alerta" ? "alerta" : "tarjeta");
-  if (!foto && plantilla !== "alerta") plantilla = "tarjeta";
+  // 2026-10-31: TODAS las postales de notas salen en el estilo "impacto" (foto
+  // completa, etiqueta roja y lugar resaltado), también las alertas. Sin foto
+  // oficial se usa una foto de archivo del tema o del lugar, sin difuminar.
+  let plantilla: Plantilla = n.plantilla ?? "impacto";
+  if (plantilla === "impacto" && !foto) {
+    const candidatos = [
+      await fotoDelTema(n.titulo, n.resumen ?? "").catch(() => null),
+      fotoDeArchivo(n.titulo, ""),
+      fotoFondo(n.titulo, n.resumen ?? "", c.etiqueta, CATEGORY_IMAGES, n.categoria),
+    ].filter(Boolean) as { url: string; credito: string }[];
+    for (const f of candidatos) {
+      foto = await imagenComoDataUri(f.url);
+      if (foto) {
+        credito = f.credito.replace(/^Foto de archivo/i, "Foto de archivo");
+        break;
+      }
+    }
+    // Sin ninguna foto disponible, la postal tipográfica de siempre.
+    if (!foto) plantilla = c.tipo === "alerta" ? "alerta" : "tarjeta";
+  }
+  if (!foto && plantilla === "foto") plantilla = "tarjeta";
 
   // Sin foto propia: foto de ARCHIVO de lo que trata la nota (si es un choque,
   // un choque; si es San Pancho, San Pancho), un poco difuminada de fondo.
