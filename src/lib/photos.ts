@@ -52,7 +52,8 @@ export const PHOTOS = {
   costaSur: commons("e/e2", "Beach in Puerto Vallarta.jpg"),
   playaMuertos: commons("a/a7", "Playa de Los Muertos.jpg"),
   // Ilustrativas para notas de seguridad (2026-10-31): sin víctimas ni personas identificables.
-  ilusPatrulla: commons("f/f0", "Policía Municipal de Progreso Yucatán Chrysler 300.jpg"),
+  // Original de 1000 px (no hay miniatura de 1280): se usa el archivo completo.
+  ilusPatrulla: "https://upload.wikimedia.org/wikipedia/commons/a/a9/15-02-2011_M%C3%A1s_patrullas_de_Guadalajara.jpg",
   ilusCinta: commons("a/ad", "Police Line Do Not Cross (42422022254).jpg"),
   ilusAmbulancia: commons("7/7d", "Ambulancia de la Cruz Roja Mexicana.jpg"),
   ilusVeladoras: commons("1/14", "Candle Light Vigil For Lost Lives (3425514019).jpg"),
@@ -99,7 +100,7 @@ export const PHOTO_CREDITS: Partial<Record<PhotoKey, string>> = {
   vistaAerea: "Atilin · dominio público",
   costaSur: "Michael Condouris · CC BY 2.0",
   playaMuertos: "Melikamp · CC BY-SA 3.0",
-  ilusPatrulla: "J. Magno · CC BY-SA 2.0",
+  ilusPatrulla: "Aristóteles Sandoval · CC BY-SA 2.0",
   ilusCinta: "Tony Webster · CC BY 2.0",
   ilusAmbulancia: "ProtoplasmaKid · CC BY-SA 4.0",
   ilusVeladoras: "Kaz Andrew · CC BY-SA 2.0",
