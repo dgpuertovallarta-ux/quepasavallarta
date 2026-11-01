@@ -80,3 +80,28 @@ export function fotoFondo(titulo: string, resumen: string, etiqueta: string, cat
   const autor = PHOTO_CREDITS[clave];
   return { url: PHOTOS[clave], credito: `Fondo: foto de archivo${autor ? ` · ${autor}` : ""}`, clave };
 }
+
+/**
+ * Imagen ILUSTRATIVA para notas de seguridad, accidentes y desapariciones
+ * (2026-10-31, pedido del propietario): tiene que ver con lo que dice el
+ * titular, pero nunca muestra víctimas ni personas identificables. Se marca
+ * "Imagen ilustrativa". En temas de menores, abuso o suicidio no hay imagen.
+ */
+const ILUSTRATIVAS: { re: RegExp; foto: PhotoKey }[] = [
+  { re: /desaparec|desaparici|b[uú]squeda|ficha de|paradero|localizar a|familiares (exigen|piden|marchan)/i, foto: "ilusVeladoras" },
+  { re: /incendio|se incendia|incendi[oó]|quema|llamas|bomberos/i, foto: "ilusBomberos" },
+  { re: /accidente|choque|chocan?|volcadura|vuelca|atropell|lesionad|herid|ambulancia|cruz roja/i, foto: "ilusAmbulancia" },
+  { re: /homicid|asesin|sin vida|cad[aá]ver|restos|balace|dispar|baleado|ejecut|fosa|hallazgo/i, foto: "ilusCinta" },
+  { re: /guardia nacional|ej[eé]rcito|militar|marina armada|operativo|cateo|despliegue/i, foto: "ilusGuardia" },
+  { re: /detien|detenid|captur|arrest|robo|rob[aó]|asalt|polic[ií]a|patrulla|seguridad|fiscal/i, foto: "ilusPatrulla" },
+];
+const SIN_ILUSTRATIVA = /menor de edad|\bmenor(es)?\b|niñ[oa]s?|adolescente|abuso|violaci|suicid|feminicid/i;
+
+export function fotoIlustrativaDelicada(titulo: string, resumen = ""): FotoArchivo | null {
+  const t = `${titulo} ${resumen}`;
+  if (SIN_ILUSTRATIVA.test(t)) return null;
+  const regla = ILUSTRATIVAS.find((r) => r.re.test(titulo)) ?? ILUSTRATIVAS.find((r) => r.re.test(t));
+  if (!regla) return null;
+  const autor = PHOTO_CREDITS[regla.foto];
+  return { url: PHOTOS[regla.foto], credito: `Imagen ilustrativa${autor ? ` · ${autor}` : ""}`, clave: regla.foto };
+}

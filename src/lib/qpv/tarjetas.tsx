@@ -16,7 +16,7 @@ import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial 
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
-import { fotoFondo, fotoDeArchivo } from "./fotoArchivo";
+import { fotoFondo, fotoDeArchivo, fotoIlustrativaDelicada } from "./fotoArchivo";
 import { fotoDelTema } from "./fotoTema";
 import { titularEnIngles } from "./traducir";
 import { llevaIngles } from "../social/publishToSocial";
@@ -139,7 +139,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     // En nota roja, desapariciones o víctimas: ninguna foto de archivo.
     const delicada = c.tipo === "seguridad" || c.tipo === "accidente" || c.requiereRevision || DELICADA.test(`${n.titulo} ${n.resumen ?? ""}`);
     const candidatos = delicada
-      ? []
+      ? ([fotoIlustrativaDelicada(n.titulo, n.resumen ?? "")].filter(Boolean) as { url: string; credito: string }[])
       : ([await fotoDelTema(n.titulo, n.resumen ?? "").catch(() => null), fotoDeArchivo(n.titulo, "")].filter(Boolean) as { url: string; credito: string }[]);
     for (const f of candidatos) {
       foto = await imagenComoDataUri(f.url);
