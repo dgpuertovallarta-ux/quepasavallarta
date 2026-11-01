@@ -350,7 +350,12 @@ export function Tarjeta(d: DatosTarjeta) {
     const rojo = COLORES.red;
     return (
       <div style={base}>
-        {d.foto && <img src={d.foto} width={ANCHO} height={ALTO} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, objectFit: "cover" }} />}
+        {d.foto ? (
+          <img src={d.foto} width={ANCHO} height={ALTO} style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, objectFit: "cover" }} />
+        ) : (
+          // Sin foto que corresponda a la nota: fondo oscuro liso con un brillo rojo tenue.
+          <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, display: "flex", background: "#0B1626", backgroundImage: "radial-gradient(circle at 85% 18%, rgba(215,38,46,0.28), rgba(11,22,38,0) 55%), radial-gradient(circle at 10% 95%, rgba(20,184,176,0.14), rgba(11,22,38,0) 50%)" }} />
+        )}
         <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: 260, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(6,16,32,0.7), rgba(6,16,32,0))" }} />
         <div style={{ position: "absolute", left: 0, top: 0, width: ANCHO, height: ALTO, display: "flex", backgroundImage: "linear-gradient(180deg, rgba(6,16,32,0) 32%, rgba(6,16,32,0.78) 56%, rgba(6,16,32,0.97) 78%, #061020 100%)" }} />
         <div style={{ position: "absolute", left: 0, top: 0, width: 16, height: ALTO, display: "flex", background: rojo }} />

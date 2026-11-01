@@ -115,6 +115,8 @@ export type NotaTarjeta = {
   plantilla?: Plantilla;
 };
 
+const DELICADA = /\b(desaparec|desaparici|b[uú]squeda de|ficha de b[uú]squeda|privaci[oó]n de la libertad|secuestr|v[ií]ctima|sin vida|cad[aá]ver|fosa|homicid|asesin|feminicid|violaci|abuso|menor de edad|lesionad|herid|muert|falleci)/i;
+
 export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   const c = clasificar(n.titulo);
   const credOficial = creditoOficial(n.urlFuente) ?? creditoOficial(n.fotoFuente);
@@ -131,11 +133,14 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   // oficial se usa una foto de archivo del tema o del lugar, sin difuminar.
   let plantilla: Plantilla = n.plantilla ?? "impacto";
   if (plantilla === "impacto" && !foto) {
-    const candidatos = [
-      await fotoDelTema(n.titulo, n.resumen ?? "").catch(() => null),
-      fotoDeArchivo(n.titulo, ""),
-      fotoFondo(n.titulo, n.resumen ?? "", c.etiqueta, CATEGORY_IMAGES, n.categoria),
-    ].filter(Boolean) as { url: string; credito: string }[];
+    // Solo una foto que tenga que ver con la nota: la del tema (búsqueda en
+    // Wikimedia) o la de archivo del lugar/tema del titular. Nunca la foto
+    // genérica de la sección (salía un delfín en una nota de desaparecidos).
+    // En nota roja, desapariciones o víctimas: ninguna foto de archivo.
+    const delicada = c.tipo === "seguridad" || c.tipo === "accidente" || c.requiereRevision || DELICADA.test(`${n.titulo} ${n.resumen ?? ""}`);
+    const candidatos = delicada
+      ? []
+      : ([await fotoDelTema(n.titulo, n.resumen ?? "").catch(() => null), fotoDeArchivo(n.titulo, "")].filter(Boolean) as { url: string; credito: string }[]);
     for (const f of candidatos) {
       foto = await imagenComoDataUri(f.url);
       if (foto) {
@@ -143,8 +148,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
         break;
       }
     }
-    // Sin ninguna foto disponible, la postal tipográfica de siempre.
-    if (!foto) plantilla = c.tipo === "alerta" ? "alerta" : "tarjeta";
+    // Sin foto que corresponda: misma postal "impacto" con fondo oscuro liso.
   }
   if (!foto && plantilla === "foto") plantilla = "tarjeta";
 
