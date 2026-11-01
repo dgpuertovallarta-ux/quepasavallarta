@@ -143,6 +143,26 @@ async function main() {
     log(JSON.stringify(await wp("/qpv/v1/estado")));
     return;
   }
+  // republicar <slug o inicio del slug>: vuelve a mandar una nota publicada a Facebook con la postal actual (2026-10-31).
+  if (orden === "republicar") {
+    if (!arg) throw new Error("Falta el slug de la nota.");
+    const { getPublishedArticles } = await import("../../src/lib/db/articles");
+    const { crearTarjeta } = await import("../../src/lib/qpv/tarjetas");
+    const { publishToSocial } = await import("../../src/lib/social/publishToSocial");
+    const { creditoOficial } = await import("../../src/lib/qpv/oficiales");
+    const { siteUrl } = await import("../../src/lib/storage/imageBlobs");
+    const a = (await getPublishedArticles(80)).find((x) => x.slug === arg || x.slug.startsWith(arg));
+    if (!a) throw new Error(`No encontré una nota publicada con el slug "${arg}".`);
+    const fuente = a.sources[0]?.url;
+    const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));
+    const card = await crearTarjeta({ titulo: a.title, categoria: a.category, clave: a.slug, urlFuente: fuente, resumen: a.dek, fotoFuente: oficial ? a.imageUrl : undefined, creditoFoto: oficial ? a.imageCredit : undefined });
+    if (!card) throw new Error("No se pudo armar la postal.");
+    log("postal:", card);
+    const r = await publishToSocial({ title: a.title, excerpt: a.dek, articleUrl: `${siteUrl()}/noticia/${a.slug}`, imageUrl: card });
+    log("republicada:", a.title, JSON.stringify(r));
+    if (!r.facebook.ok) throw new Error(`Facebook: ${r.facebook.error}`);
+    return;
+  }
   if (orden === "vigilar") {
     const fin = Date.now() + Number(arg || 340) * 60_000;
     while (Date.now() < fin) {
