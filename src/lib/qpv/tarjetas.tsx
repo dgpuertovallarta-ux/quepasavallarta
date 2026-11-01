@@ -139,7 +139,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
     for (const f of candidatos) {
       foto = await imagenComoDataUri(f.url);
       if (foto) {
-        credito = f.credito.replace(/^Foto de archivo/i, "Foto de archivo");
+        credito = f.credito.replace(/^(Fondo:\s*)?foto de archivo/i, "Foto de archivo");
         break;
       }
     }
