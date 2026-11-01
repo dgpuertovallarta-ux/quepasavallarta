@@ -100,8 +100,15 @@ fecha de consulta, nivel de confianza). No mezcles datos de fuentes
 distintas sin dejar claro cuál dijo qué si hay discrepancia entre ellas.
 `.trim();
 
+/** Fecha y hora en Puerto Vallarta (2026-10-31: en UTC las notas de la noche decían "mañana"). */
+function fechaLocal(iso?: string | null): string {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return iso || "no disponible";
+  return d.toLocaleString("es-MX", { timeZone: "America/Mexico_City", weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " (hora de Puerto Vallarta)";
+}
+
 function buildSourceBlocks(story: Story): string {
-  const now = new Date().toISOString();
+  const now = fechaLocal();
   return story.items
     .map((it, idx) =>
       [
@@ -109,7 +116,7 @@ function buildSourceBlocks(story: Story): string {
         `- Nombre: ${it.sourceName}`,
         `- Nivel de confianza: ${it.trustLevel}`,
         `- URL original: ${it.link}`,
-        `- Fecha de publicación de la fuente: ${it.publishedAt || "no disponible"}`,
+        `- Fecha de publicación de la fuente: ${it.publishedAt ? fechaLocal(it.publishedAt) : "no disponible"}`,
         `- Fecha de consulta: ${now}`,
         `- Titular de la fuente (NO copiar, solo referencia de contexto): ${it.title}`,
         `- Extracto/resumen consultado: ${it.excerpt || "(sin extracto disponible)"}`,
@@ -126,6 +133,7 @@ function buildSourceBlocks(story: Story): string {
 export function buildEditorialUserPrompt(story: Story): string {
   return [
     `STORY ID: ${story.storyId}`,
+    `HOY ES: ${fechaLocal()}. Usa siempre la fecha de Puerto Vallarta al mencionar "hoy" o el día del hecho.`,
     `Fuentes que cubren este evento: ${story.sourceCount} (niveles: ${story.levels.join(", ")})`,
     story.hasCorroboration
       ? "Corroboración: SÍ hay al menos una fuente NIVEL A o B — se puede redactar."
