@@ -19,6 +19,10 @@ async function main() {
     const r = await wp<{ status: string; title: { rendered: string } }>(`/wp/v2/posts/${id}`, { method: "POST", json: { status: "draft" } }).catch((e) => ({ status: "error " + String(e).slice(0, 80), title: { rendered: "" } }));
     console.log(`a borrador ${id}: ${r.status} · ${limpio(r.title.rendered).slice(0, 70)}`);
   }
+  for (const id of (process.env.PUBLICAR_IDS || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+    const r = await wp<{ status: string; title: { rendered: string } }>(`/wp/v2/posts/${id}`, { method: "POST", json: { status: "publish" } }).catch((e) => ({ status: "error " + String(e).slice(0, 80), title: { rendered: "" } }));
+    console.log(`publicada de nuevo ${id}: ${r.status} · ${limpio(r.title.rendered).slice(0, 70)}`);
+  }
   const tipos = (process.env.RELLENAR_TIPOS || "explica,comunidad,cultura").split(",").map((x) => x.trim()).filter(Boolean);
   const max = Number(process.env.RELLENAR_MAX || 300);
   const cats = new Map(((await wp<{ id: number; slug: string }[]>("/wp/v2/categories?per_page=100&_fields=id,slug")) ?? []).map((c) => [c.slug, c.id]));

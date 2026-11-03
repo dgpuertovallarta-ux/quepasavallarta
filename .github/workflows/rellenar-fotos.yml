@@ -7,6 +7,7 @@ on:
       tipos: { description: "Secciones (todas, comunidad, seguridad… separadas por coma)", default: "todas" }
       maximo: { description: "Máximo de notas a arreglar", default: "80" }
       quitar: { description: "IDs a pasar a borrador (separados por coma)", required: false, default: "" }
+      publicar: { description: "IDs a volver a publicar (separados por coma)", required: false, default: "" }
 
 permissions:
   contents: read
@@ -24,6 +25,7 @@ jobs:
       RELLENAR_TIPOS: ${{ inputs.tipos }}
       RELLENAR_MAX: ${{ inputs.maximo }}
       QUITAR_IDS: ${{ inputs.quitar }}
+      PUBLICAR_IDS: ${{ inputs.publicar }}
       TZ: America/Mexico_City
     steps:
       - uses: actions/checkout@v5

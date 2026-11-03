@@ -48,7 +48,7 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
     }
   }
 
-  const eligible = stories.filter((x) => isAutoPublishEligible(x) && (isLocalStory(x) || process.env.QPV_SOLO_LOCAL === "0"));
+  const eligible = stories.filter((x) => isAutoPublishEligible(x) && (isLocalStory(x) || process.env.QPV_SOLO_LOCAL !== "1"));
 
   for (const story of eligible) {
     if (outOfTime()) break;

@@ -315,6 +315,8 @@ async function reabastecer(yaEnCola: Set<string>): Promise<ItemRedes | null> {
       resumen: a.dek,
       fotoFuente: oficial ? a.imageUrl : archivo?.url,
       creditoFoto: oficial ? a.imageCredit : archivo?.credito,
+      fotoRespaldo: a.imageUrl,
+      creditoRespaldo: a.imageCredit,
     });
     const articleUrl = `${siteUrl()}/noticia/${a.slug}`;
     if (!cardUrl) {

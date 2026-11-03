@@ -99,6 +99,9 @@ export type NotaTarjeta = {
   clave: string;
   /** Foto real de la nota (la de su fuente, ya guardada en el sitio). */
   fotoFuente?: string;
+  /** Última opción si no hay foto que corresponda: la foto de la nota en el sitio (de la fuente, con crédito). */
+  fotoRespaldo?: string;
+  creditoRespaldo?: string;
   /** Crédito de esa foto ("Ayuntamiento de PV", nombre del medio…). */
   creditoFoto?: string;
   urlFuente?: string;
@@ -161,6 +164,8 @@ async function fotoPropiaDeMedios(tema: string): Promise<{ url: string; credito:
  *    archivo del lugar del titular → imagen ilustrativa si el tema la tiene.
  *  - Nunca la foto genérica de la sección (salía un delfín en desaparecidos).
  */
+const LOCAL = /vallarta|pitillal|ixtapa|las juntas|mismaloya|zona rom[aá]ntica|coapinole|mojoneras|r[ií]o cuale|bah[ií]a de banderas|bucer[ií]as|sayulita|punta de? mita|san pancho|nuevo vallarta|valle de banderas|mezcales|jarretaderas|cabo corrientes|el tuito|yelapa|seapal|oromapas/i;
+
 export async function fotosQueCorresponden(titulo: string, resumen = ""): Promise<{ url: string; credito: string }[]> {
   const c = clasificar(titulo, resumen);
   const delicada = c.tipo === "seguridad" || c.tipo === "accidente" || c.requiereRevision || DELICADA.test(`${titulo} ${resumen}`);
@@ -176,7 +181,8 @@ export async function fotosQueCorresponden(titulo: string, resumen = ""): Promis
         fotoDeTemaFijo(titulo, resumen),
         ilustrativa,
         await fotoDelTema(titulo, resumen).catch(() => null),
-        fotoDelLugar(titulo, resumen),
+        // La vista de Vallarta o la bahía solo si la nota es de aquí (no en notas de otros países).
+        LOCAL.test(`${titulo} ${resumen}`) ? fotoDelLugar(titulo, resumen) : null,
       ];
   return lista.filter(Boolean) as { url: string; credito: string }[];
 }
@@ -205,7 +211,13 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
         break;
       }
     }
-    // Sin foto que corresponda: misma postal "impacto" con fondo oscuro liso.
+    // 2026-11-02 (pedido del propietario: "solo que tengan foto"): si nada corresponde,
+    // la foto de la nota en el sitio, con el crédito del medio.
+    if (!foto && n.fotoRespaldo) {
+      foto = await imagenComoDataUri(n.fotoRespaldo);
+      if (foto) credito = `Foto: ${n.creditoRespaldo || "fuente original"}`;
+    }
+    // Sin ninguna foto: misma postal "impacto" con fondo oscuro liso.
   }
   if (!foto && plantilla === "foto") plantilla = "tarjeta";
 

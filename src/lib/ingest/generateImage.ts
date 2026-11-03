@@ -316,6 +316,8 @@ export async function generateArticleImage(input: {
     urlFuente: input.sourceUrl,
     resumen: input.excerpt,
     patrocinio: input.patrocinio ?? null,
+    fotoRespaldo: url,
+    creditoRespaldo: credit,
   });
 
   if (!url && !cardUrl) return null;

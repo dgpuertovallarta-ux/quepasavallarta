@@ -167,7 +167,7 @@ async function main() {
     if (!a) throw new Error(`No encontré una nota publicada con el slug "${arg}".`);
     const fuente = a.sources[0]?.url;
     const oficial = a.imageUrl && (creditoOficial(fuente) || /^(denuncia|reporte) ciudadan[oa]/i.test(a.imageCredit ?? ""));
-    const card = await crearTarjeta({ titulo: a.title, categoria: a.category, clave: a.slug, urlFuente: fuente, resumen: a.dek, fotoFuente: oficial ? a.imageUrl : undefined, creditoFoto: oficial ? a.imageCredit : undefined });
+    const card = await crearTarjeta({ titulo: a.title, categoria: a.category, clave: a.slug, urlFuente: fuente, resumen: a.dek, fotoFuente: oficial ? a.imageUrl : undefined, creditoFoto: oficial ? a.imageCredit : undefined, fotoRespaldo: a.imageUrl, creditoRespaldo: a.imageCredit });
     if (!card) throw new Error("No se pudo armar la postal.");
     log("postal:", card);
     const r = await publishToSocial({ title: a.title, excerpt: a.dek, articleUrl: `${siteUrl()}/noticia/${a.slug}`, imageUrl: card });

@@ -6,7 +6,7 @@ import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles, publishArticle, DuplicateArticleError, type RecentTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { usaWordPress } from "../wp/cliente";
-import { sortByEditorialFocus, isOffTopicStory, isLocalStory, isOfficialBulletinStory } from "./localFocus";
+import { sortByEditorialFocus, isLocalStory, isOfficialBulletinStory } from "./localFocus";
 import { loadSkips, saveSkips } from "./skipMemory";
 import { encolarRedes } from "../qpv/colaRedes";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
@@ -87,9 +87,8 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
     stories.filter(
       (s) =>
         (isAutoPublishEligible(s) || isHumanReviewEligible(s) || mencionaExpress(textoHistoria(s))) &&
-        !isOffTopicStory(s) &&
-        // 2026-11-02: solo notas de Vallarta y la bahía (se colaban Tucker Carlson, Galápagos, Oaxaca…).
-        (isLocalStory(s) || isOfficialBulletinStory(s) || process.env.QPV_SOLO_LOCAL === "0")
+        // 2026-11-02: el propietario acepta nacionales/internacionales (solo que lleven foto); QPV_SOLO_LOCAL=1 deja solo Vallarta y la bahía.
+        (isLocalStory(s) || isOfficialBulletinStory(s) || process.env.QPV_SOLO_LOCAL !== "1")
     )
   ).sort((a, b) => Number(mencionaExpress(textoHistoria(b))) - Number(mencionaExpress(textoHistoria(a))));
 
