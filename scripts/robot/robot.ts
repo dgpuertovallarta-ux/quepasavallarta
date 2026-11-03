@@ -144,6 +144,18 @@ async function main() {
     return;
   }
   // republicar <slug o inicio del slug>: vuelve a mandar una nota publicada a Facebook con la postal actual (2026-10-31).
+  // republicar LISTAR: muestra lo que salió hoy a Facebook (para saber qué volver a publicar).
+  if (orden === "republicar" && arg === "LISTAR") {
+    const s = getStore({ name: "qpv-cola-redes", consistency: "strong" });
+    const { blobs } = await s.list({ prefix: "item/" });
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    const xs = (await Promise.all(blobs.map((b) => s.get(b.key, { type: "json" }) as Promise<{ title: string; articleUrl: string; imageUrl?: string; estado: string; publicadaEn?: string; resultado?: string } | null>)))
+      .filter((x): x is NonNullable<typeof x> => !!x && x.estado === "publicada" && !!x.publicadaEn && new Date(x.publicadaEn).toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }) === hoy)
+      .sort((a, b) => a.publicadaEn!.localeCompare(b.publicadaEn!));
+    for (const x of xs) log("fb-hoy:", new Date(x.publicadaEn!).toLocaleTimeString("es-MX", { timeZone: "America/Mexico_City", hour12: false }), "|", x.articleUrl.split("/").filter(Boolean).pop(), "|", (x.imageUrl || "").split("/").pop(), "|", x.title.slice(0, 80));
+    log(`fb-hoy total: ${xs.length}`);
+    return;
+  }
   if (orden === "republicar") {
     if (!arg) throw new Error("Falta el slug de la nota.");
     const { getPublishedArticles } = await import("../../src/lib/db/articles");
