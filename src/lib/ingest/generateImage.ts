@@ -3,7 +3,7 @@ import { saveImageBlob } from "../storage/imageBlobs";
 import { extractOgImage } from "./extractImage";
 import { fotoDeFuente } from "../qpv/fotoFuente";
 import { fotoDeArchivo } from "../qpv/fotoArchivo";
-import { crearTarjeta } from "../qpv/tarjetas";
+import { crearTarjeta, fotosQueCorresponden } from "../qpv/tarjetas";
 
 const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
 
@@ -296,8 +296,11 @@ export async function generateArticleImage(input: {
   // SITIO: foto real de la fuente (oficial o medio, con crédito); si no hay, foto de archivo.
   const foto = await fotoDeFuente(input.sourceUrl, input.sourceName);
   const archivo = fotoDeArchivo(input.title, input.excerpt);
-  const url = foto?.url ?? archivo?.url;
-  const credit = foto?.credito ?? archivo?.credito;
+  // 2026-11-02: sin foto de la fuente ni de archivo, una que corresponda al tema
+  // (ilustrativa de seguridad, foto propia de Medios o foto del tema) en vez de dejar la nota sin imagen.
+  const tema = foto || archivo ? null : (await fotosQueCorresponden(input.title, input.excerpt).catch(() => []))[0] ?? null;
+  const url = foto?.url ?? archivo?.url ?? tema?.url;
+  const credit = foto?.credito ?? archivo?.credito ?? tema?.credito;
   // FACEBOOK: nunca la foto de otro medio (se veía que copiábamos a Noticias PV):
   // foto oficial, o si no, la de archivo del lugar/tema. Sin ninguna, no sale a redes.
   const fotoRedes = foto?.oficial ? { url: foto.url, credito: foto.credito } : archivo ? { url: archivo.url, credito: archivo.credito } : null;
@@ -316,5 +319,5 @@ export async function generateArticleImage(input: {
   });
 
   if (!url && !cardUrl) return null;
-  return { url, cardUrl: cardUrl ?? undefined, fotoRedes: fotoRedes?.url, creditoRedes: fotoRedes?.credito, credit, licenseStatus: foto ? "source_unlicensed" : archivo ? "illustrative_fallback" : undefined, model: "qpv-tarjeta" };
+  return { url, cardUrl: cardUrl ?? undefined, fotoRedes: fotoRedes?.url, creditoRedes: fotoRedes?.credito, credit, licenseStatus: foto ? "source_unlicensed" : archivo || tema ? "illustrative_fallback" : undefined, model: "qpv-tarjeta" };
 }

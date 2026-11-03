@@ -8,13 +8,17 @@
  */
 import { wp } from "../../src/lib/wp/cliente";
 import { fotoDeFuente } from "../../src/lib/qpv/fotoFuente";
-import { fotoDelTema } from "../../src/lib/qpv/fotoTema";
-import { fotoDeArchivo } from "../../src/lib/qpv/fotoArchivo";
+import { fotosQueCorresponden } from "../../src/lib/qpv/tarjetas";
 
 type Post = { id: number; slug: string; title: { rendered: string }; excerpt: { rendered: string }; meta: Record<string, string> };
 const limpio = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&#8217;|&#039;/g, "'").replace(/&#822[01];|&quot;/g, '"').replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&[a-z#0-9]+;/g, "").replace(/\s+/g, " ").trim();
 
 async function main() {
+  // QUITAR_IDS="123,456": pasa esas notas a borrador (fuera de tema). No las borra.
+  for (const id of (process.env.QUITAR_IDS || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+    const r = await wp<{ status: string; title: { rendered: string } }>(`/wp/v2/posts/${id}`, { method: "POST", json: { status: "draft" } }).catch((e) => ({ status: "error " + String(e).slice(0, 80), title: { rendered: "" } }));
+    console.log(`a borrador ${id}: ${r.status} · ${limpio(r.title.rendered).slice(0, 70)}`);
+  }
   const tipos = (process.env.RELLENAR_TIPOS || "explica,comunidad,cultura").split(",").map((x) => x.trim()).filter(Boolean);
   const max = Number(process.env.RELLENAR_MAX || 300);
   const cats = new Map(((await wp<{ id: number; slug: string }[]>("/wp/v2/categories?per_page=100&_fields=id,slug")) ?? []).map((c) => [c.slug, c.id]));
@@ -37,12 +41,9 @@ async function main() {
           if (f) { url = f.url; credito = f.credito; }
         }
         if (!url) {
-          const f = await fotoDelTema(titulo, resumen).catch(() => null);
+          // 2026-11-02: la misma regla que las postales (foto que corresponda; ilustrativa en nota roja).
+          const f = (await fotosQueCorresponden(titulo, resumen).catch(() => []))[0];
           if (f) { url = f.url; credito = f.credito; }
-        }
-        if (!url) {
-          const a = fotoDeArchivo(titulo, resumen, p.slug);
-          if (a) { url = a.url; credito = a.credito; }
         }
         if (!url) { sinFoto++; continue; }
         await wp(`/wp/v2/${ruta}/${p.id}`, { method: "POST", json: { meta: { qpv_image_url: url, qpv_image_credit: credito } } });

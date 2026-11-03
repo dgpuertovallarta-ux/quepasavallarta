@@ -16,7 +16,7 @@ import { ReporteVial, ResumenVial, type DatosReporteVial, type DatosResumenVial 
 import { clasificar } from "./clasificar";
 import { creditoOficial } from "./oficiales";
 import { saveImageBlob, siteUrl } from "../storage/imageBlobs";
-import { fotoFondo, fotoDeArchivo, fotoIlustrativaDelicada, temaIlustrativo } from "./fotoArchivo";
+import { fotoFondo, fotoDeArchivo, fotoIlustrativaDelicada, temaIlustrativo, fotoDeTemaFijo, fotoDelLugar } from "./fotoArchivo";
 import { usaWordPress, wp } from "../wp/cliente";
 import { fotoDelTema } from "./fotoTema";
 import { titularEnIngles } from "./traducir";
@@ -151,6 +151,36 @@ async function fotoPropiaDeMedios(tema: string): Promise<{ url: string; credito:
   }
 }
 
+/**
+ * Fotos que SÍ tienen que ver con la nota, en orden de preferencia (2026-11-02).
+ * Sirve para la postal de Facebook y para la foto de la nota en el sitio.
+ *  - Nota roja, accidentes, desapariciones: foto propia de Medios del tema
+ *    (qpv-ilustrativa-…) o imagen ilustrativa del banco (patrulla de Vallarta,
+ *    ambulancia, bomberos, veladoras…). Nunca una foto de archivo bonita.
+ *  - Lo demás: foto propia del tema → foto del tema (IA + Wikimedia) → foto de
+ *    archivo del lugar del titular → imagen ilustrativa si el tema la tiene.
+ *  - Nunca la foto genérica de la sección (salía un delfín en desaparecidos).
+ */
+export async function fotosQueCorresponden(titulo: string, resumen = ""): Promise<{ url: string; credito: string }[]> {
+  const c = clasificar(titulo, resumen);
+  const delicada = c.tipo === "seguridad" || c.tipo === "accidente" || c.requiereRevision || DELICADA.test(`${titulo} ${resumen}`);
+  const tema = temaIlustrativo(titulo, resumen);
+  const propia = tema ? await fotoPropiaDeMedios(tema) : null;
+  const ilustrativa = fotoIlustrativaDelicada(titulo, resumen);
+  // 2026-11-02: primero lo que no depende de la IA (sin cuota de Gemini salían postales sin foto).
+  const lista = delicada
+    ? [propia, ilustrativa, fotoDeTemaFijo(titulo, resumen, true)]
+    : [
+        propia,
+        fotoDeArchivo(titulo, ""),
+        fotoDeTemaFijo(titulo, resumen),
+        ilustrativa,
+        await fotoDelTema(titulo, resumen).catch(() => null),
+        fotoDelLugar(titulo, resumen),
+      ];
+  return lista.filter(Boolean) as { url: string; credito: string }[];
+}
+
 export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   const c = clasificar(n.titulo);
   const credOficial = creditoOficial(n.urlFuente) ?? creditoOficial(n.fotoFuente);
@@ -167,19 +197,7 @@ export async function datosTarjeta(n: NotaTarjeta): Promise<DatosTarjeta> {
   // oficial se usa una foto de archivo del tema o del lugar, sin difuminar.
   let plantilla: Plantilla = n.plantilla ?? "impacto";
   if (plantilla === "impacto" && !foto) {
-    // Solo una foto que tenga que ver con la nota: la del tema (búsqueda en
-    // Wikimedia) o la de archivo del lugar/tema del titular. Nunca la foto
-    // genérica de la sección (salía un delfín en una nota de desaparecidos).
-    // En nota roja, desapariciones o víctimas: ninguna foto de archivo.
-    const delicada = c.tipo === "seguridad" || c.tipo === "accidente" || c.requiereRevision || DELICADA.test(`${n.titulo} ${n.resumen ?? ""}`);
-    // Fotos propias subidas a Medios de WordPress ("qpv-ilustrativa-policia-1"…), antes que el banco genérico.
-    const tema = temaIlustrativo(n.titulo, n.resumen ?? "");
-    const propia = tema && (delicada || tema === "proteccion-civil" || tema === "bomberos") ? await fotoPropiaDeMedios(tema) : null;
-    const candidatos = propia
-      ? [propia]
-      : delicada
-      ? ([fotoIlustrativaDelicada(n.titulo, n.resumen ?? "")].filter(Boolean) as { url: string; credito: string }[])
-      : ([await fotoDelTema(n.titulo, n.resumen ?? "").catch(() => null), fotoDeArchivo(n.titulo, "")].filter(Boolean) as { url: string; credito: string }[]);
+    const candidatos = await fotosQueCorresponden(n.titulo, n.resumen ?? "");
     for (const f of candidatos) {
       foto = await imagenComoDataUri(f.url);
       if (foto) {

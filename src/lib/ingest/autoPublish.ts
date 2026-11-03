@@ -6,7 +6,7 @@ import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles, publishArticle, DuplicateArticleError, type RecentTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { usaWordPress } from "../wp/cliente";
-import { sortByEditorialFocus, isOffTopicStory, isOfficialBulletinStory } from "./localFocus";
+import { sortByEditorialFocus, isOffTopicStory, isLocalStory, isOfficialBulletinStory } from "./localFocus";
 import { loadSkips, saveSkips } from "./skipMemory";
 import { encolarRedes } from "../qpv/colaRedes";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
@@ -84,7 +84,13 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
   // aunque solo las reporte una fuente y van al principio de la fila.
   const textoHistoria = (s: Story) => s.items.map((i) => `${i.title} ${i.excerpt}`).join(" ");
   const candidates = sortByEditorialFocus(
-    stories.filter((s) => (isAutoPublishEligible(s) || isHumanReviewEligible(s) || mencionaExpress(textoHistoria(s))) && !isOffTopicStory(s))
+    stories.filter(
+      (s) =>
+        (isAutoPublishEligible(s) || isHumanReviewEligible(s) || mencionaExpress(textoHistoria(s))) &&
+        !isOffTopicStory(s) &&
+        // 2026-11-02: solo notas de Vallarta y la bahía (se colaban Tucker Carlson, Galápagos, Oaxaca…).
+        (isLocalStory(s) || isOfficialBulletinStory(s) || process.env.QPV_SOLO_LOCAL === "0")
+    )
   ).sort((a, b) => Number(mencionaExpress(textoHistoria(b))) - Number(mencionaExpress(textoHistoria(a))));
 
   // Se recorre la lista hasta publicar o enviar a revisión una nota. Las historias ya

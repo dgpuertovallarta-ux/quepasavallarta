@@ -1,0 +1,33 @@
+# Pone foto que corresponda a las notas que no tienen, y opcionalmente pasa a borrador notas fuera de tema (2026-11-02).
+name: Rellenar fotos de notas
+
+on:
+  workflow_dispatch:
+    inputs:
+      tipos: { description: "Secciones (todas, comunidad, seguridad… separadas por coma)", default: "todas" }
+      maximo: { description: "Máximo de notas a arreglar", default: "80" }
+      quitar: { description: "IDs a pasar a borrador (separados por coma)", required: false, default: "" }
+
+permissions:
+  contents: read
+
+jobs:
+  rellenar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USER: ${{ secrets.WP_USER }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      QPV_SITE_URL: https://quepasavta.com
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      RELLENAR_TIPOS: ${{ inputs.tipos }}
+      RELLENAR_MAX: ${{ inputs.maximo }}
+      QUITAR_IDS: ${{ inputs.quitar }}
+      TZ: America/Mexico_City
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsx scripts/robot/rellenar-fotos.ts

@@ -1,3 +1,4 @@
+import { isLocalStory } from "./localFocus";
 import type { Story } from "./storyGraph";
 import { isAutoPublishEligible } from "./storyGraph";
 import { generateExplainerDraft, isAiConfigured } from "./generateArticle";
@@ -47,7 +48,7 @@ export async function runExplicaPublish(stories: Story[], options: { startBefore
     }
   }
 
-  const eligible = stories.filter(isAutoPublishEligible);
+  const eligible = stories.filter((x) => isAutoPublishEligible(x) && (isLocalStory(x) || process.env.QPV_SOLO_LOCAL === "0"));
 
   for (const story of eligible) {
     if (outOfTime()) break;

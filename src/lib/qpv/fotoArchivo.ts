@@ -89,8 +89,8 @@ export function fotoFondo(titulo: string, resumen: string, etiqueta: string, cat
  */
 const ILUSTRATIVAS: { re: RegExp; foto: PhotoKey; tema: string }[] = [
   { re: /desaparec|desaparici|b[uú]squeda|ficha de|paradero|localizar a|familiares (exigen|piden|marchan)/i, foto: "ilusVeladoras", tema: "busqueda" },
-  { re: /incendio|se incendia|incendi[oó]|quema|llamas|bomberos/i, foto: "ilusBomberos", tema: "bomberos" },
-  { re: /accidente|choque|chocan?|volcadura|vuelca|atropell|lesionad|herid|ambulancia|cruz roja/i, foto: "ilusAmbulancia", tema: "ambulancia" },
+  { re: /incendio|se incendia|incendi[oó]|quema|llamas|bomberos|ardi[oó]|fuego|humo/i, foto: "ilusBomberos", tema: "bomberos" },
+  { re: /accidente|choque|chocan?|volcadura|vuelca|atropell|lesionad|herid|ambulancia|cruz roja|ca[ií]da desde|sufre ca[ií]da|cae de|explosi[oó]n|fuga de gas|electrocut|param[eé]dic/i, foto: "ilusAmbulancia", tema: "ambulancia" },
   { re: /homicid|asesin|sin vida|cad[aá]ver|restos|balace|dispar|baleado|ejecut|fosa|hallazgo/i, foto: "ilusCinta", tema: "cinta" },
   { re: /guardia nacional|ej[eé]rcito|militar|marina armada|operativo|cateo|despliegue/i, foto: "ilusGuardia", tema: "guardia" },
   { re: /protecci[oó]n civil|rescate|rescat|evacua/i, foto: "ilusAmbulancia", tema: "proteccion-civil" },
@@ -112,4 +112,42 @@ export function temaIlustrativo(titulo: string, resumen = ""): string | null {
   const t = `${titulo} ${resumen}`;
   if (SIN_ILUSTRATIVA.test(t)) return null;
   return (ILUSTRATIVAS.find((r) => r.re.test(titulo)) ?? ILUSTRATIVAS.find((r) => r.re.test(t)))?.tema ?? null;
+}
+
+/**
+ * Foto fija por TEMA del titular (2026-11-02): no depende de la IA, así que
+ * funciona aunque Gemini no tenga cuota. Se marca "Imagen ilustrativa".
+ * `neutral` = se puede usar también en notas delicadas.
+ */
+const TEMAS_FIJOS: { re: RegExp; fotos: PhotoKey[]; neutral: boolean }[] = [
+  { re: /\b(agua potable|servicio de agua|sin agua|corte de agua|baja presi[oó]n|seapal|oromapas|fugas? de agua|tuber[ií]as?|drenaje|pipas? de agua|suministro)\b/i, fotos: ["temaAgua"], neutral: true },
+  { re: /\b(basura|recolecci[oó]n|residuos|relleno sanitario|predio abandonado|tiradero|contaminad[ao])/i, fotos: ["temaBasura"], neutral: true },
+  { re: /\b(escuelas?|escolar(es)?|plantel|alumnos|maestr[oa]s|docentes|ciclo escolar|universidad|preparatoria|secundaria|primaria)\b/i, fotos: ["temaEscuela"], neutral: true },
+  { re: /\b(hospital|imss|issste|cl[ií]nica|centro de salud|vacuna|dengue|sector salud|secretar[ií]a de salud)/i, fotos: ["temaHospital"], neutral: true },
+  { re: /\b(guardavidas|salvavidas|corrientes? de retorno|espig[oó]n|ba[ñn]istas)/i, fotos: ["temaSalvavidas"], neutral: true },
+  { re: /\b(ayuntamiento|cabildo|regidor(es|a)?|president[ae] municipal|alcald[ea]|gobierno municipal|diputad[oa]s?|congreso|morena|movimiento ciudadano|partido|pol[ií]tic[oa]s?|funcionari[oa]s?|gobernador|gobierno (de|del|estatal|municipal|federal))/i, fotos: ["plazaArmas", "kiosco"], neutral: true },
+  { re: /\b(obras?|bacheo|baches|pavimenta|rehabilitaci[oó]n|repavimenta|construcci[oó]n|caminos? rurales?|banquetas?)/i, fotos: ["construccion"], neutral: true },
+  { re: /\b(catrinas?|d[ií]a de muertos|altar(es)? de muertos|ofrendas?|pante[oó]n|calaveras?|xantolo|halloween)/i, fotos: ["temaCatrinas"], neutral: false },
+  { re: /\b(festival|concierto|feria|desfile|certamen|premios|espect[aá]culo|danza|baile|carnaval)/i, fotos: ["bailarines"], neutral: false },
+];
+
+export function fotoDeTemaFijo(titulo: string, resumen = "", soloNeutral = false): FotoArchivo | null {
+  const t = `${titulo} ${resumen}`;
+  if (SIN_ILUSTRATIVA.test(t)) return null;
+  const reglas = TEMAS_FIJOS.filter((r) => !soloNeutral || r.neutral);
+  const regla = reglas.find((r) => r.re.test(titulo)) ?? reglas.find((r) => r.re.test(t));
+  if (!regla) return null;
+  const clave = regla.fotos[hash(titulo) % regla.fotos.length];
+  const autor = PHOTO_CREDITS[clave];
+  return { url: PHOTOS[clave], credito: `Imagen ilustrativa${autor ? ` · ${autor}` : ""}`, clave };
+}
+
+/** Última opción en notas no delicadas: una vista de la ciudad o la bahía donde pasa la nota. */
+export function fotoDelLugar(titulo: string, resumen = ""): FotoArchivo | null {
+  const t = `${titulo} ${resumen}`;
+  if (SIN_ILUSTRATIVA.test(t)) return null;
+  const nayarit = /bucer[ií]as|nuevo vallarta|bah[ií]a de banderas|valle de banderas|sayulita|punta de? mita|san pancho|la cruz de huanacaxtle|mezcales|jarretaderas|nayarit/i.test(t);
+  const clave: PhotoKey = nayarit ? "costaSur" : "bahiaCiudad";
+  const autor = PHOTO_CREDITS[clave];
+  return { url: PHOTOS[clave], credito: `Foto de archivo: ${nayarit ? "Bahía de Banderas" : "Puerto Vallarta"}${autor ? ` · ${autor}` : ""}`, clave };
 }
