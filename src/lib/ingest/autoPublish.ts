@@ -16,12 +16,14 @@ import { mencionaExpress, esExpress } from "../qpv/express";
 // Una noticia publicada o enviada a revisión por corrida. El texto y la
 // imagen se generan dentro de la ingesta; mantener el límite evita
 // acercarse al máximo de tiempo de Netlify.
-const MAX_ARTICLES_PER_RUN = 1;
+// 2026-11-05: ya no corre en Netlify (es el robot de GitHub, sin límite de 60 s) y el
+// propietario pidió que se publique todo lo que se encuentre: hasta 4 notas por vuelta.
+const MAX_ARTICLES_PER_RUN = Number(process.env.QPV_NOTAS_POR_VUELTA || 4);
 
 // Borradores que se pueden pedir a la IA por corrida mientras no se haya
 // creado una noticia. El primero siempre se intenta; los siguientes
 // solo si todavía queda tiempo (ver `attemptsUntil`).
-const MAX_DRAFTS_PER_RUN = 4;
+const MAX_DRAFTS_PER_RUN = MAX_ARTICLES_PER_RUN + 4;
 
 const HOUR = 3_600_000;
 

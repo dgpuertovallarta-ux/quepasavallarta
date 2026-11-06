@@ -54,7 +54,7 @@ async function ingesta() {
     (h) => !esContenidoDeHuracan(h.items.map((i) => `${i.title} ${i.excerpt}`).join(" "))
   );
   // Sin el límite de 60 s de Netlify: hay más tiempo para cada intento.
-  const hasta = inicio + 120_000;
+  const hasta = inicio + 300_000; // 5 min: alcanza para varias notas por vuelta (2026-11-05)
   const explicadorPrimero = new Date(inicio).getUTCMinutes() < 10;
   let nota, explica;
   if (explicadorPrimero) {
