@@ -130,6 +130,29 @@ export function buildCaption(input: SocialPublishInput, ingles?: string | null, 
   return `${marcador}${cuerpo}${cierre}${en}${pat}${credito}\n\n${enlace}`;
 }
 
+/**
+ * Estilo "liga directa" (2026-11-05, como Faro 322 Noticias): emoji + TITULAR EN
+ * MAYÚSCULAS + resumen corto, y el post lleva la liga de la nota para que Facebook
+ * muestre la vista previa del sitio con la foto real de la nota (og:image) y el
+ * titular. Al tocarla se abre la nota en quepasavta.com.
+ * QPV_FB_ESTILO=foto vuelve al estilo anterior (postal + liga en comentario).
+ */
+export function estiloLigaDirecta(input: SocialPublishInput): boolean {
+  if (process.env.QPV_FB_ESTILO === "foto") return false;
+  // Las promos (reporte ciudadano, tráfico en vivo) siguen saliendo con su tarjeta.
+  return !(input.articleUrl.endsWith("/reporte") || input.articleUrl.includes("/trafico"));
+}
+
+export function buildCaptionDirecto(input: SocialPublishInput, ingles?: string | null): string {
+  const titulo = input.title.trim().replace(/[.\s]+$/, "").toLocaleUpperCase("es-MX");
+  let lede = (input.excerpt || "").trim().replace(/\s+/g, " ");
+  if (lede.length < 40 || input.title.toLowerCase().includes(lede.toLowerCase().slice(0, 30))) lede = "";
+  if (lede && !/[.!?…]$/.test(lede)) lede += ".";
+  const en = ingles ? `\n\nEN: ${ingles}` : "";
+  const pat = input.patrocinador ? `\n\nPresentado por ${input.patrocinador}.` : "";
+  return `🔴 ${titulo}${lede ? `\n\n${lede}` : ""}${en}${pat}`;
+}
+
 /** El cuerpo del post (sin marcador, pregunta ni liga) para traducirlo. */
 function cuerpoPost(input: SocialPublishInput): string {
   const titulo = input.title.trim().replace(/[.\s]+$/, "");
@@ -170,6 +193,15 @@ async function postToFacebook(input: SocialPublishInput): Promise<SocialPublishR
   if (!pageId || !token) return { attempted: false, ok: false };
 
   try {
+    if (estiloLigaDirecta(input)) {
+      const ingles = llevaIngles(input) ? await postEnIngles(cuerpoPost(input)) : null;
+      const body = new URLSearchParams({ access_token: token, message: buildCaptionDirecto(input, ingles), link: input.articleUrl });
+      const res = await fetch(`${GRAPH_BASE}/${pageId}/feed`, { method: "POST", body });
+      const json = (await res.json()) as { id?: string; error?: { message?: string } };
+      if (!res.ok || json.error) return { attempted: true, ok: false, error: json.error?.message || `HTTP ${res.status}` };
+      return { attempted: true, ok: true, postId: json.id };
+    }
+
     // Con imagen: /photos publica una foto con el texto como caption.
     // Sin imagen (no debería pasar en el flujo normal, pero por si
     // falla la generación): /feed publica un post de solo texto+enlace.
