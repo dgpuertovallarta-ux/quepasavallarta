@@ -129,9 +129,10 @@ export async function correrMonitor(): Promise<string> {
     avisos++;
   }
 
-  // 3) Resumen vial a las 8:00, 14:00 y 18:00 (postal azul con el semáforo)
+  // 3) Resumen vial a las 7:00, 14:00 y 18:00 (postal azul con el semáforo).
+  // 2026-11-05: el propietario pidió el de la mañana a las 7 (antes 8).
   let resumen = "";
-  const slot = [8, 14, 18].find((x) => x === h);
+  const slot = [7, 14, 18].find((x) => x === h);
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
   if (slot !== undefined && corredores.length && !avisados[`resumen:${hoy}:${slot}`]) {
     resumen = await publicarResumen(corredores, incs, slot);

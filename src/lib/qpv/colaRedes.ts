@@ -11,8 +11,10 @@
  *   - Huracanes: los videos por boletín van por otro camino (hurricane-video).
  *   - Una nota que lleva más de 8 h esperando ya no sale (dejó de ser noticia).
  *   - 2026-10-31: el propietario pidió que NO salga tráfico en Facebook. Las
- *     notas de tráfico/tránsito nunca entran a la cola, y los resúmenes de
- *     8, 14 y 18 h solo salen si se activa QPV_TRAFICO_FB=1.
+ *     notas de tráfico/tránsito nunca entran a la cola.
+ *   - 2026-11-05: el propietario volvió a pedir los resúmenes de tráfico a las
+ *     7 a. m., 2 p. m. y 6 p. m. (QPV_TRAFICO_FB=0 los apaga). Los avisos sueltos
+ *     de corredores lentos siguen sin salir (QPV_TRAFICO_ALERTAS_FB=1 los prende).
  * Se procesa al final de cada corrida de /api/ingest (cada 10 min).
  */
 import { getStore } from "../storage/blobs";
@@ -32,8 +34,10 @@ const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 8);
 const VIGENCIA_MS = 12 * 3_600_000;
 const HORA_INICIO = 7;
 const HORA_FIN = 23;
-/** Resúmenes viales de 8, 14 y 18 h en Facebook (apagados salvo QPV_TRAFICO_FB=1). */
-const RESUMENES_TRAFICO = process.env.QPV_TRAFICO_FB === "1";
+/** Resúmenes viales de 7, 14 y 18 h en Facebook (prendidos salvo QPV_TRAFICO_FB=0). */
+const RESUMENES_TRAFICO = process.env.QPV_TRAFICO_FB !== "0";
+/** Avisos sueltos de corredores con retraso (apagados salvo QPV_TRAFICO_ALERTAS_FB=1). */
+const ALERTAS_TRAFICO = process.env.QPV_TRAFICO_ALERTAS_FB === "1";
 
 /** ¿Es una nota de tráfico/tránsito? (por sección, liga o contenido). */
 export function esDeTrafico(titulo: string, resumen = "", categoria?: string | null, url = ""): boolean {
@@ -83,9 +87,9 @@ export async function encolarRedes(
   if (!n.imageUrl) return; // siempre con imagen (foto propia o tarjeta QPV)
   const c = clasificar(n.title, n.excerpt);
   const tipo = opts.tipo ?? (n.articleUrl.includes("/trafico") ? "trafico" : "nota");
-  // Sin tráfico en Facebook (2026-10-31): las notas viales no entran nunca;
-  // los resúmenes de 8/14/18 h solo con QPV_TRAFICO_FB=1.
-  if (tipo === "trafico" && !RESUMENES_TRAFICO) return;
+  // Notas viales: no entran nunca. Resúmenes 7/14/18 h (llegan con tipo "trafico"): sí.
+  // Avisos sueltos de corredores (sin tipo): solo con QPV_TRAFICO_ALERTAS_FB=1.
+  if (tipo === "trafico" && !(opts.tipo === "trafico" ? RESUMENES_TRAFICO : ALERTAS_TRAFICO)) return;
   if (tipo === "nota" && esDeTrafico(n.title, n.excerpt, opts.categoria, n.articleUrl)) return;
   const item: ItemRedes = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
