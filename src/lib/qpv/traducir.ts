@@ -5,6 +5,7 @@
  * la tarjeta sale solo en español.
  */
 import { GoogleGenAI } from "@google/genai";
+import { cuotaAgotada, esCuotaAgotada, marcarCuotaAgotada } from "./cuotaGemini";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
@@ -24,6 +25,7 @@ async function traducir(titulo: string, tipo: "headline" | "post"): Promise<stri
   if (!process.env.GEMINI_API_KEY || !titulo.trim()) return null;
   const clave = `${tipo}:${titulo}`;
   if (cache.has(clave)) return cache.get(clave)!;
+  if (cuotaAgotada()) return null;
   const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   // 2026-10-25: a veces salía sin inglés. El modelo "piensa" antes de contestar y
   // con un límite de salida chico se acababa el espacio sin dar la traducción;
@@ -50,12 +52,19 @@ async function traducir(titulo: string, tipo: "headline" | "post"): Promise<stri
       let t = (res.text || "").trim().replace(/^["“']|["”']$/g, "");
       if (tipo === "headline") t = t.split("\n")[0].trim();
       else t = t.replace(/\s*\n+\s*/g, " ").trim();
-      if (t && t.length <= (tipo === "headline" ? 220 : 900) && t.toLowerCase() !== titulo.toLowerCase()) {
+      // 2026-11-05: salió en Facebook "EN: Sentence 2:*" (el modelo dejó notas de
+      // su razonamiento en vez de la traducción). Eso se descarta.
+      const basura = /\bsentence\s*\d|^\s*(en|english|translation)\s*:|\*\s*$|^\s*\*/i.test(t);
+      if (t && !basura && t.length <= (tipo === "headline" ? 220 : 900) && t.toLowerCase() !== titulo.toLowerCase()) {
         cache.set(clave, t);
         return t;
       }
       console.error(`[traducir] respuesta vacía o rara (${tipo}, intento ${intento + 1})`);
     } catch (err) {
+      if (esCuotaAgotada(err)) {
+        marcarCuotaAgotada();
+        return null;
+      }
       console.error(`[traducir] falló (${tipo}, intento ${intento + 1}):`, err instanceof Error ? err.message : err);
     }
     await new Promise((r) => setTimeout(r, 1500));

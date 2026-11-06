@@ -73,4 +73,12 @@ jobs:
 
       - name: Volver a lanzar
         if: always() && github.event_name != 'schedule'
-        run: gh workflow run robot.yml -R "$REPO" --ref main
+        # 2026-11-05: GitHub contestó un 500 pasajero y el robot se quedó sin relevo.
+        # Se reintenta hasta 5 veces antes de darse por vencido.
+        run: |
+          for i in 1 2 3 4 5; do
+            gh workflow run robot.yml -R "$REPO" --ref main && exit 0
+            echo "No se pudo relanzar (intento $i), reintento en 30 s…"
+            sleep 30
+          done
+          exit 1

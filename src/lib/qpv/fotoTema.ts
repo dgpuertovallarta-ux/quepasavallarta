@@ -9,6 +9,7 @@
  * Nunca lanza: si algo falla, devuelve null y se usa el banco de archivo.
  */
 import { GoogleGenAI } from "@google/genai";
+import { cuotaAgotada, esCuotaAgotada, marcarCuotaAgotada } from "./cuotaGemini";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const UA = "QuePasaVallartaBot/1.0 (https://quepasavta.com; contacto via sitio)";
@@ -17,7 +18,7 @@ const LICENCIAS_OK = /^(cc0|public domain|pd|cc by(-sa)? ?[0-9.]*|cc-by(-sa)?-[0
 export type FotoTema = { url: string; credito: string; busqueda: string };
 
 async function busquedas(titulo: string, resumen: string): Promise<string[]> {
-  if (!process.env.GEMINI_API_KEY) return [];
+  if (!process.env.GEMINI_API_KEY || cuotaAgotada()) return [];
   try {
     const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const res = await Promise.race([
@@ -43,7 +44,8 @@ async function busquedas(titulo: string, resumen: string): Promise<string[]> {
       .map((l) => l.replace(/^[-*\d.)\s"']+|["']$/g, "").trim())
       .filter((l) => l.length > 2 && l.length < 60)
       .slice(0, 3);
-  } catch {
+  } catch (err) {
+    if (esCuotaAgotada(err)) marcarCuotaAgotada();
     return [];
   }
 }

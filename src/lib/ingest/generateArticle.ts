@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { EDITORIAL_SYSTEM_PROMPT, EXPLICA_SYSTEM_PROMPT, buildEditorialUserPrompt } from "./editorialPrompt";
 import type { Story } from "./storyGraph";
+import { cuotaAgotada, esCuotaAgotada, marcarCuotaAgotada } from "../qpv/cuotaGemini";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
@@ -43,10 +44,18 @@ async function callGemini(systemPrompt: string, story: Story): Promise<Generated
     config: { systemInstruction: systemPrompt, maxOutputTokens: 4096 },
   };
 
+  if (cuotaAgotada()) {
+    throw new Error("Cuota de Gemini agotada: la redacción está en pausa y se reintenta más tarde.");
+  }
+
   let response;
   try {
     response = await client.models.generateContent(request);
   } catch (err) {
+    if (esCuotaAgotada(err)) {
+      marcarCuotaAgotada();
+      throw new Error("Cuota de Gemini agotada (429): la redacción queda en pausa y se reintenta más tarde.");
+    }
     const isOverloaded = err instanceof Error && /503|UNAVAILABLE|high demand/i.test(err.message);
     if (!isOverloaded) throw err;
     await new Promise((r) => setTimeout(r, 2500));
