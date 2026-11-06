@@ -15,11 +15,48 @@
 const PAUSA_MS = Number(process.env.QPV_PAUSA_CUOTA_MIN || "60") * 60_000;
 const NO_EXISTE_MS = 24 * 3_600_000;
 
-const POR_OMISION = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+const POR_OMISION = ["gemini-3.6-flash"];
+
+// 2026-11-06: los nombres fijos de respaldo (2.5/2.0 flash) ya no existen para la
+// llave. Ahora se le pregunta a Google qué modelos de texto "flash" tiene la llave
+// y se usan todos como respaldo, del más nuevo al más viejo (lite al final).
+let descubiertos: string[] = [];
+let descubrir: Promise<void> | null = null;
+
+function version(nombre: string): number {
+  const m = nombre.match(/(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : 0;
+}
+
+export function filtrarModelosTexto(nombres: string[]): string[] {
+  return nombres
+    .map((n) => n.replace(/^models\//, ""))
+    .filter((n) => /flash/i.test(n) && !/image|tts|audio|live|embed|vision|native|computer|robotics/i.test(n))
+    .sort((a, b) => Number(/lite/i.test(a)) - Number(/lite/i.test(b)) || version(b) - version(a));
+}
+
+async function descubrirModelos(): Promise<void> {
+  if (!process.env.GEMINI_API_KEY) return;
+  descubrir ??= (async () => {
+    try {
+      const { GoogleGenAI } = await import("@google/genai");
+      const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const nombres: string[] = [];
+      for await (const m of await client.models.list({ config: { pageSize: 200 } })) {
+        if (m.name && (!m.supportedActions || m.supportedActions.includes("generateContent"))) nombres.push(m.name);
+      }
+      descubiertos = filtrarModelosTexto(nombres);
+      console.warn(`[gemini] modelos de respaldo disponibles: ${descubiertos.join(", ") || "ninguno"}`);
+    } catch (err) {
+      console.warn("[gemini] no se pudo listar modelos:", err instanceof Error ? err.message.slice(0, 200) : err);
+    }
+  })();
+  return descubrir;
+}
 
 export function modelosGemini(): string[] {
   const lista = (process.env.GEMINI_MODELS || "").split(",").map((m) => m.trim()).filter(Boolean);
-  const base = lista.length ? lista : POR_OMISION;
+  const base = lista.length ? lista : [...POR_OMISION, ...descubiertos];
   const primero = process.env.GEMINI_MODEL?.trim();
   return [...new Set(primero ? [primero, ...base] : base)];
 }
@@ -57,6 +94,7 @@ export class CuotaAgotadaError extends Error {
  * pasa al siguiente. Cualquier otro error se lanza tal cual.
  */
 export async function conGemini<T>(fn: (modelo: string) => Promise<T>): Promise<{ valor: T; modelo: string }> {
+  await descubrirModelos();
   for (const modelo of modelosGemini()) {
     if (!libre(modelo)) continue;
     try {

@@ -55,6 +55,8 @@ export function tituloIncidente(i: Incidente): string {
   return `${que[i.tipo]}${donde}`;
 }
 
+const resumenesEnviados = new Set<string>();
+
 export async function correrMonitor(): Promise<string> {
   if (!process.env.TOMTOM_API_KEY) return "Falta TOMTOM_API_KEY: el monitor de tráfico está apagado.";
   const s = store();
@@ -134,9 +136,14 @@ export async function correrMonitor(): Promise<string> {
   let resumen = "";
   const slot = [7, 14, 18].find((x) => x === h);
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
-  if (slot !== undefined && corredores.length && !avisados[`resumen:${hoy}:${slot}`]) {
+  // 2026-11-06: el de las 7 salió 3 veces (7:15, 7:35, 7:55): la marca guardada en
+  // WordPress no se alcanzaba a leer en la siguiente vuelta. Además de esa marca,
+  // el robot recuerda en memoria los resúmenes que ya mandó en esta corrida.
+  const claveResumen = `resumen:${hoy}:${slot}`;
+  if (slot !== undefined && corredores.length && !avisados[claveResumen] && !resumenesEnviados.has(claveResumen)) {
+    resumenesEnviados.add(claveResumen);
     resumen = await publicarResumen(corredores, incs, slot);
-    avisados[`resumen:${hoy}:${slot}`] = new Date().toISOString();
+    avisados[claveResumen] = new Date().toISOString();
   }
 
   await s.setJSON("avisados", avisados);
