@@ -1,9 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { EDITORIAL_SYSTEM_PROMPT, EXPLICA_SYSTEM_PROMPT, buildEditorialUserPrompt } from "./editorialPrompt";
 import type { Story } from "./storyGraph";
-import { cuotaAgotada, esCuotaAgotada, marcarCuotaAgotada } from "../qpv/cuotaGemini";
+import { conGemini } from "../qpv/cuotaGemini";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 export function isAiConfigured(): boolean {
   return !!process.env.GEMINI_API_KEY;
@@ -38,33 +37,28 @@ function assertCanGenerate(story: Story) {
 // petición), así que se reintenta una vez antes de darse por vencido.
 async function callGemini(systemPrompt: string, story: Story): Promise<GeneratedArticle> {
   const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const request = {
-    model: MODEL,
-    contents: buildEditorialUserPrompt(story),
-    config: { systemInstruction: systemPrompt, maxOutputTokens: 4096 },
-  };
+  // 2026-11-05: el modelo lo elige conGemini (salta a otro modelo gratuito si uno se agota).
+  const pedir = (model: string) =>
+    client.models.generateContent({
+      model,
+      contents: buildEditorialUserPrompt(story),
+      config: { systemInstruction: systemPrompt, maxOutputTokens: 4096 },
+    });
 
-  if (cuotaAgotada()) {
-    throw new Error("Cuota de Gemini agotada: la redacción está en pausa y se reintenta más tarde.");
-  }
-
-  let response;
-  try {
-    response = await client.models.generateContent(request);
-  } catch (err) {
-    if (esCuotaAgotada(err)) {
-      marcarCuotaAgotada();
-      throw new Error("Cuota de Gemini agotada (429): la redacción queda en pausa y se reintenta más tarde.");
+  const { valor: response, modelo } = await conGemini(async (model) => {
+    try {
+      return await pedir(model);
+    } catch (err) {
+      const isOverloaded = err instanceof Error && /503|UNAVAILABLE|high demand/i.test(err.message);
+      if (!isOverloaded) throw err;
+      await new Promise((r) => setTimeout(r, 2500));
+      return await pedir(model);
     }
-    const isOverloaded = err instanceof Error && /503|UNAVAILABLE|high demand/i.test(err.message);
-    if (!isOverloaded) throw err;
-    await new Promise((r) => setTimeout(r, 2500));
-    response = await client.models.generateContent(request);
-  }
+  });
 
   const draft = (response.text || "").trim();
 
-  return { storyId: story.storyId, model: MODEL, draft, generatedAt: new Date().toISOString() };
+  return { storyId: story.storyId, model: modelo, draft, generatedAt: new Date().toISOString() };
 }
 
 /**

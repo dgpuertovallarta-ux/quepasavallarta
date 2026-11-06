@@ -5,9 +5,8 @@
  * la tarjeta sale solo en español.
  */
 import { GoogleGenAI } from "@google/genai";
-import { cuotaAgotada, esCuotaAgotada, marcarCuotaAgotada } from "./cuotaGemini";
+import { conGemini, cuotaAgotada, CuotaAgotadaError } from "./cuotaGemini";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 export function titularEnIngles(titulo: string): Promise<string | null> {
   return traducir(titulo, "headline");
@@ -32,9 +31,9 @@ async function traducir(titulo: string, tipo: "headline" | "post"): Promise<stri
   // ahora hay espacio de sobra, más tiempo y un segundo intento.
   for (let intento = 0; intento < 2; intento++) {
     try {
-      const res = await Promise.race([
+      const { valor: res } = await conGemini((model) => Promise.race([
         client.models.generateContent({
-          model: MODEL,
+          model,
           contents: titulo,
           config: {
             systemInstruction:
@@ -48,7 +47,7 @@ async function traducir(titulo: string, tipo: "headline" | "post"): Promise<stri
           },
         }),
         new Promise<never>((_, rej) => setTimeout(() => rej(new Error("tiempo agotado")), 12000)),
-      ]);
+      ]));
       let t = (res.text || "").trim().replace(/^["“']|["”']$/g, "");
       if (tipo === "headline") t = t.split("\n")[0].trim();
       else t = t.replace(/\s*\n+\s*/g, " ").trim();
@@ -61,10 +60,7 @@ async function traducir(titulo: string, tipo: "headline" | "post"): Promise<stri
       }
       console.error(`[traducir] respuesta vacía o rara (${tipo}, intento ${intento + 1})`);
     } catch (err) {
-      if (esCuotaAgotada(err)) {
-        marcarCuotaAgotada();
-        return null;
-      }
+      if (err instanceof CuotaAgotadaError) return null;
       console.error(`[traducir] falló (${tipo}, intento ${intento + 1}):`, err instanceof Error ? err.message : err);
     }
     await new Promise((r) => setTimeout(r, 1500));
