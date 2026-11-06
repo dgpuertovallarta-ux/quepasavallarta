@@ -6,7 +6,8 @@ import { generateArticleImage } from "./generateImage";
 import { hasPublishedArticleForStory, findDuplicateTitle, getRecentArticleTitles, publishArticle, DuplicateArticleError, type RecentTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { usaWordPress } from "../wp/cliente";
-import { sortByEditorialFocus, isLocalStory, isOfficialBulletinStory } from "./localFocus";
+import { storyPriority, isEmergencyStory, isLocalStory, isOfficialBulletinStory } from "./localFocus";
+import { getPublishedArticles } from "../db/articles";
 import { loadSkips, saveSkips } from "./skipMemory";
 import { encolarRedes } from "../qpv/colaRedes";
 import { isHurricaneSimonContent } from "../social/editorialPolicy";
@@ -16,9 +17,8 @@ import { mencionaExpress, esExpress } from "../qpv/express";
 // Una noticia publicada o enviada a revisión por corrida. El texto y la
 // imagen se generan dentro de la ingesta; mantener el límite evita
 // acercarse al máximo de tiempo de Netlify.
-// 2026-11-05: ya no corre en Netlify (es el robot de GitHub, sin límite de 60 s) y el
-// propietario pidió que se publique todo lo que se encuentre: hasta 4 notas por vuelta.
-const MAX_ARTICLES_PER_RUN = Number(process.env.QPV_NOTAS_POR_VUELTA || 4);
+// Una noticia por corrida (cada ~10 min); el ritmo lo marca el límite diario (abajo).
+const MAX_ARTICLES_PER_RUN = Number(process.env.QPV_NOTAS_POR_VUELTA || 1);
 
 // Borradores que se pueden pedir a la IA por corrida mientras no se haya
 // creado una noticia. El primero siempre se intenta; los siguientes
@@ -36,6 +36,51 @@ class StorySkipped extends Error {
   constructor(message: string, readonly retryAfterMs: number) {
     super(message);
   }
+}
+
+/**
+ * 2026-11-05 — Línea del propietario: 20 notas al día, las MÁS IMPORTANTES, es
+ * decir las que más medios están reportando ("más presencia"). Se reparten de
+ * 7 a. m. a 11 p. m. para que el cupo no se acabe temprano con notas flojas y
+ * dé tiempo a que una historia junte medios. Emergencias (Protección Civil) y
+ * notas express no esperan ni cuentan para el tope.
+ * QPV_NOTAS_POR_DIA cambia el tope (0 = sin tope).
+ */
+const NOTAS_POR_DIA = Number(process.env.QPV_NOTAS_POR_DIA ?? 20);
+const HORA_INICIO = 7;
+const HORA_FIN = 23;
+
+/** Cuántos medios distintos reportan la historia. */
+export function presencia(s: Story): number {
+  return new Set(s.items.map((it) => it.sourceName || it.sourceId)).size;
+}
+
+/** Importancia: la presencia manda; luego emergencia/local y el puntaje de la nota. */
+function importancia(s: Story): number {
+  return presencia(s) * 10 + storyPriority(s) * 8 + s.maxNewsScore / 10;
+}
+
+function minutoLocal(d: Date): { dia: string; min: number } {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(d).map((x) => [x.type, x.value])
+  );
+  return { dia: `${p.year}-${p.month}-${p.day}`, min: (Number(p.hour) % 24) * 60 + Number(p.minute) };
+}
+
+/** ¿Toca publicar una nota normal ahora? Devuelve el motivo si no. */
+async function cupoDelDia(): Promise<string | null> {
+  if (!NOTAS_POR_DIA) return null;
+  const ahora = minutoLocal(new Date());
+  if (ahora.min < HORA_INICIO * 60 || ahora.min >= HORA_FIN * 60) return "de noche solo emergencias y express";
+  const recientes = await getPublishedArticles(60);
+  const hoy = recientes.filter((n) => n.publishedAt && minutoLocal(new Date(n.publishedAt)).dia === ahora.dia);
+  if (hoy.length >= NOTAS_POR_DIA) return `tope diario alcanzado (${NOTAS_POR_DIA})`;
+  const ultima = recientes.map((n) => n.publishedAt).filter(Boolean).sort().pop();
+  if (!ultima) return null;
+  const desde = (Date.now() - new Date(ultima).getTime()) / 60_000;
+  const espacio = Math.max(15, (HORA_FIN * 60 - ahora.min) / (NOTAS_POR_DIA - hoy.length));
+  return desde < espacio ? `siguiente nota en ${Math.ceil(espacio - desde)} min` : null;
 }
 
 export type AutoPublishOptions = {
@@ -85,14 +130,26 @@ export async function runAutoPublish(stories: Story[], options: AutoPublishOptio
   // Notas «express» (ver lib/qpv/express.ts): las que mencionan a Diego Franco entran
   // aunque solo las reporte una fuente y van al principio de la fila.
   const textoHistoria = (s: Story) => s.items.map((i) => `${i.title} ${i.excerpt}`).join(" ");
-  const candidates = sortByEditorialFocus(
-    stories.filter(
+  const sinEspera = (s: Story) => isEmergencyStory(s) || isOfficialBulletinStory(s) || mencionaExpress(textoHistoria(s));
+  let candidates = stories
+    .filter(
       (s) =>
         (isAutoPublishEligible(s) || isHumanReviewEligible(s) || mencionaExpress(textoHistoria(s))) &&
         // 2026-11-02: el propietario acepta nacionales/internacionales (solo que lleven foto); QPV_SOLO_LOCAL=1 deja solo Vallarta y la bahía.
         (isLocalStory(s) || isOfficialBulletinStory(s) || process.env.QPV_SOLO_LOCAL !== "1")
     )
-  ).sort((a, b) => Number(mencionaExpress(textoHistoria(b))) - Number(mencionaExpress(textoHistoria(a))));
+    // Las express primero; luego las que más medios reportan (ver importancia).
+    .sort((a, b) => Number(mencionaExpress(textoHistoria(b))) - Number(mencionaExpress(textoHistoria(a))) || importancia(b) - importancia(a));
+
+  // Tope de 20 al día repartidas en el día: fuera de turno solo pasan emergencias y express.
+  const motivo = await cupoDelDia().catch(() => null);
+  if (motivo) {
+    candidates = candidates.filter(sinEspera);
+    if (!candidates.length) {
+      result.errors.push({ storyId: "-", error: `En espera: ${motivo}.` });
+      return result;
+    }
+  }
 
   // Se recorre la lista hasta publicar o enviar a revisión una nota. Las historias ya
   // publicadas y las que ya se descartaron en una corrida anterior se
