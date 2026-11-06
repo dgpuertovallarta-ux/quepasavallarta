@@ -24,9 +24,12 @@ import { isHurricaneSimonContent } from "../social/editorialPolicy";
 import { siteUrl } from "../storage/imageBlobs";
 import { esExpress } from "./express";
 
-const MAX_POR_DIA = Number(process.env.QPV_MAX_POR_DIA || 12);
-const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 40);
-const VIGENCIA_MS = 8 * 3_600_000;
+// 2026-11-05: el propietario pidió que salgan TODAS las notas y de forma fluida
+// (como Faro 322): sin límite diario y una cada vuelta del robot (~10 min), en vez
+// de repartir 12 al día con esperas de hasta 2 h. QPV_MAX_POR_DIA vuelve a poner tope.
+const MAX_POR_DIA = Number(process.env.QPV_MAX_POR_DIA || 0) || Infinity;
+const MINUTOS_ENTRE_POSTS = Number(process.env.QPV_MINUTOS_ENTRE_POSTS || 8);
+const VIGENCIA_MS = 12 * 3_600_000;
 const HORA_INICIO = 7;
 const HORA_FIN = 23;
 /** Resúmenes viales de 8, 14 y 18 h en Facebook (apagados salvo QPV_TRAFICO_FB=1). */
@@ -256,12 +259,10 @@ export async function procesarColaRedes(): Promise<string> {
     const urgente = notas.filter((x) => x.urgente).sort((a, b) => a.creada.localeCompare(b.creada))[0];
     if (urgente && minutos >= 10) return await publicar(urgente);
     if (!deDia) return `De noche solo salen urgentes (${notas.length} en espera para la mañana).`;
-    if (publicadasHoy.length >= MAX_POR_DIA) return `Límite diario alcanzado (${MAX_POR_DIA}).`;
-    // Reparte las notas a lo largo del día (que no se acaben a mediodía):
-    // separación = lo que falta del día ÷ las notas que quedan, mínimo 40 min.
-    const ahoraMin = h * 60 + Number(new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City", minute: "numeric" }));
-    const quedan = Math.max(1, MAX_POR_DIA - publicadasHoy.length);
-    const espacio = Math.max(MINUTOS_ENTRE_POSTS, Math.min(120, (HORA_FIN * 60 - ahoraMin) / quedan));
+    if (publicadasHoy.length >= MAX_POR_DIA) return `Límite diario alcanzado (${MAX_POR_DIA}).`; // solo con QPV_MAX_POR_DIA
+    // Flujo continuo: solo una separación corta entre posts (antes se repartían
+    // las notas a lo largo del día y había esperas de hasta 2 h).
+    const espacio = MINUTOS_ENTRE_POSTS;
     if (minutos < espacio) return `En espera: faltan ${Math.ceil(espacio - minutos)} min para la siguiente.`;
 
     // Importancia + frescura, y castigo si es de la misma sección que la última publicada.
