@@ -54,6 +54,26 @@ jobs:
           printf '%s' "$DATOS" > datos.json
           python scripts/traffic-video/generate.py --payload datos.json --out out
 
+      - name: Hoja de cuadros para revisar (solo pruebas)
+        if: inputs.publicar == 'no'
+        run: |
+          D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out/video.mp4)
+          for k in 1 2 3 4 5 6; do
+            T=$(python -c "print(round($D*($k-0.5)/6,2))")
+            ffmpeg -loglevel error -y -ss "$T" -i out/video.mp4 -frames:v 1 -vf scale=270:-1 "out/c$k.png"
+          done
+          python - <<'PY'
+          import base64, io
+          from PIL import Image
+          ims = [Image.open(f"out/c{k}.png") for k in range(1, 7)]
+          w, h = ims[0].size
+          hoja = Image.new("RGB", (w * 6, h))
+          for i, im in enumerate(ims):
+              hoja.paste(im, (i * w, 0))
+          b = io.BytesIO(); hoja.save(b, "JPEG", quality=70)
+          print("HOJA-INICIO" + base64.b64encode(b.getvalue()).decode() + "HOJA-FIN")
+          PY
+
       - name: Guardar copia del video
         uses: actions/upload-artifact@v4
         with:
