@@ -361,8 +361,12 @@ class Render:
         self.scenes = scenes
         self.logo = Image.open(os.path.join(A, "logo.png")).convert("RGBA")
         self.logo.thumbnail((220, 220))
-        self.clat, self.clon = (BBOX[1] + BBOX[3]) / 2 + 0.005, (BBOX[0] + BBOX[2]) / 2
-        self.general, self.ancho_general = mapa_para(self.clat, self.clon, (BBOX[3] - BBOX[1]) * 0.9)
+        # Mapa general: Vallarta y, si un foco queda afuera (Punta Mita, Sayulita), se abre para incluirlo.
+        las = [BBOX[1], BBOX[3]] + [f["lat"] for s0 in scenes for f in s0.data.get("focos", [])]
+        los = [BBOX[0], BBOX[2]] + [f["lon"] for s0 in scenes for f in s0.data.get("focos", [])]
+        self.clat, self.clon = (min(las) + max(las)) / 2 + 0.005, (min(los) + max(los)) / 2
+        span = max(max(las) - min(las), (max(los) - min(los)) * H / W * math.cos(math.radians(self.clat)))
+        self.general, self.ancho_general = mapa_para(self.clat, self.clon, span * 0.95)
         self.tomtom = self.general.tomtom
         # mapas acercados (se piden una sola vez)
         self.zoom = {}

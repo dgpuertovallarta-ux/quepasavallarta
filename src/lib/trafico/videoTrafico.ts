@@ -59,34 +59,52 @@ function puntaje(i: Incidente): number {
   return i.retrasoMin * 2 + i.magnitud * 3 + Math.min(km, 5) + extra;
 }
 
+const ES_VIALIDAD = /^(Av\.|Avenida|Blvd\.|Boulevard|Carretera|Carr\.|Calle|Prol\.|Libramiento|Paseo|Calzada|Camino)\b/i;
+
+function kmEntre(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const k = 111.32, cos = Math.cos((a.lat * Math.PI) / 180);
+  return Math.hypot((a.lat - b.lat) * k, (a.lon - b.lon) * k * cos);
+}
+
 export function focosDeTrafico(incs: Incidente[], n = 3) {
-  const vistos = new Set<string>();
-  const focos = [];
+  const ahora = Date.now();
+  const focos: (ReturnType<typeof aFoco> & { _par: string })[] = [];
   for (const i of [...incs].filter((x) => TIPOS_FOCO.has(x.tipo)).sort((a, b) => puntaje(b) - puntaje(a))) {
     // Embotellamientos chicos no son noticia; accidentes y cierres sí.
     if (i.tipo === "congestion" && i.retrasoMin < 2 && i.magnitud < 2) continue;
     if (i.tipo === "obra" && i.retrasoMin < 3) continue;
-    const calle = limpiarCalle(i.de) || limpiarCalle(i.a);
-    if (!calle) continue;
-    const clave = `${calle}|${i.tipo === "congestion" ? "" : i.tipo}`; // el mismo tramo en los dos sentidos cuenta una vez
-    if (vistos.has(clave)) continue;
-    vistos.add(clave);
-    const hacia = limpiarCalle(i.a);
-    focos.push({
-      tipo: i.tipo,
-      calle,
-      hacia: hacia && hacia !== calle ? hacia : "",
-      zona: zonaDe(i.lat, i.lon) ?? "",
-      retrasoMin: i.retrasoMin,
-      largoKm: i.largoM ? Math.round(i.largoM / 100) / 10 : 0,
-      magnitud: i.magnitud,
-      lat: i.lat,
-      lon: i.lon,
-      linea: i.linea,
-    });
+    // Cierres y obras de días (p. ej. la carretera a Punta Mita) no se repiten en cada video;
+    // quedan como punto en el mapa general.
+    const dias = i.inicio ? (ahora - new Date(i.inicio).getTime()) / 86_400_000 : 99;
+    if ((i.tipo === "cierre" || i.tipo === "obra" || i.tipo === "carril") && dias > 2 && i.retrasoMin < 3) continue;
+    const f = aFoco(i);
+    if (!f.calle) continue;
+    // El mismo tramo en sentido contrario (de/a invertidos) o a menos de 1 km de otro foco del mismo tipo cuenta una vez.
+    const par = [limpiarCalle(i.de), limpiarCalle(i.a)].sort().join("|");
+    if (focos.some((x) => x._par === par || (x.tipo === f.tipo && kmEntre(x, f) < 1))) continue;
+    focos.push({ ...f, _par: par });
     if (focos.length >= n) break;
   }
-  return focos;
+  return focos.map(({ _par, ...f }) => f);
+}
+
+function aFoco(i: Incidente) {
+  const de = limpiarCalle(i.de), a = limpiarCalle(i.a);
+  // TomTom da los extremos del tramo ("de"/"a"); el nombre que se muestra es la vialidad.
+  const calle = ES_VIALIDAD.test(de) || !ES_VIALIDAD.test(a) ? de || a : a;
+  const otro = calle === de ? a : de;
+  return {
+    tipo: i.tipo,
+    calle,
+    hacia: otro && otro !== calle ? otro : "",
+    zona: zonaDe(i.lat, i.lon) ?? "",
+    retrasoMin: i.retrasoMin,
+    largoKm: i.largoM ? Math.round(i.largoM / 100) / 10 : 0,
+    magnitud: i.magnitud,
+    lat: i.lat,
+    lon: i.lon,
+    linea: i.linea,
+  };
 }
 
 /** Video del resumen de las 7, 14 y 18 h. Devuelve false si no se pudo lanzar (sale la postal). */
