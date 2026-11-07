@@ -21,6 +21,7 @@ import type { Semaforo } from "@/components/social/TarjetaVial";
 import { publishArticle, getRecentArticleTitles, findDuplicateTitle } from "../db/articles";
 import { isDatabaseConfigured } from "../db/client";
 import { siteUrl } from "../storage/imageBlobs";
+import { VIDEO_TRAFICO_ACTIVO, lanzarVideoResumen, accidenteUrgente, puedeLanzarUrgente, lanzarVideoUrgente } from "./videoTrafico";
 
 export type Instantanea = { actualizado: string; corredores: EstadoCorredor[]; incidentes: Incidente[]; resumen?: { tipo: string; t: string; d: string }[] };
 
@@ -142,8 +143,21 @@ export async function correrMonitor(): Promise<string> {
   const claveResumen = `resumen:${hoy}:${slot}`;
   if (slot !== undefined && corredores.length && !avisados[claveResumen] && !resumenesEnviados.has(claveResumen)) {
     resumenesEnviados.add(claveResumen);
-    resumen = await publicarResumen(corredores, incs, slot);
+    // 2026-11-06: el resumen sale en video (reel con voz y mapa); si no se pudo lanzar, sale la postal.
+    const enVideo = VIDEO_TRAFICO_ACTIVO && (await lanzarVideoResumen(corredores, incs).catch(() => false));
+    resumen = enVideo ? `video del resumen de las ${slot} h lanzado` : await publicarResumen(corredores, incs, slot);
     avisados[claveResumen] = new Date().toISOString();
+  }
+
+  // 4) Video urgente: accidente nuevo en un corredor principal (máx. uno por hora).
+  if (VIDEO_TRAFICO_ACTIVO && puedeLanzarUrgente(h, avisados["urg-ultimo"])) {
+    const acc = accidenteUrgente(incs, (id) => !!avisados["urg:" + id]);
+    if (acc) {
+      avisados["urg:" + acc.id] = new Date().toISOString();
+      avisados["urg-ultimo"] = new Date().toISOString();
+      const ok = await lanzarVideoUrgente(acc).catch(() => false);
+      resumen += `${resumen ? " · " : ""}video urgente ${ok ? "lanzado" : "falló"}: ${acc.descripcion || acc.de || acc.id}`;
+    }
   }
 
   await s.setJSON("avisados", avisados);

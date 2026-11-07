@@ -1,0 +1,77 @@
+# Video de tráfico «QPV al Volante» (2026-11-06).
+# Lo lanza el robot (src/lib/trafico/videoTrafico.ts) a las 7, 14 y 18 h y cuando hay
+# un accidente en un corredor principal. También se puede lanzar a mano con datos de prueba.
+# Variable del repo QPV_VIDEO_TRAFICO_PUBLICAR=false: genera el video pero no lo publica.
+name: Video de tráfico
+
+on:
+  workflow_dispatch:
+    inputs:
+      datos:
+        description: "JSON con hora, corredores, incidentes y (opcional) urgente"
+        required: true
+      publicar:
+        description: "Publicar en Facebook (no = solo generar, para pruebas)"
+        required: false
+        default: "si"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: video-trafico
+  cancel-in-progress: false
+
+jobs:
+  video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      WP_URL: ${{ secrets.WP_URL }}
+      WP_USER: ${{ secrets.WP_USER }}
+      WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+      QPV_SITE_URL: https://quepasavta.com
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+      TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+      TZ: America/Mexico_City
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar herramientas
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q -r scripts/hurricane-video/requirements.txt
+
+      - name: Generar video
+        env:
+          DATOS: ${{ inputs.datos }}
+        run: |
+          printf '%s' "$DATOS" > datos.json
+          python scripts/traffic-video/generate.py --payload datos.json --out out
+
+      - name: Guardar copia del video
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-trafico
+          path: |
+            out/video.mp4
+            out/portada.jpg
+            out/story.json
+          retention-days: 7
+
+      - uses: actions/setup-node@v5
+        if: vars.QPV_VIDEO_TRAFICO_PUBLICAR != 'false' && inputs.publicar != 'no'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Subir a WordPress y publicar el reel en Facebook
+        if: vars.QPV_VIDEO_TRAFICO_PUBLICAR != 'false' && inputs.publicar != 'no'
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsx scripts/robot/huracan.ts publicar out

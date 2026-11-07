@@ -149,10 +149,13 @@ export async function publishToFacebook(key: string): Promise<{ id: string; kind
   if (row.fbVideoId) return { id: row.fbVideoId, kind: "reel" };
   if (process.env.HURRICANE_VIDEO_PUBLISH === "false") throw new Error("Publicación desactivada (HURRICANE_VIDEO_PUBLISH=false).");
   const { pageId, token } = fbConfig();
+  // 2026-11-06: el mismo camino publica los videos de tráfico (key "trafico-…"):
+  // esos van sin inglés ni "Source: NHC" y con el patrocinio de tráfico.
+  const esTrafico = key.startsWith("trafico");
   // Texto en español y, debajo, en inglés (2026-10-24).
-  const en = row.caption ? await postEnIngles(row.caption.replace(/\s*Fuente: NHC \(Miami\)\.?\s*$/, "")).catch(() => null) : null;
+  const en = row.caption && !esTrafico ? await postEnIngles(row.caption.replace(/\s*Fuente: NHC \(Miami\)\.?\s*$/, "")).catch(() => null) : null;
   const { getPatrocinio, contarPublicacion } = await import("@/lib/business/patrocinios");
-  const pat = await getPatrocinio("huracanes");
+  const pat = await getPatrocinio(esTrafico ? "trafico" : "huracanes").catch(() => null);
   const description = (row.caption || "") + (en ? `\n\nEN: ${en} Source: NHC (Miami).` : "") + (pat ? `\n\nPresentado por ${pat.nombre}.` : "");
   try {
     const start = await graph(`/${pageId}/video_reels`, { upload_phase: "start" });
