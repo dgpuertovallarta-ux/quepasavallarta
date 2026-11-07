@@ -123,8 +123,9 @@ def mapa_tomtom(bbox, z: int) -> Mapa | None:
             if not base:
                 continue
             t = Image.open(io.BytesIO(base)).convert("RGBA")
-            for estilo in ("relative0-dark", "relative-dark", "relative"):
-                flujo = _get(f"https://api.tomtom.com/traffic/map/4/tile/flow/{estilo}/{z}/{tx}/{ty}.png?key={key}&thickness=8")
+            # thickness solo lo aceptan algunos estilos (TomTom contesta 400 con relative0-dark).
+            for estilo, extra in (("relative0-dark", ""), ("relative", "&thickness=8")):
+                flujo = _get(f"https://api.tomtom.com/traffic/map/4/tile/flow/{estilo}/{z}/{tx}/{ty}.png?key={key}{extra}")
                 if flujo:
                     f = Image.open(io.BytesIO(flujo)).convert("RGBA")
                     t.alpha_composite(f)
