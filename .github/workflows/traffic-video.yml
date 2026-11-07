@@ -71,7 +71,11 @@ jobs:
           for i, im in enumerate(ims):
               hoja.paste(im, (i * w, 0))
           b = io.BytesIO(); hoja.save(b, "JPEG", quality=70)
-          print("HOJA-INICIO" + base64.b64encode(b.getvalue()).decode() + "HOJA-FIN")
+          t = base64.b64encode(b.getvalue()).decode()
+          print("HOJA-INICIO")
+          for i in range(0, len(t), 900):
+              print("HOJA:" + t[i:i + 900])
+          print("HOJA-FIN")
           PY
 
       - name: Guardar copia del video

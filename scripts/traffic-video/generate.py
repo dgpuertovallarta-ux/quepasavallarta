@@ -85,7 +85,13 @@ def _get(url: str) -> bytes | None:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "QPV-Robot/1.0"}), timeout=20) as r:
             return r.read()
     except Exception as e:  # sin red / llave → mapa de respaldo
-        print("mosaico falló:", str(e)[:120])
+        cuerpo = ""
+        if hasattr(e, "read"):
+            try:
+                cuerpo = e.read().decode("utf-8", "replace")[:200]
+            except Exception:
+                pass
+        print("mosaico falló:", str(e)[:120], url.split("?")[0][-60:], cuerpo)
         return None
 
 
