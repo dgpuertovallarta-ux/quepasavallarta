@@ -197,7 +197,9 @@ def vista(m: Mapa, lat: float, lon: float, ancho: float, frac_y: float = 0.5):
 
 
 def caja(linea, lat, lon):
-    pts = linea or [[lat, lon]]
+    if not linea or len(linea) < 2:
+        return lat, lon, 0.03  # solo un punto: se ve el barrio alrededor
+    pts = linea
     las = [p[0] for p in pts]
     los = [p[1] for p in pts]
     clat, clon = (min(las) + max(las)) / 2, (min(los) + max(los)) / 2
