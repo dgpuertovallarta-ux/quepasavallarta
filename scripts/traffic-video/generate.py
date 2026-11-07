@@ -160,13 +160,49 @@ def preparar_mapa(bbox, z: int) -> Mapa:
     return mapa_tomtom(bbox, z) or mapa_respaldo(bbox)
 
 
-def recorte(m: Mapa, lat: float, lon: float, ancho_px: float) -> Image.Image:
-    """Recorta el mapa centrado en (lat, lon) con proporción 9:16 y lo escala a WxH."""
+_MAPAS: dict = {}
+
+
+def mapa_para(lat: float, lon: float, span_lat: float) -> tuple[Mapa, float]:
+    """Mapa (en caché) que cubre un área de `span_lat` grados de alto centrada en (lat, lon).
+    Devuelve el mapa y el ancho en píxeles de mapa que corresponde a la vista 9:16."""
+    span_lat = max(span_lat, 0.012)
+    span_lon = span_lat * W / H / math.cos(math.radians(lat))
+    z = 15 if span_lat < 0.03 else 14 if span_lat < 0.07 else 13
+    bbox = (lon - span_lon * 0.75, lat - span_lat * 0.75, lon + span_lon * 0.75, lat + span_lat * 0.75)
+    clave = (round(lat, 3), round(lon, 3), round(span_lat, 3), z)
+    if clave not in _MAPAS:
+        _MAPAS[clave] = preparar_mapa(bbox, z)
+    m = _MAPAS[clave]
+    x0, _ = m.px(lat, lon - span_lon / 2)
+    x1, _ = m.px(lat, lon + span_lon / 2)
+    return m, abs(x1 - x0)
+
+
+def vista(m: Mapa, lat: float, lon: float, ancho: float, frac_y: float = 0.5):
+    """Recorte 9:16 de `ancho` px de mapa con (lat, lon) a la altura `frac_y` de la
+    pantalla (0.36 = arriba de la tarjeta), escalado a WxH, y la función que
+    convierte (lat, lon) a píxeles de pantalla."""
     cx, cy = m.px(lat, lon)
-    alto = ancho_px * H / W
-    x0 = min(max(0, cx - ancho_px / 2), max(0, m.img.width - ancho_px))
-    y0 = min(max(0, cy - alto / 2), max(0, m.img.height - alto))
-    return m.img.crop((int(x0), int(y0), int(x0 + ancho_px), int(y0 + alto))).resize((W, H), Image.LANCZOS)
+    alto = ancho * H / W
+    x0 = min(max(0, cx - ancho / 2), max(0, m.img.width - ancho))
+    y0 = min(max(0, cy - alto * frac_y), max(0, m.img.height - alto))
+    img = m.img.crop((int(x0), int(y0), int(x0 + ancho), int(y0 + alto))).resize((W, H), Image.LANCZOS)
+
+    def a_pantalla(la, lo):
+        px, py = m.px(la, lo)
+        return (px - int(x0)) * W / ancho, (py - int(y0)) * H / alto
+
+    return img, a_pantalla
+
+
+def caja(linea, lat, lon):
+    pts = linea or [[lat, lon]]
+    las = [p[0] for p in pts]
+    los = [p[1] for p in pts]
+    clat, clon = (min(las) + max(las)) / 2, (min(los) + max(los)) / 2
+    span = max(max(las) - min(las), (max(los) - min(los)) * H / W * math.cos(math.radians(clat)))
+    return clat, clon, span * 2.4 + 0.008  # la línea cabe arriba de la tarjeta
 
 
 # ------------------------------------------------------------------ escenas
@@ -189,35 +225,68 @@ def hora_texto(dt: datetime) -> tuple[str, str]:
 
 
 def nombre_voz(n: str) -> str:
-    n = n.replace("Francisco Medina Ascencio", "Medina Ascencio").replace("Av.", "avenida").replace("→", "rumbo a")
+    n = n.replace("Francisco Medina Ascencio", "Medina Ascencio").replace("Av.", "avenida").replace("Blvd.", "bulevar")
+    n = n.replace("Prol.", "prolongación").replace("Carr.", "carretera").replace("→", "rumbo a")
     n = n.replace(" (", ", ").replace("(", "").replace(")", "")
     return " ".join(n.split())
+
+
+def color_foco(f: dict):
+    if f["tipo"] == "congestion":
+        return RED if f.get("retrasoMin", 0) >= 8 or f.get("magnitud", 0) >= 3 else ORANGE
+    return TIPO.get(f["tipo"], ("", ORANGE))[1]
+
+
+def etiqueta_foco(f: dict) -> str:
+    if f["tipo"] == "congestion":
+        return "TRÁFICO PESADO" if color_foco(f) == RED else "TRÁFICO LENTO"
+    return TIPO.get(f["tipo"], ("AVISO", YELLOW))[0]
+
+
+def voz_foco(f: dict) -> str:
+    calle = nombre_voz(f["calle"])
+    donde = calle + (f", rumbo a {nombre_voz(f['hacia'])}" if f.get("hacia") else "") + (f", en {f['zona']}" if f.get("zona") else "")
+    r = f.get("retrasoMin", 0)
+    km = f.get("largoKm", 0)
+    if f["tipo"] == "congestion":
+        nivel = "pesado" if color_foco(f) == RED else "lento"
+        extra = f": unos {r} minutos de retraso" if r >= 1 else ""
+        extra += f" en {str(km).replace('.0', '')} kilómetros" if km >= 0.5 and extra else ""
+        return f"En {donde} hay tráfico {nivel}{extra}."
+    if f["tipo"] == "accidente":
+        return f"En {donde} se reporta un accidente" + (f"; el retraso es de unos {r} minutos." if r >= 1 else ".")
+    if f["tipo"] == "cierre":
+        return f"Hay un cierre en {donde}. Busca una ruta alterna."
+    if f["tipo"] in ("obra", "carril"):
+        return f"Obras en {donde} reducen la circulación" + (f"; unos {r} minutos de retraso." if r >= 1 else ".")
+    return f"Encharcamiento en {donde}. Maneja con precaución."
 
 
 def guion_resumen(p: dict) -> list[Scene]:
     dt = datetime.fromisoformat(p["hora"]).astimezone(TZ)
     corta, voz_h = hora_texto(dt)
+    focos = list(p.get("focos", []))[:3]
     corr = sorted(p.get("corredores", []), key=lambda c: -c["retrasoMin"])
-    lentos = [c for c in corr if c["nivel"] != "fluido" and c["retrasoMin"] >= 2]
-    incs = [i for i in p.get("incidentes", []) if not i.get("soloMapa") and i["tipo"] in ("accidente", "cierre", "inundacion", "obra")][:3]
+    if not focos:
+        # Sin embotellamientos reportados: los corredores medidos que vayan lentos, con su ruta real.
+        for c in corr:
+            if c["nivel"] != "fluido" and c.get("ruta"):
+                focos.append({"tipo": "congestion", "calle": c["nombre"].split("(")[0].strip(), "hacia": "",
+                              "zona": "", "retrasoMin": c["retrasoMin"], "largoKm": 0,
+                              "magnitud": 3 if c["nivel"] == "pesado" else 2,
+                              "lat": c["ruta"][len(c["ruta"]) // 2][0], "lon": c["ruta"][len(c["ruta"]) // 2][1], "linea": c["ruta"]})
+        focos = focos[:2]
     s = [Scene("intro", f"Así va el tráfico en Puerto Vallarta a las {voz_h}.", 2.6, {"hora": corta})]
-    if lentos:
-        nombres = " y ".join(dict.fromkeys(nombre_voz(c["nombre"]).split(",")[0] for c in lentos[:2]))
-        general = f"Hay tráfico lento en {nombres}. El resto circula con normalidad."
+    if focos:
+        nombres = list(dict.fromkeys(nombre_voz(f["calle"]) for f in focos))
+        lista = nombres[0] if len(nombres) == 1 else ", ".join(nombres[:-1]) + " y " + nombres[-1]
+        s.append(Scene("mapa", f"Donde hay más tráfico ahora: {lista}.", 4.0, {"focos": focos}))
+        for k, f in enumerate(focos):
+            s.append(Scene("foco", voz_foco(f), 3.6, {"f": f, "n": k + 1}))
     else:
-        general = "Las principales vialidades circulan con fluidez."
-    s.append(Scene("mapa", general, 4.0, {"hora": corta}))
-    for c in lentos[:3]:
-        v = f"En {nombre_voz(c['nombre'])}, el trayecto toma {c['minutos']} minutos, {c['retrasoMin']} más de lo normal."
-        s.append(Scene("corredor", v, 3.2, {"c": c}))
-    if not lentos and corr:
-        s.append(Scene("fluido", "Buen momento para salir: no hay retrasos importantes en los corredores que medimos.", 3.0, {"corr": corr[:5]}))
-    if incs:
-        partes = []
-        for i in incs:
-            et = {"accidente": "un accidente", "cierre": "un cierre", "obra": "obras", "inundacion": "encharcamiento"}[i["tipo"]]
-            partes.append(f"{et} en {nombre_voz(i['calle'])}")
-        s.append(Scene("incidentes", "Toma en cuenta: " + ", ".join(partes) + ".", 3.5, {"incs": incs}))
+        s.append(Scene("mapa", "Las principales vialidades circulan con fluidez.", 3.5, {"focos": []}))
+        if corr:
+            s.append(Scene("fluido", "Buen momento para salir: no hay retrasos importantes en las avenidas principales.", 3.0, {"corr": corr[:5]}))
     s.append(Scene("outro", "¿Ves algo en el camino? Repórtalo en que pasa v t a punto com.", 3.0))
     return s
 
@@ -226,14 +295,13 @@ def guion_urgente(p: dict) -> list[Scene]:
     u = p["urgente"]
     dt = datetime.fromisoformat(p["hora"]).astimezone(TZ)
     corta, _ = hora_texto(dt)
-    lugar = nombre_voz(u["calle"]) + (f", a la altura de {nombre_voz(u['cruce'])}" if u.get("cruce") else "")
-    s = [
+    lugar = nombre_voz(u["calle"]) + (f", a la altura de {nombre_voz(u['cruce'])}" if u.get("cruce") else "") + (f", en {u['zona']}" if u.get("zona") else "")
+    return [
         Scene("urg_intro", f"Atención: se reporta un {u.get('tipoTexto', 'accidente')} en {nombre_voz(u['calle'])}.", 2.8, {"hora": corta, "u": u}),
         Scene("urg_mapa", f"Es en {lugar}." + (f" Hay un retraso de unos {u['retrasoMin']} minutos." if u.get("retrasoMin") else ""), 4.0, {"u": u}),
         Scene("urg_consejo", "Maneja con precaución y, si puedes, busca una ruta alterna.", 3.0, {"u": u}),
         Scene("outro", "Te seguimos informando en Qué Pasa Vallarta.", 2.6),
     ]
-    return s
 
 
 # ------------------------------------------------------------------ dibujo
@@ -264,11 +332,25 @@ def barra_progreso(d, t_total: float, t: float):
     d.rectangle((40, 40, 40 + (W - 80) * min(1, t / t_total), 48), fill=YELLOW)
 
 
-def pin(d, x, y, color, r=22, pulso=0.0):
+def pin(d, x, y, color, r=22, pulso=0.0, texto=""):
     if pulso:
         rr = r + 30 * pulso
         d.ellipse((x - rr, y - rr, x + rr, y + rr), outline=color + (int(200 * (1 - pulso)),), width=6)
     d.ellipse((x - r, y - r, x + r, y + r), fill=color, outline=WHITE, width=5)
+    if texto:
+        f = font(F_BLACK, int(r * 1.3))
+        w = d.textlength(texto, font=f)
+        d.text((x - w / 2, y - r * 0.78), texto, font=f, fill=WHITE)
+
+
+def trazo(d, pts, color, avance=1.0, ancho=16):
+    """Dibuja el tramo afectado (con borde blanco) hasta el `avance` (0..1)."""
+    if len(pts) < 2:
+        return
+    n = max(2, int(round(len(pts) * min(1.0, avance))))
+    tramo = pts[:n]
+    d.line(tramo, fill=(255, 255, 255, 230), width=ancho + 10, joint="curve")
+    d.line(tramo, fill=color + (255,), width=ancho, joint="curve")
 
 
 class Render:
@@ -277,35 +359,63 @@ class Render:
         self.scenes = scenes
         self.logo = Image.open(os.path.join(A, "logo.png")).convert("RGBA")
         self.logo.thumbnail((220, 220))
-        urg = p.get("urgente")
-        if urg:
-            self.mapa = preparar_mapa((urg["lon"] - 0.035, urg["lat"] - 0.05, urg["lon"] + 0.035, urg["lat"] + 0.05), 15)
-        else:
-            self.mapa = preparar_mapa(BBOX, 13)
+        self.clat, self.clon = (BBOX[1] + BBOX[3]) / 2 + 0.005, (BBOX[0] + BBOX[2]) / 2
+        self.general, self.ancho_general = mapa_para(self.clat, self.clon, (BBOX[3] - BBOX[1]) * 0.9)
+        self.tomtom = self.general.tomtom
+        # mapas acercados (se piden una sola vez)
+        self.zoom = {}
+        for s in scenes:
+            f = s.data.get("f") or s.data.get("u")
+            if f is not None and id(f) not in self.zoom:
+                clat, clon, span = caja(f.get("linea"), f["lat"], f["lon"])
+                self.zoom[id(f)] = (mapa_para(clat, clon, span), clat, clon)
+                self.tomtom = self.tomtom or self.zoom[id(f)][0][0].tomtom
         self.f_big = font(F_BLACK, 150)
         self.f_mid = font(F_BLACK, 92)
         self.f_sm = font(F_SEMI, 46)
         self.f_xs = font(F_REG, 34)
-
-    def fondo(self, lat, lon, ancho, oscuro=0.0):
-        img = recorte(self.mapa, lat, lon, ancho)
-        return oscurecer(img, oscuro) if oscuro else img
 
     def marca(self, img: Image.Image, t: float, total: float):
         img = img.convert("RGBA")
         d = ImageDraw.Draw(img, "RGBA")
         barra_progreso(d, total, t)
         img.alpha_composite(self.logo, (W - self.logo.width - 40, 70))
-        fuente = "Mapa y tráfico: © TomTom" if self.mapa.tomtom else "Datos: TomTom"
+        fuente = "Mapa y tráfico: © TomTom" if self.tomtom else "Datos: TomTom"
         d.text((40, H - 60), fuente, font=self.f_xs, fill=(255, 255, 255, 170))
         return img.convert("RGB")
 
+    def _general(self, escala=1.0, oscuro=0.0):
+        img, conv = vista(self.general, self.clat, self.clon, self.ancho_general * escala)
+        return (oscurecer(img, oscuro) if oscuro else img), conv
+
+    def _zoom(self, f, escala=1.0, oscuro=0.0, frac_y=0.36):
+        (m, ancho), clat, clon = self.zoom[id(f)]
+        img, conv = vista(m, clat, clon, ancho * escala, frac_y)
+        return (oscurecer(img, oscuro) if oscuro else img), conv
+
+    def tarjeta(self, d, f, y0=1250):
+        col = color_foco(f)
+        d.rectangle((0, y0, W, 1740), fill=NAVY + (232,))
+        d.rectangle((0, y0, 22, 1740), fill=col)
+        et = etiqueta_foco(f)
+        d.rounded_rectangle((70, y0 + 34, 70 + d.textlength(et, font=self.f_sm) + 50, y0 + 104), 14, fill=col)
+        d.text((95, y0 + 42), et, font=self.f_sm, fill=WHITE)
+        y = texto_centrado(d, y0 + 128, f["calle"].upper(), font(F_BLACK, 78 if len(f["calle"]) > 22 else 90), WHITE)
+        sub = " · ".join(x for x in (f"hacia {f['hacia']}" if f.get("hacia") else "", f.get("zona", "")) if x)
+        if sub:
+            y = texto_centrado(d, y, sub, self.f_sm, YELLOW)
+        partes = []
+        if f.get("retrasoMin", 0) >= 1:
+            partes.append(f"+{f['retrasoMin']} min")
+        if f.get("largoKm", 0) >= 0.3:
+            partes.append(f"{str(f['largoKm']).replace('.0', '')} km")
+        if partes:
+            texto_centrado(d, y + 6, "  ·  ".join(partes), font(F_BLACK, 96), col)
+
     def frame(self, s: Scene, u: float, t: float, total: float) -> Image.Image:
         """u = avance dentro de la escena (0..1)."""
-        cx_lat, cx_lon = (BBOX[1] + BBOX[3]) / 2, (BBOX[0] + BBOX[2]) / 2
-        ancho_general = self.mapa.img.width * 0.62
         if s.kind == "intro":
-            img = self.fondo(cx_lat, cx_lon, ancho_general * (1.1 - 0.05 * u), 0.55)
+            img, _ = self._general(1.1 - 0.05 * u, 0.55)
             d = ImageDraw.Draw(img, "RGBA")
             d.text((70, 560), "QPV AL VOLANTE", font=self.f_sm, fill=YELLOW)
             y = 630
@@ -315,32 +425,32 @@ class Render:
             d.rectangle((70, y + 30, 70 + 520, y + 120), fill=RED)
             d.text((96, y + 40), f"VALLARTA · {s.data['hora']}", font=self.f_sm, fill=WHITE)
         elif s.kind == "mapa":
-            img = self.fondo(cx_lat, cx_lon, ancho_general * (1.0 - 0.18 * u), 0.0)
+            img, conv = self._general(1.0 - 0.15 * u)
             d = ImageDraw.Draw(img, "RGBA")
-            self._pins(d, img_ancho=ancho_general * (1.0 - 0.18 * u), clat=cx_lat, clon=cx_lon, t=t)
+            for q in self.p.get("puntos", [])[:10]:
+                x, y = conv(q["lat"], q["lon"])
+                if 0 < x < W and 0 < y < H:
+                    pin(d, x, y, TIPO.get(q["tipo"], ("", YELLOW))[1], 12)
+            for k, f in enumerate(s.data["focos"]):
+                if f.get("linea"):
+                    trazo(d, [conv(a, b) for a, b in f["linea"]], color_foco(f), min(1, u * 2.2), 12)
+                x, y = conv(f["lat"], f["lon"])
+                pin(d, x, y, color_foco(f), 30, (t * 0.8) % 1, str(k + 1))
             d.rectangle((0, 140, W, 300), fill=NAVY + (215,))
             d.text((60, 160), "EN VIVO", font=self.f_sm, fill=RED)
-            d.text((60, 210), "Tráfico ahora en Vallarta", font=self.f_sm, fill=WHITE)
+            d.text((60, 210), "Donde hay más tráfico" if s.data["focos"] else "Tráfico ahora en Vallarta", font=self.f_sm, fill=WHITE)
             self._leyenda(d)
-        elif s.kind == "corredor":
-            c = s.data["c"]
-            lat = (c["origen"][0] + c["destino"][0]) / 2
-            lon = (c["origen"][1] + c["destino"][1]) / 2
-            img = self.fondo(lat, lon, ancho_general * 0.55 * (1.0 - 0.08 * u), 0.15)
+        elif s.kind == "foco":
+            f = s.data["f"]
+            img, conv = self._zoom(f, 1.08 - 0.12 * u, 0.1)
             d = ImageDraw.Draw(img, "RGBA")
-            col = SEM.get(c["nivel"], ORANGE)
-            d.rectangle((0, 1180, W, 1720), fill=NAVY + (230,))
-            d.rectangle((0, 1180, 22, 1720), fill=col)
-            limpio = c["nombre"].replace("→", "hacia")  # la tipografía no trae flecha
-            nombre = limpio.split("(")[0].strip()
-            sentido = limpio.split("(")[1].rstrip(")") if "(" in limpio else ""
-            y = texto_centrado(d, 1220, nombre.upper(), self.f_mid, WHITE)
-            if sentido:
-                y = texto_centrado(d, y, sentido, self.f_sm, YELLOW)
-            d.text((80, y + 20), f"{c['minutos']} min", font=self.f_big, fill=col)
-            d.text((80, y + 190), f"+{c['retrasoMin']} min de lo normal", font=self.f_sm, fill=WHITE)
+            if f.get("linea"):
+                trazo(d, [conv(a, b) for a, b in f["linea"]], color_foco(f), min(1, 0.15 + u * 1.8), 18)
+            x, y = conv(f["lat"], f["lon"])
+            pin(d, x, y, color_foco(f), 30, (t * 0.9) % 1, str(s.data["n"]))
+            self.tarjeta(d, f)
         elif s.kind == "fluido":
-            img = self.fondo(cx_lat, cx_lon, ancho_general * 0.82, 0.6)
+            img, _ = self._general(0.82, 0.6)
             d = ImageDraw.Draw(img, "RGBA")
             d.text((70, 420), "TODO FLUYE", font=self.f_big, fill=GREEN)
             y = 640
@@ -348,27 +458,16 @@ class Render:
                 d.ellipse((70, y + 12, 104, y + 46), fill=SEM.get(c["nivel"], GREEN))
                 d.text((126, y), f"{c['nombre'].replace('→', 'hacia').split('(')[0].strip()} · {c['minutos']} min", font=self.f_sm, fill=WHITE)
                 y += 92
-        elif s.kind == "incidentes":
-            img = self.fondo(cx_lat, cx_lon, ancho_general * 0.82, 0.62)
-            d = ImageDraw.Draw(img, "RGBA")
-            d.text((70, 420), "TOMA EN CUENTA", font=self.f_mid, fill=YELLOW)
-            y = 580
-            for k, i in enumerate(s.data["incs"]):
-                if u < k * 0.18:
-                    break
-                etiqueta, col = TIPO.get(i["tipo"], ("AVISO", YELLOW))
-                d.rounded_rectangle((70, y, 70 + d.textlength(etiqueta, font=self.f_sm) + 50, y + 70), 14, fill=col)
-                d.text((95, y + 8), etiqueta, font=self.f_sm, fill=WHITE if col != YELLOW else NAVY)
-                y = texto_centrado(d, y + 90, i["texto"], self.f_sm, WHITE, W - 140) + 50
         elif s.kind in ("urg_intro", "urg_mapa", "urg_consejo"):
             uu = s.data["u"]
-            acerc = {"urg_intro": 1.0, "urg_mapa": 0.75 - 0.15 * u, "urg_consejo": 0.6}[s.kind]
-            ancho = self.mapa.img.width * acerc
-            img = self.fondo(uu["lat"], uu["lon"], ancho, 0.5 if s.kind == "urg_intro" else 0.05)
+            esc = {"urg_intro": 1.3, "urg_mapa": 1.05 - 0.15 * u, "urg_consejo": 0.9}[s.kind]
+            img, conv = self._zoom(uu, esc, 0.5 if s.kind == "urg_intro" else 0.05, 0.5 if s.kind == "urg_intro" else 0.38)
             d = ImageDraw.Draw(img, "RGBA")
-            x, y = self._a_pantalla(uu["lat"], uu["lon"], uu["lat"], uu["lon"], ancho)
             if s.kind != "urg_intro":
-                pin(d, x, y, RED, 30, (t * 1.2) % 1)
+                if uu.get("linea"):
+                    trazo(d, [conv(a, b) for a, b in uu["linea"]], RED, 1.0, 18)
+                x, y = conv(uu["lat"], uu["lon"])
+                pin(d, x, y, RED, 32, (t * 1.2) % 1)
             if s.kind == "urg_intro":
                 parpadeo = int(t * 3) % 2 == 0
                 d.rectangle((0, 520, W, 760), fill=(RED if parpadeo else (170, 20, 35)) + (240,))
@@ -376,11 +475,12 @@ class Render:
                 texto_centrado(d, 820, uu["calle"].upper(), self.f_mid, WHITE)
                 texto_centrado(d, 1060, s.data["hora"], self.f_sm, YELLOW)
             elif s.kind == "urg_mapa":
-                d.rectangle((0, 1380, W, 1720), fill=NAVY + (235,))
-                d.rectangle((0, 1380, 22, 1720), fill=RED)
+                d.rectangle((0, 1380, W, 1740), fill=NAVY + (235,))
+                d.rectangle((0, 1380, 22, 1740), fill=RED)
                 yy = texto_centrado(d, 1410, uu["calle"].upper(), self.f_mid, WHITE)
-                if uu.get("cruce"):
-                    texto_centrado(d, yy + 10, f"a la altura de {uu['cruce']}", self.f_sm, YELLOW)
+                sub = " · ".join(x for x in (f"a la altura de {uu['cruce']}" if uu.get("cruce") else "", uu.get("zona", "")) if x)
+                if sub:
+                    texto_centrado(d, yy + 10, sub, self.f_sm, YELLOW)
             else:
                 d.rectangle((0, 1300, W, 1720), fill=NAVY + (235,))
                 texto_centrado(d, 1340, "PRECAUCIÓN", self.f_mid, YELLOW)
@@ -395,29 +495,15 @@ class Render:
             texto_centrado(d, 1200, "Repórtalo en quepasavta.com/reporte", self.f_sm, YELLOW)
         return self.marca(img, t, total)
 
-    def _a_pantalla(self, lat, lon, clat, clon, ancho):
-        """Coordenadas del mapa → píxeles de pantalla para un recorte centrado en (clat, clon)."""
-        cx, cy = self.mapa.px(clat, clon)
-        alto = ancho * H / W
-        x0 = min(max(0, cx - ancho / 2), max(0, self.mapa.img.width - ancho))
-        y0 = min(max(0, cy - alto / 2), max(0, self.mapa.img.height - alto))
-        px, py = self.mapa.px(lat, lon)
-        return (px - x0) * W / ancho, (py - y0) * H / alto
-
-    def _pins(self, d, img_ancho, clat, clon, t):
-        for i in self.p.get("incidentes", [])[:8]:
-            if i["tipo"] not in TIPO or "lat" not in i:
-                continue
-            x, y = self._a_pantalla(i["lat"], i["lon"], clat, clon, img_ancho)
-            if 0 < x < W and 0 < y < H:
-                pin(d, x, y, TIPO[i["tipo"]][1], 18, (t * 0.9) % 1 if i["tipo"] == "accidente" else 0)
-
     def _leyenda(self, d):
         y = H - 190
         d.rounded_rectangle((40, y - 20, W - 40, y + 80), 18, fill=NAVY + (215,))
         x = 70
         for txt, col in (("Fluido", GREEN), ("Lento", ORANGE), ("Pesado", RED), ("Accidente", RED)):
-            d.rectangle((x, y + 18, x + 46, y + 34), fill=col) if txt != "Accidente" else d.ellipse((x + 8, y + 8, x + 40, y + 40), fill=col, outline=WHITE, width=3)
+            if txt == "Accidente":
+                d.ellipse((x + 8, y + 8, x + 40, y + 40), fill=col, outline=WHITE, width=3)
+            else:
+                d.rectangle((x, y + 18, x + 46, y + 34), fill=col)
             d.text((x + 58, y + 4), txt, font=self.f_xs, fill=WHITE)
             x += 240
 
@@ -447,7 +533,7 @@ def generar(p: dict, out: str) -> dict:
         i = max(j for j, st in enumerate(starts) if st <= t)
         u = (t - starts[i]) / scenes[i].dur
         img = r.frame(scenes[i], u, t, total)
-        if portada is None and scenes[i].kind in ("mapa", "urg_mapa") and u > 0.5:
+        if portada is None and scenes[i].kind in ("mapa", "urg_mapa") and u > 0.6:
             portada = img
         ff.stdin.write(img.tobytes())
     ff.stdin.close()
@@ -468,7 +554,7 @@ def generar(p: dict, out: str) -> dict:
         caption = f"{title}\n\n" + " ".join(s.voice for s in scenes[1:-1]) + \
             "\n\nTráfico en vivo: quepasavta.com/trafico\n¿Ves algo en el camino? Repórtalo en quepasavta.com/reporte"
         key = f"trafico-{dt.strftime('%Y%m%d-%H')}"
-    story = {"key": key, "title": title, "caption": caption, "duracion": round(total, 1), "voz": any(c is not None for c in clips), "tomtom": r.mapa.tomtom}
+    story = {"key": key, "title": title, "caption": caption, "duracion": round(total, 1), "voz": any(c is not None for c in clips), "tomtom": r.tomtom}
     json.dump(story, open(os.path.join(out, "story.json"), "w"), ensure_ascii=False, indent=2)
     return story
 

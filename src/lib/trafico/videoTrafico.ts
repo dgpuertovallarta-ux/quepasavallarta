@@ -13,7 +13,7 @@
  */
 import { CORREDORES } from "./corredores";
 import type { EstadoCorredor, Incidente } from "./tomtom";
-import { agruparIncidentes, limpiarCalle, renglonIncidente } from "./resumen";
+import { limpiarCalle, zonaDe } from "./resumen";
 
 export const VIDEO_TRAFICO_ACTIVO = process.env.QPV_TRAFICO_VIDEO !== "0";
 
@@ -46,26 +46,63 @@ function corredoresDatos(corredores: EstadoCorredor[]) {
   });
 }
 
+/**
+ * 2026-11-06 — «Donde hay más tráfico»: en vez de recorrer corredores fijos, el
+ * video va a los tramos con más retraso que reporta TomTom en ese momento
+ * (embotellamientos, accidentes, cierres), con el tramo real dibujado en el mapa.
+ */
+const TIPOS_FOCO = new Set(["congestion", "accidente", "cierre", "carril", "obra", "inundacion"]);
+
+function puntaje(i: Incidente): number {
+  const km = (i.largoM ?? 0) / 1000;
+  const extra = i.tipo === "accidente" ? 6 : i.tipo === "cierre" ? 4 : 0;
+  return i.retrasoMin * 2 + i.magnitud * 3 + Math.min(km, 5) + extra;
+}
+
+export function focosDeTrafico(incs: Incidente[], n = 3) {
+  const vistos = new Set<string>();
+  const focos = [];
+  for (const i of [...incs].filter((x) => TIPOS_FOCO.has(x.tipo)).sort((a, b) => puntaje(b) - puntaje(a))) {
+    // Embotellamientos chicos no son noticia; accidentes y cierres sí.
+    if (i.tipo === "congestion" && i.retrasoMin < 2 && i.magnitud < 2) continue;
+    if (i.tipo === "obra" && i.retrasoMin < 3) continue;
+    const calle = limpiarCalle(i.de) || limpiarCalle(i.a);
+    if (!calle) continue;
+    const clave = `${calle}|${i.tipo === "congestion" ? "" : i.tipo}`; // el mismo tramo en los dos sentidos cuenta una vez
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    const hacia = limpiarCalle(i.a);
+    focos.push({
+      tipo: i.tipo,
+      calle,
+      hacia: hacia && hacia !== calle ? hacia : "",
+      zona: zonaDe(i.lat, i.lon) ?? "",
+      retrasoMin: i.retrasoMin,
+      largoKm: i.largoM ? Math.round(i.largoM / 100) / 10 : 0,
+      magnitud: i.magnitud,
+      lat: i.lat,
+      lon: i.lon,
+      linea: i.linea,
+    });
+    if (focos.length >= n) break;
+  }
+  return focos;
+}
+
 /** Video del resumen de las 7, 14 y 18 h. Devuelve false si no se pudo lanzar (sale la postal). */
 export async function lanzarVideoResumen(corredores: EstadoCorredor[], incs: Incidente[]): Promise<boolean> {
-  const agrupados = agruparIncidentes(incs).filter((r) => r.tipo !== "vehiculo");
-  const elegidos = [...agrupados.filter((r) => r.nuevo), ...agrupados.filter((r) => !r.nuevo)].slice(0, 3);
-  const incidentes = [
-    ...elegidos.map((r) => {
-      const { t, d } = renglonIncidente(r);
-      return { tipo: r.tipo, calle: r.calle, texto: d ? `${t} · ${d}` : t };
-    }),
-  ];
-  // Puntos en el mapa: los accidentes y cierres con coordenadas (TomTom).
+  const focos = focosDeTrafico(incs, 3);
+  // Puntos chicos en el mapa general: el resto de accidentes y cierres.
   const puntos = incs
     .filter((i) => ["accidente", "cierre", "obra", "inundacion"].includes(i.tipo))
-    .slice(0, 8)
-    .map((i) => ({ tipo: i.tipo, calle: limpiarCalle(i.de) || "", texto: "", lat: i.lat, lon: i.lon }));
+    .slice(0, 10)
+    .map((i) => ({ tipo: i.tipo, lat: i.lat, lon: i.lon }));
   return lanzar({
     tipo: "resumen",
     hora: new Date().toISOString(),
+    focos,
+    puntos,
     corredores: corredoresDatos(corredores),
-    incidentes: [...incidentes, ...puntos.map((p) => ({ ...p, soloMapa: true }))],
   });
 }
 
@@ -114,7 +151,8 @@ export async function lanzarVideoUrgente(i: Incidente): Promise<boolean> {
     tipo: "urgente",
     hora: new Date().toISOString(),
     corredores: [],
-    incidentes: [],
+    focos: [],
+    puntos: [],
     urgente: {
       id: String(i.id).toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40) || String(Date.now()),
       etiqueta: "ACCIDENTE",
@@ -124,6 +162,8 @@ export async function lanzarVideoUrgente(i: Incidente): Promise<boolean> {
       retrasoMin: i.retrasoMin || 0,
       lat: i.lat,
       lon: i.lon,
+      linea: i.linea,
+      zona: zonaDe(i.lat, i.lon) ?? "",
     },
   });
 }

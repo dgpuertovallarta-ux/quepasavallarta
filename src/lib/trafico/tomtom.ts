@@ -20,16 +20,31 @@ export type Incidente = {
   lat: number;
   lon: number;
   inicio?: string;
+  /** Tramo afectado [lat, lon] (máx. 40 puntos) y su largo en metros (2026-11-06, para el video). */
+  linea?: [number, number][];
+  largoM?: number;
 };
 
 type TomTomIncidente = {
   geometry?: { type?: string; coordinates?: number[] | number[][] };
   properties?: {
     id?: string | number; iconCategory?: number; magnitudeOfDelay?: number; events?: { description?: string }[];
-    startTime?: string; from?: string; to?: string; delay?: number;
+    startTime?: string; from?: string; to?: string; delay?: number; length?: number;
   };
 };
-type TomTomRuta = { routes?: { summary?: { travelTimeInSeconds?: number; noTrafficTravelTimeInSeconds?: number; trafficDelayInSeconds?: number } }[] };
+type TomTomRuta = {
+  routes?: {
+    summary?: { travelTimeInSeconds?: number; noTrafficTravelTimeInSeconds?: number; trafficDelayInSeconds?: number };
+    legs?: { points?: { latitude: number; longitude: number }[] }[];
+  }[];
+};
+
+/** Reduce una línea a máx. n puntos (para mandarla al video sin pesar de más). */
+export function adelgazar(pts: [number, number][], n = 40): [number, number][] {
+  if (pts.length <= n) return pts;
+  const paso = (pts.length - 1) / (n - 1);
+  return Array.from({ length: n }, (_, k) => pts[Math.round(k * paso)]);
+}
 
 const CATEGORIAS: Record<number, Incidente["tipo"]> = {
   1: "accidente", 6: "congestion", 7: "carril", 8: "cierre", 9: "obra", 11: "inundacion", 14: "vehiculo",
@@ -55,6 +70,8 @@ export async function incidentes(): Promise<Incidente[]> {
       magnitud: p.magnitudeOfDelay ?? 0,
       lon: coords?.[0], lat: coords?.[1],
       inicio: p.startTime,
+      linea: i.geometry?.type === "LineString" ? adelgazar((g as number[][]).map((c) => [c[1], c[0]] as [number, number])) : undefined,
+      largoM: p.length,
     } as Incidente;
   }).filter((x) => Number.isFinite(x.lat));
 }
@@ -66,6 +83,8 @@ export type EstadoCorredor = {
   minutosLibre: number;   // sin tráfico
   retrasoMin: number;
   nivel: "fluido" | "lento" | "pesado";
+  /** Ruta real del corredor [lat, lon] según TomTom (para dibujarla en el video). */
+  ruta?: [number, number][];
 };
 
 export async function medirCorredor(c: Corredor): Promise<EstadoCorredor> {
@@ -73,11 +92,13 @@ export async function medirCorredor(c: Corredor): Promise<EstadoCorredor> {
   const url = `https://api.tomtom.com/routing/1/calculateRoute/${ruta}/json?key=${KEY()}&traffic=true&computeTravelTimeFor=all&routeType=fastest&travelMode=car`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(`TomTom ruta ${c.id} ${r.status}`);
-  const s = ((await r.json()) as TomTomRuta).routes?.[0]?.summary ?? {};
+  const ruta0 = ((await r.json()) as TomTomRuta).routes?.[0];
+  const s = ruta0?.summary ?? {};
+  const trazo = adelgazar((ruta0?.legs ?? []).flatMap((l) => l.points ?? []).map((q) => [q.latitude, q.longitude] as [number, number]));
   const minutos = Math.round((s.travelTimeInSeconds ?? 0) / 60);
   const minutosLibre = Math.round((s.noTrafficTravelTimeInSeconds ?? s.travelTimeInSeconds ?? 0) / 60);
   const retrasoSeg = s.trafficDelayInSeconds ?? Math.max(0, (s.travelTimeInSeconds ?? 0) - (s.noTrafficTravelTimeInSeconds ?? s.travelTimeInSeconds ?? 0));
   const retrasoMin = Math.max(0, Math.round(retrasoSeg / 60));
   const nivel = retrasoMin >= c.umbralMin ? "pesado" : retrasoMin >= Math.ceil(c.umbralMin / 2) ? "lento" : "fluido";
-  return { id: c.id, nombre: c.nombre, minutos, minutosLibre, retrasoMin, nivel };
+  return { id: c.id, nombre: c.nombre, minutos, minutosLibre, retrasoMin, nivel, ruta: trazo.length > 1 ? trazo : undefined };
 }
