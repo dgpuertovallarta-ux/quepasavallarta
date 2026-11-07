@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       datos:
-        description: "JSON con hora, corredores, incidentes y (opcional) urgente"
+        description: "JSON con hora, focos, puntos, corredores y (opcional) urgente — o EN_VIVO para armarlo con TomTom ahora"
         required: true
       publicar:
         description: "Publicar en Facebook (no = solo generar, para pruebas)"
@@ -47,11 +47,23 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
           pip install -q -r scripts/hurricane-video/requirements.txt
 
+      - uses: actions/setup-node@v5
+        if: inputs.datos == 'EN_VIVO'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Datos de TomTom en vivo (prueba)
+        if: inputs.datos == 'EN_VIVO'
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsx scripts/robot/datos-video-trafico.ts > datos.json
+
       - name: Generar video
         env:
           DATOS: ${{ inputs.datos }}
         run: |
-          printf '%s' "$DATOS" > datos.json
+          if [ "$DATOS" != "EN_VIVO" ]; then printf '%s' "$DATOS" > datos.json; fi
           python scripts/traffic-video/generate.py --payload datos.json --out out
 
       - name: Hoja de cuadros para revisar (solo pruebas)
