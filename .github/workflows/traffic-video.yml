@@ -78,6 +78,15 @@ jobs:
           print("HOJA-FIN")
           PY
 
+      - name: Vista previa del video en el registro (solo pruebas)
+        if: inputs.publicar == 'no'
+        run: |
+          ffmpeg -loglevel error -y -i out/video.mp4 -vf scale=540:-2 -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 96k -movflags +faststart out/preview.mp4
+          ls -l out/preview.mp4
+          echo "VIDEO-INICIO"
+          base64 -w 900 out/preview.mp4 | sed 's/^/VID:/'
+          echo "VIDEO-FIN"
+
       - name: Guardar copia del video
         uses: actions/upload-artifact@v4
         with:
