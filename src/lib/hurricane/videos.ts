@@ -189,3 +189,56 @@ export async function publishToFacebook(key: string): Promise<{ id: string; kind
     }
   }
 }
+
+/**
+ * 2026-11-07: el ModSecurity de HostGator rechaza (406) subir MP4 a /wp/v2/media, así que el
+ * video ya no se puede alojar en WordPress. Este camino sube los bytes directo a Facebook
+ * (reel por carga binaria; si falla, video normal de la página por multipart).
+ */
+export async function publishFileToFacebook(key: string, video: Buffer, caption: string, title: string): Promise<{ id: string; kind: "reel" | "video" }> {
+  if (video.subarray(4, 8).toString("latin1") !== "ftyp") throw new Error("El archivo no es un MP4 válido.");
+  const previo = await getVideo(key).catch(() => null);
+  if (previo?.fbVideoId) return { id: previo.fbVideoId, kind: "reel" };
+  await upsert(key, { status: "stored", caption: caption.slice(0, 2000), title: title.slice(0, 200), error: null }).catch((e) => console.warn("registro:", (e as Error).message));
+  const { pageId, token } = fbConfig();
+  const esTrafico = key.startsWith("trafico");
+  const en = caption && !esTrafico ? await postEnIngles(caption.replace(/\s*Fuente: NHC \(Miami\)\.?\s*$/, "")).catch(() => null) : null;
+  const { getPatrocinio, contarPublicacion } = await import("@/lib/business/patrocinios");
+  const pat = await getPatrocinio(esTrafico ? "trafico" : "huracanes").catch(() => null);
+  const description = (caption || "") + (en ? `\n\nEN: ${en} Source: NHC (Miami).` : "") + (pat ? `\n\nPresentado por ${pat.nombre}.` : "");
+  const marcar = async (id: string, error: string | null) => {
+    await upsert(key, { status: "published", fb_video_id: id, error }).catch((e) => console.warn("registro:", (e as Error).message));
+    if (pat) await contarPublicacion(pat.id, caption?.split(":")[0] || key).catch(() => undefined);
+  };
+  try {
+    const start = await graph(`/${pageId}/video_reels`, { upload_phase: "start" });
+    const videoId = String(start.video_id);
+    const up = await fetch(`https://rupload.facebook.com/video-upload/${GRAPH_API_VERSION}/${videoId}`, {
+      method: "POST",
+      headers: { Authorization: `OAuth ${token}`, offset: "0", file_size: String(video.length), "Content-Type": "application/octet-stream" },
+      body: new Uint8Array(video),
+    });
+    const upJson = (await up.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
+    if (!up.ok || upJson.error) throw new Error(upJson.error?.message || `rupload ${up.status}`);
+    await graph(`/${pageId}/video_reels`, { upload_phase: "finish", video_id: videoId, video_state: "PUBLISHED", description });
+    await marcar(videoId, null);
+    return { id: videoId, kind: "reel" };
+  } catch (reelErr) {
+    try {
+      const form = new FormData();
+      form.set("access_token", token);
+      form.set("description", description);
+      if (title) form.set("title", title.slice(0, 200));
+      form.set("source", new Blob([new Uint8Array(video)], { type: "video/mp4" }), "video.mp4");
+      const res = await fetch(`https://graph-video.facebook.com/${GRAPH_API_VERSION}/${pageId}/videos`, { method: "POST", body: form });
+      const json = (await res.json().catch(() => ({}))) as { id?: string; error?: { message?: string } };
+      if (!res.ok || !json.id) throw new Error(json.error?.message || `videos ${res.status}`);
+      await marcar(json.id, `reel: ${(reelErr as Error).message}`);
+      return { id: json.id, kind: "video" };
+    } catch (videoErr) {
+      const msg = `reel: ${(reelErr as Error).message} · video: ${(videoErr as Error).message}`;
+      await upsert(key, { status: "failed", error: msg.slice(0, 1000) }).catch(() => undefined);
+      throw new Error(msg);
+    }
+  }
+}
